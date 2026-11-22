@@ -5,6 +5,8 @@
     <setters>
       <set name="level">1</set>
       <set name="time">1 action</set>
+      <set name="isConcentration">true</set>
+      <set name="duration">Concentration, up to 1 minute</set>
       <set name="range">60 feet</set>
       <set name="materialComponent">a copper reflector worth 5 gp</set>
     </setters>
@@ -23,7 +25,7 @@
   </element>
   <element id="ID_TEST_SPELL_SHIELD_FLASH" name="Shield Flash" type="Spell" source="Synthetic Test Content">
     <description><p>Make a ranged spell attack as you release the flash.</p></description>
-    <setters><set name="time">1 reaction</set><set name="range">15 feet</set></setters>
+    <setters><set name="time">1 reaction</set><set name="range">15 feet</set><set name="duration">Concentration, up to 2 rounds</set></setters>
   </element>
   <element id="ID_TEST_ITEM_SCROLL_FLARE" name="Scroll of Flare" type="Magic Item" source="Synthetic Test Content">
     <description><p>The parchment vanishes after use.</p></description>

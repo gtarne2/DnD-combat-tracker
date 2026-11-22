@@ -1,0 +1,39 @@
+<section id="concentration" aria-labelledby="concentration-heading">
+  <h2 id="concentration-heading">Concentration</h2>
+  <div class="focus-panel">
+    <div>
+      <p><strong id="active-concentration">None active</strong></p>
+      <p id="concentration-duration" hidden></p>
+      <div id="concentration-actions" hidden>
+        <form id="concentration-time" class="focus-form">
+          <label>Elapsed <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
+          <label>Unit <select name="unit"><option value="6">Rounds</option><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select></label>
+          <button type="submit">Advance time</button>
+        </form>
+        <button id="end-concentration" type="button">End concentration</button>
+      </div>
+    </div>
+    <form id="concentration-damage" class="focus-form">
+      <label>Damage taken <input name="damage" type="number" min="0" max="4294967295" required></label>
+      <label>Rules <select id="concentration-rules"><option value="2014">2014</option><option value="2024">2024</option></select></label>
+      <button type="submit">Record damage</button>
+    </form>
+    <div id="concentration-save" class="focus-save" hidden>
+      <p><strong id="concentration-save-prompt"></strong></p>
+      <button type="button" data-save-result="success">Save succeeded</button>
+      <button type="button" data-save-result="failure">Save failed</button>
+    </div>
+    <p id="concentration-last" class="focus-feedback" hidden></p>
+    <p id="encounter-status" class="focus-feedback" role="status"></p>
+  </div>
+</section>
+<dialog id="replace-concentration" aria-labelledby="replace-heading" aria-describedby="replace-message">
+  <form method="dialog">
+    <h2 id="replace-heading">Replace concentration?</h2>
+    <p id="replace-message"></p>
+    <div class="focus-form">
+      <button value="keep" autofocus>Keep current</button>
+      <button value="replace">Replace concentration</button>
+    </div>
+  </form>
+</dialog>

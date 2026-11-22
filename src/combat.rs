@@ -4,6 +4,7 @@ use crate::aurora::{
     CharacterProfile, ContentDefinition, ContentElement, ContentNode, ImportedCharacter,
     SpellcastingStats, is_feature_kind,
 };
+use crate::concentration::ConcentrationSpell;
 use crate::inventory::{ConsumableUses, consumable_amounts, consumable_key, is_scroll};
 
 mod html;
@@ -71,6 +72,7 @@ pub struct CombatOption {
     pub details: Vec<CombatDetail>,
     pub description: Vec<ContentNode>,
     pub consumable: Option<ConsumableAmount>,
+    pub concentration: Option<ConcentrationSpell>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -288,6 +290,30 @@ impl CombatSheet {
         );
         let mechanics = linked_spell.or(definition);
         let time = setter(mechanics, "time");
+        if matches!(kind, OptionKind::Spell | OptionKind::Scroll) {
+            let duration = setter(mechanics, "duration");
+            let concentration = setter(mechanics, "isConcentration").map_or_else(
+                || {
+                    duration.as_deref().is_some_and(|value| {
+                        value.to_ascii_lowercase().starts_with("concentration")
+                    })
+                },
+                |flag| flag.eq_ignore_ascii_case("true"),
+            );
+            if concentration {
+                let spell_id = mechanics
+                    .and_then(|spell| attr(&spell.element, "id"))
+                    .unwrap_or(id);
+                let spell_name = linked_spell
+                    .and_then(|spell| spell.name.as_deref())
+                    .unwrap_or(name);
+                option.concentration = Some(ConcentrationSpell::new(
+                    spell_id.to_owned(),
+                    spell_name.to_owned(),
+                    duration,
+                ));
+            }
+        }
         option.detail("Casting time", time.as_deref());
         option.detail("Range", setter(mechanics, "range"));
         let damage = setter(mechanics, "damage");
@@ -400,6 +426,7 @@ impl CombatOption {
             details: Vec::new(),
             description: Vec::new(),
             consumable: None,
+            concentration: None,
         }
     }
 

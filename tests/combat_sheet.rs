@@ -226,3 +226,29 @@ fn imports_consumable_quantities_without_treating_reusable_charges_as_units() {
     assert!(html.contains("aria-label=\"Use Uncertain Draught Stack\" disabled"));
     assert!(!html.contains("aria-label=\"Use Signal Rod\""));
 }
+
+#[test]
+fn exposes_concentration_from_a_spell_and_a_generated_scroll() {
+    let sheet = sheet();
+    let spell = option(&sheet, ActionGroup::Action, "Flare")
+        .concentration
+        .as_ref()
+        .unwrap();
+    assert_eq!(spell.duration_seconds, Some(60));
+    let scroll = option(&sheet, ActionGroup::Reaction, "Scroll of Shield Flash")
+        .concentration
+        .as_ref()
+        .unwrap();
+    assert_eq!(scroll.name, "Shield Flash");
+    assert_eq!(scroll.duration_seconds, Some(12));
+    assert!(
+        option(&sheet, ActionGroup::Reaction, "Counter Spark")
+            .concentration
+            .is_none()
+    );
+
+    let html = render_html(&sheet);
+    assert!(html.contains("aria-label=\"Concentrate on Flare\""));
+    assert!(html.contains("data-focus-spell=\"Shield Flash\""));
+    assert!(html.contains("id=\"replace-concentration\""));
+}

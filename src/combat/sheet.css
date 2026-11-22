@@ -52,6 +52,32 @@ article[data-pin] h3 { margin-right: 3.65rem; }
   position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap;
 }
+.focus-panel {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem 1.25rem;
+  padding: .9rem; background: #fffdf6; border: 1px solid var(--edge); border-radius: .45rem;
+  align-items: start;
+}
+.focus-form, .spell-concentration {
+  display: flex; flex-wrap: wrap; align-items: end; gap: .4rem .65rem;
+}
+.focus-form input, .focus-form select {
+  display: block; font: inherit; color: inherit; border: 1px solid var(--edge); padding: .28rem;
+}
+.focus-form input { width: 7rem; }
+#concentration-actions { margin-top: .5rem; }
+#end-concentration { margin-top: .45rem; }
+.focus-save, .focus-feedback { grid-column: 1 / -1; }
+.focus-save { padding: .65rem; background: #edf1e7; border-radius: .35rem; }
+.focus-save p { margin-bottom: .4rem; }
+.focus-feedback:empty { display: none; }
+.spell-concentration { justify-content: space-between; align-items: center; margin-top: .6rem; }
+#replace-concentration {
+  width: min(90%, 29rem); padding: 1.1rem;
+  background: #fffdf6; color: inherit; border: 1px solid var(--edge); border-radius: .45rem;
+}
+#replace-concentration::backdrop { background: #17251d99; }
+#replace-concentration .focus-form { margin-top: .8rem; justify-content: flex-end; }
+@media (max-width: 55rem) { .focus-panel { grid-template-columns: 1fr; } }
 button, input { font: inherit; color: inherit; }
 button {
   color: var(--accent); background: #f5f7f1; border: 1px solid #a7b8a8;

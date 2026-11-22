@@ -26,7 +26,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         html.push_str("</p>");
     }
     html.push_str("</div></header><nav aria-label=\"Combat options\"><div>");
-    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
+    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#concentration\">Concentration</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
     for group in &sheet.groups {
         if group.action != ActionGroup::Other || !group.options.is_empty() {
             write!(
@@ -41,6 +41,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     }
     html.push_str("</span><a href=\"#sheet-layout\" data-open-panel>Layout</a><a href=\"#full-sheet\" data-open-panel>Full sheet</a></div></nav><main>");
     render_stats(&mut html, &sheet.profile.stats);
+    html.push_str(include_str!("concentration.html"));
     html.push_str("<section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
     render_layout(&mut html, sheet);
     html.push_str("<p id=\"consumable-status\" class=\"visually-hidden\" role=\"status\"></p>");
@@ -82,6 +83,25 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
             if let Some(consumable) = &option.consumable {
                 render_consumable(&mut html, consumable, &option.name);
             }
+            if let Some(spell) = &option.concentration {
+                html.push_str("<div class=\"spell-concentration\" data-focus-spell=\"");
+                escape(&mut html, &spell.name);
+                html.push_str("\" data-duration-label=\"");
+                escape(&mut html, spell.duration.as_deref().unwrap_or(""));
+                html.push('"');
+                if let Some(seconds) = spell.duration_seconds {
+                    write!(html, " data-duration-seconds=\"{seconds}\"").unwrap();
+                }
+                html.push_str("><span>Concentration</span>");
+                if option.consumable.is_none() {
+                    html.push_str(
+                        "<button type=\"button\" data-concentrate aria-label=\"Concentrate on ",
+                    );
+                    escape(&mut html, &spell.name);
+                    html.push_str("\">Concentrate</button>");
+                }
+                html.push_str("</div>");
+            }
             if !option.description.is_empty() {
                 html.push_str(
                     "<details><summary>Full description</summary><div class=\"description\">",
@@ -97,7 +117,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_full_sheet(&mut html, &sheet.profile);
     html.push_str("</main><script>");
     html.push_str(include_str!("preferences.js"));
+    html.push_str(include_str!("encounter.js"));
     html.push_str(include_str!("consumables.js"));
+    html.push_str(include_str!("concentration.js"));
     html.push_str("</script></body></html>");
     html
 }

@@ -8,6 +8,9 @@ use std::{
 use aurora_combat_tracker::{
     aurora::{ImportError, import_character_with_content},
     combat::{CombatSheet, ConsumableAmount},
+    concentration::{
+        ConcentrationCast, ConcentrationRules, ConcentrationStart, SaveResult, StartError,
+    },
     inventory::ConsumableUseError,
     session::{CharacterSession, Pin},
 };
@@ -231,6 +234,152 @@ fn stack<'a>(sheet: &'a CombatSheet, name: &str) -> &'a ConsumableAmount {
         .find(|option| option.name == name)
         .and_then(|option| option.consumable.as_ref())
         .unwrap()
+}
+
+#[test]
+fn damage_queues_individual_constitution_saves_and_failure_ends_concentration() {
+    let files = TestFiles::new();
+    let mut session = concentration_session(&files);
+    let rules = ConcentrationRules::Rules2014;
+    assert_eq!(session.concentration.record_damage(12, rules), None);
+    let flare = concentration_cast(&session.combat_sheet(), "Flare");
+    assert_eq!(
+        session.start_concentration(flare),
+        Ok(ConcentrationStart::Started)
+    );
+    assert_eq!(
+        session.concentration.active().unwrap().remaining_seconds,
+        Some(60)
+    );
+    assert!(!session.concentration.elapse(6));
+    assert_eq!(
+        session.concentration.active().unwrap().remaining_seconds,
+        Some(54)
+    );
+    assert_eq!(session.concentration.record_damage(0, rules), None);
+    let first = session.concentration.record_damage(21, rules).unwrap();
+    let second = session
+        .concentration
+        .record_damage(83, ConcentrationRules::Rules2024)
+        .unwrap();
+    assert_eq!(first.dc, 10);
+    assert_eq!(second.dc, 30);
+    assert_eq!(rules.save_dc(83), Some(41));
+    assert_eq!(session.concentration.next_save(), Some(first));
+    assert!(
+        session
+            .concentration
+            .record_save(second.id, SaveResult::Success)
+            .is_none()
+    );
+    session
+        .concentration
+        .record_save(first.id, SaveResult::Success)
+        .unwrap();
+    assert!(session.concentration.active().is_some());
+    assert_eq!(session.concentration.next_save(), Some(second));
+    session
+        .concentration
+        .record_save(second.id, SaveResult::Failure)
+        .unwrap();
+    assert!(session.concentration.active().is_none());
+    assert_eq!(session.concentration.next_save(), None);
+    assert_eq!(
+        session.concentration.last_result().unwrap().result,
+        SaveResult::Failure
+    );
+}
+
+#[test]
+fn replacing_concentration_spends_the_scroll_only_after_confirmation() {
+    let files = TestFiles::new();
+    let mut session = concentration_session(&files);
+    let sheet = session.combat_sheet();
+    let flare = concentration_cast(&sheet, "Flare");
+    let name = "Scroll of Shield Flash";
+    let scroll = concentration_cast(&sheet, name);
+    assert_eq!(
+        session.start_concentration(flare),
+        Ok(ConcentrationStart::Started)
+    );
+    let hit = session
+        .concentration
+        .record_damage(8, ConcentrationRules::Rules2014)
+        .unwrap();
+    let ConcentrationStart::ConfirmReplacement(declined) =
+        session.start_concentration(scroll.clone()).unwrap()
+    else {
+        panic!("replacement should require confirmation")
+    };
+    assert_eq!(declined.current_spell, "Flare");
+    drop(declined);
+    assert_eq!(session.concentration.active().unwrap().spell.name, "Flare");
+    assert_eq!(session.concentration.next_save(), Some(hit));
+    assert_eq!(stack(&session.combat_sheet(), name).remaining, Some(1));
+
+    let ConcentrationStart::ConfirmReplacement(stale) =
+        session.start_concentration(scroll.clone()).unwrap()
+    else {
+        panic!("replacement should require confirmation")
+    };
+    let ConcentrationStart::ConfirmReplacement(confirmed) =
+        session.start_concentration(scroll.clone()).unwrap()
+    else {
+        panic!("replacement should require confirmation")
+    };
+    session.confirm_concentration(confirmed).unwrap();
+    assert_eq!(
+        session.confirm_concentration(stale),
+        Err(StartError::StaleReplacement)
+    );
+    assert_eq!(
+        session.concentration.active().unwrap().spell.name,
+        "Shield Flash"
+    );
+    assert_eq!(session.concentration.next_save(), None);
+    assert_eq!(stack(&session.combat_sheet(), name).remaining, Some(0));
+
+    let ConcentrationStart::ConfirmReplacement(depleted) =
+        session.start_concentration(scroll).unwrap()
+    else {
+        panic!("replacement should require confirmation")
+    };
+    assert_eq!(
+        session.confirm_concentration(depleted),
+        Err(StartError::Consumable(ConsumableUseError::Depleted))
+    );
+    session.reimport().unwrap();
+    assert_eq!(
+        session.concentration.active().unwrap().remaining_seconds,
+        Some(12)
+    );
+    assert!(!session.concentration.elapse(6));
+    assert!(session.concentration.elapse(6));
+    assert!(session.concentration.active().is_none());
+}
+
+fn concentration_session(files: &TestFiles) -> CharacterSession<Encounter, Layout> {
+    fs::copy(fixture("combat-sheet.dnd5e"), files.save()).unwrap();
+    CharacterSession::open(
+        files.save(),
+        vec![fixture("combat-sheet.xml")],
+        encounter(),
+        layout(),
+    )
+    .unwrap()
+}
+
+fn concentration_cast(sheet: &CombatSheet, name: &str) -> ConcentrationCast {
+    let option = sheet
+        .groups
+        .iter()
+        .flat_map(|group| &group.options)
+        .find(|option| option.name == name)
+        .unwrap();
+    ConcentrationCast {
+        spell: option.concentration.clone().unwrap(),
+        scroll_key: option.consumable.as_ref().map(|stack| stack.key.clone()),
+    }
 }
 
 fn fixture(name: &str) -> PathBuf {

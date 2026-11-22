@@ -43,3 +43,9 @@ The standalone preview stores stat overrides, ordered pins, and section order an
 Aurora supplies inventory amounts and instance identifiers. The tracker records units used against the item ID and its instance identifier. Entries without an identifier share a stack by content ID. A missing amount represents one unit. Invalid amounts stay unavailable. Consumable classification uses scroll IDs and item metadata, including potion and ammunition types. Stackability and charges alone do not make a reusable item consumable.
 
 Using a consumable subtracts one unit from the active stack and disables further use at zero. The Rust session keeps the usage record when Aurora content changes or the save is re-imported. The standalone preview records the same per-stack usage in browser storage and updates every visible copy, including pins. Re-import supplies the new starting quantities and the tracker continues to subtract the units already recorded. The Aurora files are read-only.
+
+## Concentration
+
+The Rust session keeps the active concentration spell, remaining in-game time, and unresolved Constitution saves. Standard numeric durations are converted to seconds. One round is six seconds. A custom duration stays visible as text for manual ending. The combat sheet reads concentration metadata from the exact spell definition, including a scroll's linked spell. Advance time explicitly in the standalone preview.
+
+Each recorded hit with positive damage after reductions adds a save while concentration is active. The DC is the greater of 10 and half the damage rounded down. The 2024 setting caps it at 30. A successful save keeps concentration and a failed save ends it. Replacement confirmation is tied to the specific active cast, and a concentration scroll is spent only when the new cast starts. The browser preview persists consumption and concentration in one update and reads existing usage records from the earlier preview format.

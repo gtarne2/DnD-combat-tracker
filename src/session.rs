@@ -3,6 +3,9 @@ use std::path::{Path, PathBuf};
 use crate::{
     aurora::{ImportError, ImportedCharacter, import_character_with_content},
     combat::CombatSheet,
+    concentration::{
+        Concentration, ConcentrationCast, ConcentrationStart, Replacement, StartError,
+    },
     inventory::{ConsumableUseError, ConsumableUses},
 };
 
@@ -37,6 +40,7 @@ pub struct CharacterSession<Encounter, Layout> {
     content_paths: Vec<PathBuf>,
     character: ImportedCharacter,
     consumable_uses: ConsumableUses,
+    pub concentration: Concentration,
     pub encounter: Encounter,
     pub layout: Layout,
     pub pins: Vec<Pin>,
@@ -55,6 +59,7 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
             content_paths,
             character,
             consumable_uses: ConsumableUses::default(),
+            concentration: Concentration::default(),
             encounter,
             layout,
             pins: Vec::new(),
@@ -72,6 +77,41 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
     /// Records one unit spent and returns the updated quantity.
     pub fn use_consumable(&mut self, key: &str) -> Result<u32, ConsumableUseError> {
         self.consumable_uses.use_one(&self.character, key)
+    }
+
+    /// Starts concentrating, or returns the proposal before changing the active spell or inventory.
+    pub fn start_concentration(
+        &mut self,
+        cast: ConcentrationCast,
+    ) -> Result<ConcentrationStart, StartError> {
+        if let Some(active) = self.concentration.active() {
+            return Ok(ConcentrationStart::ConfirmReplacement(Replacement {
+                current_spell: active.spell.name.clone(),
+                active_id: active.id,
+                cast,
+            }));
+        }
+        self.apply_concentration(cast)?;
+        Ok(ConcentrationStart::Started)
+    }
+
+    pub fn confirm_concentration(&mut self, replacement: Replacement) -> Result<(), StartError> {
+        if !self
+            .concentration
+            .active()
+            .is_some_and(|active| active.id == replacement.active_id)
+        {
+            return Err(StartError::StaleReplacement);
+        }
+        self.apply_concentration(replacement.cast)
+    }
+
+    fn apply_concentration(&mut self, cast: ConcentrationCast) -> Result<(), StartError> {
+        if let Some(key) = &cast.scroll_key {
+            self.use_consumable(key).map_err(StartError::Consumable)?;
+        }
+        self.concentration.begin(cast.spell);
+        Ok(())
     }
 
     /// Rereads the saved character and content files. Returns the pins whose targets disappeared.
