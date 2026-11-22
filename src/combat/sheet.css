@@ -1,0 +1,49 @@
+:root {
+  color-scheme: light;
+  font: 100% / 1.5 system-ui, sans-serif;
+  color: #242720;
+  background: #f5f3eb;
+  --edge: #d8d7c9;
+  --accent: #2d5043;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.heading, nav div, main { width: min(100% - 2rem, 76rem); margin: 0 auto; }
+header { color: #f8f7ee; background: #203c32; padding: 1.5rem 0; }
+h1, h2, h3, p { margin: 0; }
+h1, h2 { font-family: Georgia, serif; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); }
+header p { color: #e3e9d9; }
+nav {
+  position: sticky; top: 0; z-index: 1; background: #f5f3eb;
+  border-bottom: 1px solid var(--edge);
+}
+nav div { display: flex; gap: .25rem; flex-wrap: wrap; padding: .35rem 0; }
+nav a { color: var(--accent); font-weight: 650; padding: .45rem .65rem; }
+nav a:hover, summary:hover { background: #e8ece1; }
+:focus-visible { outline: 3px solid #42755f; outline-offset: 2px; }
+main {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem;
+  padding: 1.4rem 0 3rem; align-items: start;
+}
+section { scroll-margin-top: 6.5rem; min-width: 0; }
+section:last-child#other-options { grid-column: 1 / -1; }
+h2 { color: var(--accent); margin-bottom: .85rem; padding-bottom: .45rem; border-bottom: 2px solid #7a9b88; }
+.empty { color: #52574b; margin: .6rem 0; }
+article {
+  padding: .9rem; margin: 0 0 .8rem; background: #fffdf6; border: 1px solid var(--edge);
+  border-radius: .45rem; overflow-wrap: anywhere;
+}
+h3 { font-size: 1.08rem; line-height: 1.35; }
+.kind { font-size: .75rem; font-weight: 650; color: #4e5d50; }
+dl { margin: .65rem 0 0; }
+dl div { display: grid; grid-template-columns: minmax(6.1rem, 1fr) minmax(0, 2fr); gap: .35rem; }
+dt { color: #52574b; }
+dd { margin: 0; font-weight: 600; }
+details { border-top: 1px solid var(--edge); margin-top: .75rem; }
+summary { padding: .55rem .2rem .1rem; color: var(--accent); font-weight: 650; cursor: pointer; }
+.description { padding-top: .6rem; white-space: pre-line; overflow-x: auto; }
+.description p, .description ul, .description ol { margin: 0 0 .55rem; }
+.description table { border-collapse: collapse; white-space: normal; }
+.description th, .description td { padding: .25rem .45rem; border: 1px solid var(--edge); }
+@media (max-width: 55rem) { main { grid-template-columns: 1fr; } }

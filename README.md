@@ -6,4 +6,12 @@ A personal Windows companion app for characters built in Aurora. It brings attac
 - [Architecture](docs/architecture.md)
 - [Windows development and workflow](docs/development.md)
 
-The first implementation milestone is a Rust importer that opens one Aurora character save, resolves references against sample content XML, and reports missing references. A small synthetic fixture will make the test reproducible.
+## Preview the combat sheet
+
+From the repository root, generate a local HTML sheet and open it in a browser.
+
+```powershell
+cargo run --bin combat-sheet -- tests/fixtures/combat-sheet.dnd5e tests/fixtures/combat-sheet.xml > target/combat-sheet.html
+```
+
+Use your own save and content XML paths to preview your character. Supply multiple content files in Aurora load order, with overrides last.

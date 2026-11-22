@@ -1,0 +1,143 @@
+use std::path::Path;
+
+use aurora_combat_tracker::{
+    aurora::import_character,
+    combat::{ActionGroup, CombatOption, CombatSheet, OptionKind, render_html},
+};
+
+fn sheet() -> CombatSheet {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &fixtures.join("combat-sheet.dnd5e"),
+        &fixtures.join("combat-sheet.xml"),
+    )
+    .unwrap();
+    CombatSheet::from_character(&character)
+}
+
+fn option<'a>(sheet: &'a CombatSheet, group: ActionGroup, name: &str) -> &'a CombatOption {
+    sheet
+        .groups
+        .iter()
+        .find(|entry| entry.action == group)
+        .unwrap()
+        .options
+        .iter()
+        .find(|option| option.name == name)
+        .expect(name)
+}
+
+fn detail<'a>(option: &'a CombatOption, label: &str) -> Option<&'a str> {
+    option
+        .details
+        .iter()
+        .find(|detail| detail.label == label)
+        .map(|detail| detail.value.as_str())
+}
+
+#[test]
+fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
+    let sheet = sheet();
+    let bow = option(&sheet, ActionGroup::Action, "Signal Bow");
+    assert_eq!(bow.kind, OptionKind::Attack);
+    assert_eq!(detail(bow, "Range"), Some("80/320 ft."));
+    assert_eq!(detail(bow, "Attack roll"), Some("+5 vs AC"));
+    assert_eq!(detail(bow, "Damage"), Some("1d8+3 piercing"));
+    let spur = option(&sheet, ActionGroup::Action, "Clockwork Spur");
+    assert_eq!(spur.kind, OptionKind::Attack);
+    assert_eq!(detail(spur, "Damage"), Some("1d4 piercing"));
+
+    let flare = option(&sheet, ActionGroup::Action, "Flare");
+    assert_eq!(flare.kind, OptionKind::Spell);
+    assert_eq!(detail(flare, "Range"), Some("60 feet"));
+    assert_eq!(detail(flare, "Save DC"), Some("15"));
+    assert_eq!(detail(flare, "Attack roll"), None);
+    assert_eq!(detail(flare, "Dice in description"), Some("2d6 · 1d6"));
+    assert_eq!(
+        detail(flare, "Material"),
+        Some("a copper reflector worth 5 gp")
+    );
+
+    let rod = option(&sheet, ActionGroup::Action, "Signal Rod");
+    assert_eq!(rod.kind, OptionKind::Item);
+    assert_eq!(detail(rod, "Cost"), Some("1 charge"));
+    assert_eq!(detail(rod, "Uses"), Some("3/Day"));
+
+    let turret = option(&sheet, ActionGroup::BonusAction, "Signal Turret");
+    assert_eq!(turret.kind, OptionKind::Feature);
+    assert_eq!(detail(turret, "Uses"), Some("1/Long Rest"));
+    let ballista = option(&sheet, ActionGroup::BonusAction, "Ballista Mode");
+    assert_eq!(detail(ballista, "Damage"), Some("2d8 force"));
+    assert_eq!(detail(ballista, "Uses"), Some("2/Long Rest"));
+    assert_eq!(
+        detail(
+            option(&sheet, ActionGroup::Reaction, "Ballista Mode"),
+            "Level"
+        ),
+        Some("6")
+    );
+
+    assert_eq!(
+        detail(
+            option(&sheet, ActionGroup::Reaction, "Alarm Pulse"),
+            "Save DC"
+        ),
+        Some("12")
+    );
+    let counter = option(&sheet, ActionGroup::Reaction, "Counter Spark");
+    assert_eq!(detail(counter, "Attack roll"), Some("+6"));
+    assert_eq!(detail(counter, "Save DC"), None);
+    assert_eq!(
+        detail(counter, "Casting time"),
+        Some("1 reaction, which you take when a spark approaches")
+    );
+
+    let scroll = option(&sheet, ActionGroup::Reaction, "Scroll of Shield Flash");
+    assert_eq!(scroll.kind, OptionKind::Scroll);
+    assert_eq!(detail(scroll, "Cost"), Some("1 scroll"));
+    assert_eq!(detail(scroll, "Range"), Some("15 feet"));
+    assert_eq!(detail(scroll, "Attack roll"), Some("Unavailable"));
+    let scroll = option(&sheet, ActionGroup::Action, "Scroll of Flare");
+    assert_eq!(detail(scroll, "Save DC"), Some("13"));
+    assert_eq!(detail(scroll, "Material"), None);
+
+    option(&sheet, ActionGroup::Other, "Beacon Ritual");
+    let ambiguous = option(&sheet, ActionGroup::Other, "Scroll of Twin Signal");
+    assert_eq!(
+        detail(ambiguous, "Aurora content"),
+        Some("Definition unavailable")
+    );
+    let vial = option(&sheet, ActionGroup::Other, "Unidentified Vial");
+    assert_eq!(
+        detail(vial, "Aurora content"),
+        Some("Definition unavailable")
+    );
+    assert!(
+        !sheet
+            .groups
+            .iter()
+            .flat_map(|group| &group.options)
+            .any(|option| {
+                matches!(
+                    option.name.as_str(),
+                    "Higher-Level Turret" | "Hidden Attack"
+                )
+            })
+    );
+}
+
+#[test]
+fn renders_all_groups_and_full_linked_descriptions_as_inline_disclosures() {
+    let html = render_html(&sheet());
+    for group in ["action", "bonus-action", "reaction"] {
+        assert!(html.contains(&format!("href=\"#{group}\"")));
+        assert!(html.contains(&format!("<section id=\"{group}\"")));
+    }
+    assert!(html.contains("Rowan &amp; Co."));
+    assert!(html.contains("<details><summary>Full description</summary>"));
+    assert!(html.contains("<strong>At higher levels.</strong>"));
+    assert!(html.contains("<ul><li>Blue points north.</li><li>Amber signals a retreat.</li></ul>"));
+    assert!(html.contains("The parchment vanishes after use."));
+    assert!(html.contains("Make a ranged spell attack as you release the flash."));
+    assert_eq!(html.matches("Choose a signal mode.").count(), 1);
+}

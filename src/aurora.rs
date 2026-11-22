@@ -16,26 +16,47 @@ use content::ContentIndex;
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedCharacter {
     pub name: Option<String>,
+    pub attacks: Vec<ImportedAttack>,
     pub equipment: Vec<ImportedItem>,
     pub spells: Vec<ImportedReference>,
     pub build_elements: Vec<ImportedReference>,
     pub companions: Vec<ImportedReference>,
     /// Definitions reachable from the save. A present key with no value marks missing content.
     pub definitions: BTreeMap<String, Option<ContentDefinition>>,
+    /// Generated scroll IDs mapped to their spell when the supplied content identifies it uniquely.
+    pub generated_scroll_spells: BTreeMap<String, String>,
 }
 
 impl ImportedCharacter {
-    /// Features recorded as selections in the save. Related options are in the definition catalog.
+    /// Features recorded in the save's selections or calculated build summary.
     pub fn features(&self) -> impl Iterator<Item = &ImportedReference> {
-        self.build_elements.iter().filter(|reference| {
-            reference.kind().is_some_and(|kind| {
-                matches!(
-                    kind,
-                    "Feat" | "Feature" | "Racial Trait" | "Companion Trait"
-                ) || kind.ends_with(" Feature")
-            })
-        })
+        self.build_elements
+            .iter()
+            .filter(|reference| reference.kind().is_some_and(is_feature_kind))
     }
+}
+
+pub(crate) fn is_feature_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "Feat" | "Feature" | "Racial Trait" | "Companion Trait"
+    ) || kind.ends_with(" Feature")
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ImportedAttack {
+    pub name: String,
+    pub range: Option<String>,
+    pub attack: Option<String>,
+    pub damage: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct SpellcastingStats {
+    pub name: Option<String>,
+    pub attack_bonus: Option<i16>,
+    pub save_dc: Option<u16>,
 }
 
 pub type ImportedItem = ImportedReference;
@@ -45,6 +66,7 @@ pub struct ImportedReference {
     pub content_id: String,
     pub saved_name: Option<String>,
     pub saved_kind: Option<String>,
+    pub spellcasting: Option<SpellcastingStats>,
     /// None when the supplied XML has no definition for this ID.
     pub definition: Option<ContentDefinition>,
 }
@@ -122,6 +144,24 @@ pub fn import_character_with_content(
         .filter(|name| !name.is_empty())
         .map(str::to_owned);
 
+    let attacks = child(build, "input")
+        .and_then(|input| child(input, "attacks"))
+        .into_iter()
+        .flat_map(|attacks| children_named(attacks, "attack"))
+        .filter(|attack| attack.attribute("displayed") != Some("false"))
+        .filter_map(|attack| {
+            Some(ImportedAttack {
+                name: nonempty(attack.attribute("name"))?.into(),
+                range: nonempty(attack.attribute("range")).map(str::to_owned),
+                attack: nonempty(attack.attribute("attack")).map(str::to_owned),
+                damage: nonempty(attack.attribute("damage")).map(str::to_owned),
+                description: child(attack, "description")
+                    .and_then(|description| nonempty(description.text()))
+                    .map(str::to_owned),
+            })
+        })
+        .collect();
+
     let equipment = children_named(build, "equipment")
         .flat_map(|items| children_named(items, "item"))
         .map(|item| {
@@ -130,11 +170,24 @@ pub fn import_character_with_content(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let build_elements: Vec<_> = children_named(build, "elements")
+    let mut build_elements: Vec<_> = children_named(build, "elements")
         .flat_map(|elements| elements.descendants())
         .filter(|node| node.has_tag_name("element"))
         .filter_map(SavedReference::from_node)
         .collect();
+
+    let mut build_ids: HashSet<_> = build_elements.iter().map(|entry| entry.id).collect();
+    build_elements.extend(
+        children_named(build, "sum")
+            .flat_map(|summary| children_named(summary, "element"))
+            .filter_map(SavedReference::from_node)
+            .filter(|entry| {
+                entry
+                    .kind
+                    .is_some_and(|kind| kind == "Weapon" || is_feature_kind(kind))
+                    && build_ids.insert(entry.id)
+            }),
+    );
 
     let mut spells: Vec<_> = children_named(build, "magic")
         .flat_map(|magic| children_named(magic, "spellcasting"))
@@ -175,6 +228,14 @@ pub fn import_character_with_content(
         index.add_file(path, document)?;
     }
 
+    let generated_scroll_spells: BTreeMap<_, _> = equipment
+        .iter()
+        .filter_map(|item| {
+            let spell_id = index.generated_scroll_spell(item.id)?;
+            Some((item.id.to_owned(), spell_id.to_owned()))
+        })
+        .collect();
+
     let roots = equipment
         .iter()
         .chain(&spells)
@@ -189,6 +250,7 @@ pub fn import_character_with_content(
                 .filter(|id| !id.trim().is_empty()),
         )
         .map(str::to_owned)
+        .chain(generated_scroll_spells.values().cloned())
         .collect();
     let definitions = index.resolve_graph(roots);
     let resolve = |references: Vec<SavedReference<'_, '_>>| {
@@ -198,6 +260,7 @@ pub fn import_character_with_content(
                 content_id: reference.id.to_owned(),
                 saved_name: reference.node.attribute("name").map(str::to_owned),
                 saved_kind: reference.kind.map(str::to_owned),
+                spellcasting: reference.spellcasting(),
                 definition: definitions
                     .get(reference.id)
                     .and_then(Option::as_ref)
@@ -208,11 +271,13 @@ pub fn import_character_with_content(
 
     Ok(ImportedCharacter {
         name,
+        attacks,
         equipment: resolve(equipment),
         spells: resolve(spells),
         build_elements: resolve(build_elements),
         companions: resolve(companions),
         definitions,
+        generated_scroll_spells,
     })
 }
 
@@ -231,6 +296,26 @@ impl<'a, 'input> SavedReference<'a, 'input> {
             kind: node.attribute("type"),
         })
     }
+
+    fn spellcasting(self) -> Option<SpellcastingStats> {
+        if !self.node.has_tag_name("spell") {
+            return None;
+        }
+        let casting = self.node.parent_element()?.parent_element()?;
+        casting
+            .has_tag_name("spellcasting")
+            .then(|| SpellcastingStats {
+                name: nonempty(casting.attribute("name")).map(str::to_owned),
+                attack_bonus: casting
+                    .attribute("attack")
+                    .and_then(|value| value.parse().ok()),
+                save_dc: casting.attribute("dc").and_then(|value| value.parse().ok()),
+            })
+    }
+}
+
+fn nonempty(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn read_xml(path: &Path) -> Result<String, ImportError> {

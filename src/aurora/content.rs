@@ -66,6 +66,19 @@ struct DefinitionSource<'doc, 'xml> {
 }
 
 impl<'doc, 'xml> ContentIndex<'doc, 'xml> {
+    pub(super) fn generated_scroll_spell(&self, item_id: &str) -> Option<&'doc str> {
+        let suffix = item_id.strip_prefix("ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_")?;
+        // Aurora's generated scroll ID omits the spell's source prefix.
+        let mut matches = self.elements.iter().filter(|&(id, source)| {
+            source.node.attribute("type") == Some("Spell")
+                && id
+                    .split_once("_SPELL_")
+                    .is_some_and(|(_, name)| name == suffix)
+        });
+        let (id, _) = matches.next()?;
+        matches.next().is_none().then_some(*id)
+    }
+
     pub(super) fn add_file(
         &mut self,
         path: &'doc Path,

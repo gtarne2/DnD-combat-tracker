@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character version="1.0.3" preview="false">
+  <build>
+    <input>
+      <name>Rowan &amp; Co.</name>
+      <attacks>
+        <attack name="Signal Bow" range="80/320 ft." attack="+5 vs AC" damage="1d8+3 piercing" displayed="true">
+          <description>Mark where the arrow lands.</description>
+        </attack>
+        <attack name="Hidden Attack" displayed="false" />
+      </attacks>
+    </input>
+    <equipment>
+      <item id="ID_TEST_ITEM_ROD" name="Signal Rod" />
+      <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_SHIELD_FLASH" name="Scroll of Shield Flash" />
+      <item id="ID_TEST_ITEM_SCROLL_FLARE" name="Scroll of Flare" />
+      <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_TWIN_SIGNAL" name="Scroll of Twin Signal" />
+      <item id="ID_TEST_ITEM_UNKNOWN" name="Unidentified Vial" />
+    </equipment>
+    <magic>
+      <spellcasting name="Tinkerer" attack="6" dc="15">
+        <spells>
+          <spell id="ID_TEST_SPELL_FLARE" name="Flare" level="1" />
+          <spell id="ID_TEST_SPELL_COUNTER_SPARK" name="Counter Spark" level="1" />
+          <spell id="ID_TEST_SPELL_BEACON_RITUAL" name="Beacon Ritual" level="1" />
+        </spells>
+      </spellcasting>
+    </magic>
+    <elements>
+      <element id="ID_TEST_FEATURE_TURRET" type="Class Feature" name="Signal Turret" />
+    </elements>
+    <sum>
+      <element id="ID_TEST_TURRET_BALLISTA" type="Class Feature" />
+      <element id="ID_TEST_FEATURE_ALARM" type="Racial Trait" />
+      <element id="ID_TEST_WEAPON_SPUR" type="Weapon" />
+    </sum>
+  </build>
+</character>

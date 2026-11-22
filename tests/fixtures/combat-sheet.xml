@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element id="ID_TEST_SPELL_FLARE" name="Flare" type="Spell" source="Synthetic Test Content">
+    <description><p>The target makes a Dexterity saving throw, taking 2d6 radiant damage on a failed save.</p><p><strong>At higher levels.</strong> Increase the damage by 1d6.</p></description>
+    <setters>
+      <set name="level">1</set>
+      <set name="time">1 action</set>
+      <set name="range">60 feet</set>
+      <set name="materialComponent">a copper reflector worth 5 gp</set>
+    </setters>
+  </element>
+  <element id="ID_TEST_SPELL_COUNTER_SPARK" name="Counter Spark" type="Spell" source="Synthetic Test Content">
+    <description><p>Make a ranged spell attack. On a hit, deal 1d8 force damage.</p></description>
+    <setters>
+      <set name="level">1</set>
+      <set name="time">1 reaction, which you take when a spark approaches</set>
+      <set name="range">30 feet</set>
+    </setters>
+  </element>
+  <element id="ID_TEST_SPELL_BEACON_RITUAL" name="Beacon Ritual" type="Spell" source="Synthetic Test Content">
+    <description><p>After the ritual, you can use your reaction to move the beacon.</p></description>
+    <setters><set name="time">1 minute</set></setters>
+  </element>
+  <element id="ID_TEST_SPELL_SHIELD_FLASH" name="Shield Flash" type="Spell" source="Synthetic Test Content">
+    <description><p>Make a ranged spell attack as you release the flash.</p></description>
+    <setters><set name="time">1 reaction</set><set name="range">15 feet</set></setters>
+  </element>
+  <element id="ID_TEST_ITEM_SCROLL_FLARE" name="Scroll of Flare" type="Magic Item" source="Synthetic Test Content">
+    <description><p>The parchment vanishes after use.</p></description>
+    <setters><set name="type">Scroll</set><set name="saveDC">13</set></setters>
+    <rules><grant type="Spell" id="ID_TEST_SPELL_FLARE" /></rules>
+  </element>
+  <element id="ID_TEST_ONE_SPELL_TWIN_SIGNAL" name="Twin Signal" type="Spell" source="Synthetic Edition One">
+    <setters><set name="time">1 action</set></setters>
+  </element>
+  <element id="ID_TEST_TWO_SPELL_TWIN_SIGNAL" name="Twin Signal" type="Spell" source="Synthetic Edition Two">
+    <setters><set name="time">1 bonus action</set></setters>
+  </element>
+  <element id="ID_TEST_ITEM_ROD" name="Signal Rod" type="Magic Item" source="Synthetic Test Content">
+    <description><p>As an action, you can spend one charge to light a signal.</p></description>
+    <sheet usage="3/Day" />
+    <setters><set name="range">90 feet</set></setters>
+  </element>
+  <element id="ID_TEST_FEATURE_TURRET" name="Signal Turret" type="Class Feature" source="Synthetic Test Content">
+    <description><p>Choose a signal mode.</p><div element="ID_TEST_TURRET_MODES" /></description>
+    <sheet action="Bonus Action" usage="1/Long Rest" />
+    <rules>
+      <grant type="Class Feature" id="ID_TEST_TURRET_BALLISTA" />
+      <grant type="Class Feature" id="ID_TEST_TURRET_LOCKED" level="9" />
+    </rules>
+  </element>
+  <element id="ID_TEST_TURRET_MODES" name="Signal modes" type="Information" source="Synthetic Test Content">
+    <description><ul><li>Blue points north.</li><li>Amber signals a retreat.</li></ul><div element="ID_TEST_FEATURE_TURRET" /></description>
+  </element>
+  <element id="ID_TEST_TURRET_BALLISTA" name="Ballista Mode" type="Class Feature" source="Synthetic Test Content">
+    <description><p>The turret sends a pulse.</p></description>
+    <sheet>
+      <description action="Bonus Action" usage="2/Long Rest">Charge the turret.</description>
+      <description action="Reaction" level="6" usage="1/Long Rest">Redirect the pulse.</description>
+    </sheet>
+    <setters><set name="damage">2d8 force</set></setters>
+  </element>
+  <element id="ID_TEST_TURRET_LOCKED" name="Higher-Level Turret" type="Class Feature" source="Synthetic Test Content">
+    <sheet action="Action"><description>Available at level 9.</description></sheet>
+  </element>
+  <element id="ID_TEST_FEATURE_ALARM" name="Alarm Pulse" type="Racial Trait" source="Synthetic Test Content">
+    <description><p>The creature must make a DC 12 Dexterity saving throw.</p></description>
+    <sheet action="Reaction" />
+  </element>
+  <element id="ID_TEST_WEAPON_SPUR" name="Clockwork Spur" type="Weapon" source="Synthetic Test Content">
+    <setters><set name="damage">1d4 piercing</set></setters>
+  </element>
+</elements>
