@@ -21,3 +21,11 @@ Use **Layout** to reorder or hide combat sections and override missing or condit
 Select **Use** on a scroll, potion, or other consumable to record one unit spent. The sheet immediately updates the quantity on the action card and its pinned copies.
 
 Select **Concentrate** on a concentration spell or use its scroll. In **Concentration**, advance in-game time or record damage after reductions. Record the result of each prompted Constitution save. Choose 2014 or 2024 rules for the DC calculation.
+
+In **Companions**, add an imported template or a custom companion. Edit the card to change HP, duration, command costs, and turn mode. Open **Companion initiative** to view separate entries and companions that act with their owner.
+
+To try the cannon variants and a ranger companion, generate the companion playtest sheet.
+
+```powershell
+cargo run --bin combat-sheet -- tests/fixtures/companions.dnd5e tests/fixtures/companions.xml > target/companions.html
+```

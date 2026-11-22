@@ -117,6 +117,16 @@ impl<'doc, 'xml> ContentIndex<'doc, 'xml> {
         Ok(())
     }
 
+    pub(super) fn resolve_companions(&self) -> BTreeMap<String, Option<ContentDefinition>> {
+        self.resolve_graph(
+            self.elements
+                .iter()
+                .filter(|(_, source)| source.node.attribute("type") == Some("Companion"))
+                .map(|(id, _)| (*id).to_owned())
+                .collect(),
+        )
+    }
+
     pub(super) fn resolve_graph(
         &self,
         mut pending: Vec<String>,
@@ -163,6 +173,26 @@ impl<'doc, 'xml> ContentIndex<'doc, 'xml> {
 }
 
 fn collect_references(element: &ContentElement, references: &mut BTreeSet<String>) {
+    if element.tag == "set"
+        && element.attributes.get("name").is_some_and(|name| {
+            matches!(
+                name.as_str(),
+                "actions" | "reactions" | "traits" | "bonusActions"
+            )
+        })
+    {
+        for child in &element.children {
+            if let ContentNode::Text(value) = child {
+                references.extend(
+                    value
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|id| id.starts_with("ID_"))
+                        .map(str::to_owned),
+                );
+            }
+        }
+    }
     let rule_target = match element.tag.as_str() {
         "grant" | "select" => element.attributes.get("id"),
         _ => None,

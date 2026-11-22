@@ -4,6 +4,7 @@ use crate::aurora::{
     CharacterProfile, ContentDefinition, ContentElement, ContentNode, ImportedCharacter,
     SpellcastingStats, is_feature_kind,
 };
+use crate::companion::{CompanionRoster, CompanionTemplate, companion_templates};
 use crate::concentration::ConcentrationSpell;
 use crate::inventory::{ConsumableUses, consumable_amounts, consumable_key, is_scroll};
 
@@ -98,6 +99,8 @@ pub struct CombatSheet {
     pub character_name: Option<String>,
     pub profile: CharacterProfile,
     pub groups: [CombatGroup; 4],
+    pub companion_templates: Vec<CompanionTemplate>,
+    pub companions: CompanionRoster,
 }
 
 impl CombatSheet {
@@ -109,9 +112,13 @@ impl CombatSheet {
         character: &ImportedCharacter,
         uses: &ConsumableUses,
     ) -> Self {
+        let mut companions = CompanionRoster::default();
+        companions.sync_imported(character);
         let mut sheet = Self {
             character_name: character.name.clone(),
             profile: character.profile.clone(),
+            companion_templates: companion_templates(character),
+            companions,
             groups: ActionGroup::ALL.map(|action| CombatGroup {
                 action,
                 options: Vec::new(),

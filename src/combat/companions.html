@@ -1,0 +1,46 @@
+<section id="companions" aria-labelledby="companions-heading">
+  <h2 id="companions-heading">Companions</h2>
+  <form id="add-companion" class="focus-form">
+    <div><label for="companion-template">Template</label>
+      <select id="companion-template" name="template"><option value="">Custom companion</option></select></div>
+    <button>Add companion</button>
+  </form>
+  <div id="companion-cards" class="companion-grid"></div>
+  <details id="companion-turns" class="panel">
+    <summary>Companion initiative</summary>
+    <div class="panel-body">
+      <form id="companion-owner" class="focus-form">
+        <label>Owner initiative <input name="initiative" type="number" min="-2147483648" max="2147483647"></label>
+        <button>Set initiative</button>
+      </form>
+      <ol id="companion-initiative"></ol>
+    </div>
+  </details>
+</section>
+<dialog id="companion-editor" aria-labelledby="companion-editor-title">
+  <form id="edit-companion">
+    <h2 id="companion-editor-title">Companion card</h2>
+    <div class="companion-fields">
+      <label>Name <input name="name" maxlength="160" required></label>
+      <label>Kind <input name="kind" list="companion-kinds" maxlength="80"></label>
+      <datalist id="companion-kinds"><option>Pet</option><option>Familiar</option><option>Summon</option><option>Construct</option><option>Other</option></datalist>
+      <label>Current HP <input name="currentHp" type="number" min="0" max="4294967295"></label>
+      <label>Maximum HP <input name="maxHp" type="number" min="0" max="4294967295"></label>
+      <label>Armor Class <input name="armor" maxlength="120"></label>
+      <label>Speed <input name="speed" maxlength="120"></label>
+      <label>Duration <input name="duration" maxlength="160"></label>
+      <label>Remaining rounds <input name="rounds" type="number" min="0" max="4294967295"></label>
+      <div><label for="companion-turn-mode">Turn</label>
+        <select id="companion-turn-mode" name="turn"><option value="owner">With owner</option><option value="separate">Separate initiative</option></select></div>
+      <label>Companion initiative <input name="initiative" type="number" min="-2147483648" max="2147483647" disabled></label>
+      <label class="companion-wide">Command costs <textarea name="command" rows="2"></textarea></label>
+      <label class="companion-wide">Other stats <textarea name="stats" rows="2"></textarea></label>
+      <label class="companion-wide">Attacks <textarea name="attacks" rows="2"></textarea></label>
+      <label class="companion-wide">Abilities <textarea name="abilities" rows="3"></textarea></label>
+    </div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="companion-cancel">Cancel</button>
+      <button type="submit">Save companion</button>
+    </div>
+  </form>
+</dialog>

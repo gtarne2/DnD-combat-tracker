@@ -26,6 +26,7 @@ pub struct ImportedCharacter {
     pub companions: Vec<ImportedReference>,
     /// Definitions reachable from the save. A present key with no value marks missing content.
     pub definitions: BTreeMap<String, Option<ContentDefinition>>,
+    pub companion_definitions: BTreeMap<String, Option<ContentDefinition>>,
     /// Generated scroll IDs mapped to their spell when the supplied content identifies it uniquely.
     pub generated_scroll_spells: BTreeMap<String, String>,
 }
@@ -217,6 +218,7 @@ pub fn import_character_with_content(
             .filter(|element| element.kind == Some("Spell") && spell_ids.insert(element.id)),
     );
 
+    let mut companion_ids = HashSet::new();
     let companions: Vec<_> = children_named(build, "companion")
         .filter_map(SavedReference::from_node)
         .chain(build_elements.iter().copied().filter(|element| {
@@ -225,6 +227,13 @@ pub fn import_character_with_content(
                     parent.has_tag_name("element") && parent.attribute("type") == Some("Companion")
                 })
         }))
+        .chain(
+            active
+                .iter()
+                .copied()
+                .filter(|entry| entry.kind == Some("Companion")),
+        )
+        .filter(|entry| companion_ids.insert(entry.id))
         .collect();
 
     let xml = content_paths
@@ -267,6 +276,7 @@ pub fn import_character_with_content(
         .chain(generated_scroll_spells.values().cloned())
         .collect();
     let definitions = index.resolve_graph(roots);
+    let companion_definitions = index.resolve_companions();
     let profile = profile::read_profile(save.root_element(), build, &active, &definitions);
     let resolve = |references: Vec<SavedReference<'_, '_>>| {
         references
@@ -300,6 +310,7 @@ pub fn import_character_with_content(
         build_elements: resolve(build_elements),
         companions: resolve(companions),
         definitions,
+        companion_definitions,
         generated_scroll_spells,
     })
 }

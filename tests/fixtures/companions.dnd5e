@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character version="1.0.3">
+  <display-properties><name>Rowan</name><class>Artificer (3) / Ranger (2)</class><level>5</level></display-properties>
+  <build>
+    <input><name>Rowan</name></input>
+    <elements>
+      <element type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON" name="Eldritch Cannon" />
+      <element type="Archetype Feature" id="ID_TEST_RANGER_COMPANION" name="Ranger Companion">
+        <element type="Companion" name="Select a companion"><element type="Companion" id="ID_TEST_COMPANION_MOTH" name="Moth" /></element>
+      </element>
+    </elements>
+  </build>
+</character>

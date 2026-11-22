@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::{
     aurora::{ImportError, ImportedCharacter, import_character_with_content},
     combat::CombatSheet,
+    companion::CompanionRoster,
     concentration::{
         Concentration, ConcentrationCast, ConcentrationStart, Replacement, StartError,
     },
@@ -41,6 +42,7 @@ pub struct CharacterSession<Encounter, Layout> {
     character: ImportedCharacter,
     consumable_uses: ConsumableUses,
     pub concentration: Concentration,
+    pub companions: CompanionRoster,
     pub encounter: Encounter,
     pub layout: Layout,
     pub pins: Vec<Pin>,
@@ -54,12 +56,15 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
         layout: Layout,
     ) -> Result<Self, ImportError> {
         let character = load_character(&save_path, &content_paths)?;
+        let mut companions = CompanionRoster::default();
+        companions.sync_imported(&character);
         Ok(Self {
             save_path,
             content_paths,
             character,
             consumable_uses: ConsumableUses::default(),
             concentration: Concentration::default(),
+            companions,
             encounter,
             layout,
             pins: Vec::new(),
@@ -71,7 +76,9 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
     }
 
     pub fn combat_sheet(&self) -> CombatSheet {
-        CombatSheet::with_consumable_uses(&self.character, &self.consumable_uses)
+        let mut sheet = CombatSheet::with_consumable_uses(&self.character, &self.consumable_uses);
+        sheet.companions = self.companions.clone();
+        sheet
     }
 
     /// Records one unit spent and returns the updated quantity.
@@ -140,6 +147,7 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
             }
             applies
         });
+        self.companions.sync_imported(&character);
         self.character = character;
         removed
     }

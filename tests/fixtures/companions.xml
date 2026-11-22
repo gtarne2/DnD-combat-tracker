@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON" name="Eldritch Cannon" source="Synthetic">
+    <description>
+      <p>Use a bonus action to activate the cannon within 60 feet.</p>
+      <p>It has an AC of 18 and has five times your artificer level in hit points. It vanishes at zero HP or after 1 hour.</p>
+      <p>It can walk or climb up to 15 feet with legs.</p>
+    </description>
+    <rules>
+      <grant type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON_FORCE_BALLISTA" />
+      <grant type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON_FLAMETHROWER" />
+      <grant type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON_PROTECTOR" />
+    </rules>
+  </element>
+  <element type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON_FORCE_BALLISTA" name="Force Ballista" source="Synthetic">
+    <description><p>Make a spell attack against a target in 120 feet. A hit deals 2d8 force.</p></description>
+  </element>
+  <element type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON_FLAMETHROWER" name="Flamethrower" source="Synthetic">
+    <description><p>Each target in the 15-foot cone saves against 2d8 fire damage.</p></description>
+  </element>
+  <element type="Archetype Feature" id="ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON_PROTECTOR" name="Protector" source="Synthetic">
+    <setters><set name="duration">2 hours</set></setters>
+    <description><p>Grant 1d8 temporary HP to selected allies within 10 feet.</p></description>
+  </element>
+  <element type="Archetype Feature" id="ID_TEST_RANGER_COMPANION" name="Ranger Companion">
+    <description><p>You can use your action to command an attack.</p></description>
+    <rules><select type="Companion" name="Choose a beast" supports="Beast" /></rules>
+  </element>
+  <element type="Companion" id="ID_TEST_COMPANION_MOTH" name="Lantern Moth">
+    <setters><set name="type">Beast</set><set name="hp">7 (2d6)</set><set name="ac">12</set>
+      <set name="speed">5 ft., fly 30 ft.</set><set name="wisdom">12</set>
+      <set name="actions">ID_TEST_MOTH_NIP</set><set name="traits">ID_TEST_MOTH_GLOW</set>
+    </setters>
+  </element>
+  <element type="Companion Action" id="ID_TEST_MOTH_NIP" name="Nip">
+    <sheet><description>Melee attack: +3 to hit, 1d4 piercing.</description></sheet>
+  </element>
+  <element type="Companion Trait" id="ID_TEST_MOTH_GLOW" name="Warm Glow">
+    <description><p>Illuminates a five-foot circle.</p></description>
+  </element>
+  <element type="Companion" id="ID_TEST_WARDEN_HOUND" name="Warden Hound">
+    <setters><set name="type">Beast</set><set name="hp">11</set><set name="ac">13</set>
+      <set name="speed">40 ft.</set><set name="command">Action to command</set></setters>
+  </element>
+</elements>

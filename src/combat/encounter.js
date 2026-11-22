@@ -6,7 +6,7 @@ const previewEncounter = (() => {
   const emptyFocus = () => ({ active: null, pending: [], last: null, sequence: 0, rules: "2014" });
   const integer = (number) => Number.isSafeInteger(number) && number >= 0;
   let persisted = Boolean(key);
-  let state = { spent: {}, focus: emptyFocus() };
+  let state = { spent: {}, focus: emptyFocus(), companions: null };
 
   function focusFrom(saved) {
     const focus = emptyFocus();
@@ -39,6 +39,8 @@ const previewEncounter = (() => {
         spent: Object.fromEntries(Object.entries(value?.spent || {})
           .filter(([, used]) => integer(used) && used > 0 && used <= 0xffffffff)),
         focus: focusFrom(value?.focus),
+        companions: Array.isArray(value?.companions?.cards) && Array.isArray(value.companions.seen)
+          && integer(value.companions.sequence) ? value.companions : null,
       };
     } catch (error) {
       if (!(error instanceof SyntaxError)) persisted = false;

@@ -26,7 +26,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         html.push_str("</p>");
     }
     html.push_str("</div></header><nav aria-label=\"Combat options\"><div>");
-    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#concentration\">Concentration</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
+    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#concentration\">Concentration</a><a href=\"#companions\">Companions</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
     for group in &sheet.groups {
         if group.action != ActionGroup::Other || !group.options.is_empty() {
             write!(
@@ -42,6 +42,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str("</span><a href=\"#sheet-layout\" data-open-panel>Layout</a><a href=\"#full-sheet\" data-open-panel>Full sheet</a></div></nav><main>");
     render_stats(&mut html, &sheet.profile.stats);
     html.push_str(include_str!("concentration.html"));
+    render_companions(&mut html, sheet);
     html.push_str("<section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
     render_layout(&mut html, sheet);
     html.push_str("<p id=\"consumable-status\" class=\"visually-hidden\" role=\"status\"></p>");
@@ -120,8 +121,81 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("encounter.js"));
     html.push_str(include_str!("consumables.js"));
     html.push_str(include_str!("concentration.js"));
+    html.push_str(include_str!("companions.js"));
     html.push_str("</script></body></html>");
     html
+}
+
+fn render_companions(html: &mut String, sheet: &CombatSheet) {
+    html.push_str(include_str!("companions.html"));
+    html.push_str("<div id=\"companion-templates\" hidden>");
+    for template in &sheet.companion_templates {
+        companion_data(
+            html,
+            "data-companion-template",
+            &template.id,
+            &template.details,
+            None,
+        );
+    }
+    for card in &sheet.companions.cards {
+        let id = card
+            .template_id
+            .clone()
+            .unwrap_or_else(|| format!("card:{}", card.id));
+        companion_data(html, "data-companion-seed", &id, &card.details, Some(card));
+    }
+    html.push_str("</div>");
+}
+
+fn companion_data(
+    html: &mut String,
+    marker: &str,
+    id: &str,
+    details: &crate::companion::CompanionDetails,
+    card: Option<&crate::companion::CompanionCard>,
+) {
+    write!(html, "<div {marker}=\"").unwrap();
+    escape(html, id);
+    html.push('"');
+    let hp = details.max_hp.map(|value| value.to_string());
+    let rounds = card
+        .map_or_else(
+            || {
+                crate::concentration::parse_duration(&details.duration)
+                    .map(|seconds| seconds.div_ceil(6))
+            },
+            |card| card.remaining_rounds,
+        )
+        .map(|value| value.to_string());
+    if let Some(card) = card {
+        let current = card
+            .current_hp
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        write!(html, " data-current-hp=\"{current}\"").unwrap();
+        if let crate::companion::CompanionTurn::Separate(score) = card.turn {
+            write!(html, " data-turn-score=\"{score}\"").unwrap();
+        }
+    }
+    for (key, value) in [
+        ("name", details.name.as_str()),
+        ("kind", &details.kind),
+        ("armor", &details.armor_class),
+        ("speed", &details.speed),
+        ("stats", &details.stats),
+        ("max-hp", hp.as_deref().unwrap_or("")),
+        ("attacks", &details.attacks),
+        ("abilities", &details.abilities),
+        ("command", &details.command),
+        ("duration", &details.duration),
+        ("rounds", rounds.as_deref().unwrap_or("")),
+    ] {
+        write!(html, " data-{key}=\"").unwrap();
+        escape(html, value);
+        html.push('"');
+    }
+    html.push_str("></div>");
 }
 
 fn render_consumable(html: &mut String, consumable: &ConsumableAmount, name: &str) {

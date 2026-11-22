@@ -20,7 +20,7 @@ impl ConcentrationSpell {
     }
 }
 
-fn parse_duration(label: &str) -> Option<u32> {
+pub(crate) fn parse_duration(label: &str) -> Option<u32> {
     let label = label.trim().to_ascii_lowercase();
     let label = label.strip_prefix("concentration").unwrap_or(&label);
     let label = label.trim_start_matches([',', ':', ' ']);
