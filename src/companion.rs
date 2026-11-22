@@ -51,6 +51,10 @@ pub struct CompanionRoster {
 }
 
 impl CompanionRoster {
+    pub(crate) fn keep_sequence(&mut self, newer: &Self) {
+        self.next_id = self.next_id.max(newer.next_id);
+    }
+
     pub fn add(&mut self, template_id: Option<String>, details: CompanionDetails) -> u64 {
         self.next_id += 1;
         let id = self.next_id;

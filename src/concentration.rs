@@ -104,7 +104,7 @@ impl ConcentrationRules {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveConcentration {
     pub spell: ConcentrationSpell,
     pub remaining_seconds: Option<u32>,
@@ -130,7 +130,7 @@ pub struct RecordedSave {
     pub result: SaveResult,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Concentration {
     active: Option<ActiveConcentration>,
     pending: VecDeque<ConcentrationSave>,
@@ -139,6 +139,10 @@ pub struct Concentration {
 }
 
 impl Concentration {
+    pub(crate) fn keep_sequence(&mut self, newer: &Self) {
+        self.sequence = self.sequence.max(newer.sequence);
+    }
+
     pub fn active(&self) -> Option<&ActiveConcentration> {
         self.active.as_ref()
     }

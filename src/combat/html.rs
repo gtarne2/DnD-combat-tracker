@@ -26,7 +26,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         html.push_str("</p>");
     }
     html.push_str("</div></header><nav aria-label=\"Combat options\"><div>");
-    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#concentration\">Concentration</a><a href=\"#companions\">Companions</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
+    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#encounter\">Encounter</a><a href=\"#concentration\">Concentration</a><a href=\"#companions\">Companions</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
     for group in &sheet.groups {
         if group.action != ActionGroup::Other || !group.options.is_empty() {
             write!(
@@ -41,6 +41,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     }
     html.push_str("</span><a href=\"#sheet-layout\" data-open-panel>Layout</a><a href=\"#full-sheet\" data-open-panel>Full sheet</a></div></nav><main>");
     render_stats(&mut html, &sheet.profile.stats);
+    render_encounter(&mut html, sheet);
     html.push_str(include_str!("concentration.html"));
     render_companions(&mut html, sheet);
     html.push_str("<section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
@@ -119,11 +120,27 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str("</main><script>");
     html.push_str(include_str!("preferences.js"));
     html.push_str(include_str!("encounter.js"));
+    html.push_str(include_str!("companions.js"));
+    html.push_str(include_str!("turns.js"));
     html.push_str(include_str!("consumables.js"));
     html.push_str(include_str!("concentration.js"));
-    html.push_str(include_str!("companions.js"));
     html.push_str("</script></body></html>");
     html
+}
+
+fn render_encounter(html: &mut String, sheet: &CombatSheet) {
+    html.push_str(include_str!("turns.html"));
+    html.push_str("<div id=\"encounter-baseline\" data-owner=\"");
+    escape(html, sheet.character_name.as_deref().unwrap_or("Owner"));
+    html.push_str("\" hidden>");
+    for resource in &sheet.resources {
+        html.push_str("<span data-resource=\"");
+        escape(html, &resource.key);
+        write!(html, "\" data-capacity=\"{}\">", resource.capacity).unwrap();
+        escape(html, &resource.name);
+        html.push_str("</span>");
+    }
+    html.push_str("</div>");
 }
 
 fn render_companions(html: &mut String, sheet: &CombatSheet) {

@@ -42,12 +42,15 @@ They now chart the fog.</backstory>
     </equipment>
     <magic>
       <spellcasting name="Tinkerer" attack="6" dc="15">
+        <slots s1="3" s2="1" />
         <spells>
           <spell id="ID_TEST_SPELL_FLARE" name="Flare" level="1" />
           <spell id="ID_TEST_SPELL_COUNTER_SPARK" name="Counter Spark" level="1" />
           <spell id="ID_TEST_SPELL_BEACON_RITUAL" name="Beacon Ritual" level="1" />
         </spells>
       </spellcasting>
+      <spellcasting name="Ranger"><slots s1="3" s2="1" /></spellcasting>
+      <spellcasting name="Warlock"><slots s2="2" /></spellcasting>
     </magic>
     <elements>
       <element id="ID_LEVEL_1" type="Level" />

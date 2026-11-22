@@ -21,7 +21,7 @@ impl fmt::Display for ConsumableUseError {
 
 impl Error for ConsumableUseError {}
 
-#[derive(Default)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub(crate) struct ConsumableUses {
     spent: BTreeMap<String, u32>,
 }

@@ -98,6 +98,14 @@ article[data-pin] h3 { margin-right: 3.65rem; }
 .companion-edit-actions { margin-top: .75rem; justify-content: flex-end; }
 .companion-text { white-space: pre-wrap; }
 @media (max-width: 55rem) { .companion-grid { grid-template-columns: 1fr; } }
+#current-turn { margin-left: .5rem; color: var(--accent); }
+#encounter-storage { font-size: .85rem; }
+#turn-order, #encounter-resources { margin: .55rem 0; padding-left: 1.3rem; }
+#turn-order li, #encounter-resources li { margin: .35rem 0; overflow-wrap: anywhere; }
+#turn-order li[aria-current="true"] { background: #e0ebdf; font-weight: 700; }
+#turn-order button, #encounter-resources button { margin-left: .4rem; }
+#encounter .panel { margin-top: .6rem; }
+#encounter .panel-body input:not([type="number"]) { width: min(16rem, 100%); }
 button, input { font: inherit; color: inherit; }
 button {
   color: var(--accent); background: #f5f7f1; border: 1px solid #a7b8a8;

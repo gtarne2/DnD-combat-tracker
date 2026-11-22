@@ -189,7 +189,8 @@
   });
   document.addEventListener("preview-encounter-change", render);
   render();
-  if (seeds.length) update((roster) => {
+  function syncSeeds(state) {
+    const roster = state.companions ||= blank();
     let added = false;
     for (const seed of seeds) {
       const templateId = seed.dataset.companionSeed;
@@ -199,5 +200,9 @@
       added = true;
     }
     return added;
-  });
+  }
+  if (seeds.length) {
+    previewEncounter.reconcile(syncSeeds);
+    previewEncounter.transact(syncSeeds, { undo: false });
+  }
 })();

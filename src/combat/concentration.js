@@ -122,9 +122,15 @@ const concentrationControls = (() => {
     damage.elements.namedItem("damage").value = "";
     previewEncounter.transact((state) => {
       const focus = state.focus;
+      const hp = encounterTracker.damageOwner(state, amount);
+      if (hp.dropped && focus.active) {
+        clear(focus);
+        status.textContent = "Concentration ended at 0 HP.";
+        return true;
+      }
       if (!focus.active || amount === 0) {
         status.textContent = "No concentration save required.";
-        return false;
+        return hp.changed;
       }
       const dc = Math.max(10, Math.floor(amount / 2));
       focus.sequence += 1;

@@ -19,6 +19,7 @@ use content::ContentIndex;
 pub struct ImportedCharacter {
     pub name: Option<String>,
     pub profile: CharacterProfile,
+    pub spell_slots: SpellSlots,
     pub attacks: Vec<ImportedAttack>,
     pub equipment: Vec<ImportedItem>,
     pub spells: Vec<ImportedReference>,
@@ -29,6 +30,12 @@ pub struct ImportedCharacter {
     pub companion_definitions: BTreeMap<String, Option<ContentDefinition>>,
     /// Generated scroll IDs mapped to their spell when the supplied content identifies it uniquely.
     pub generated_scroll_spells: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct SpellSlots {
+    pub standard: [u16; 9],
+    pub pact: [u16; 9],
 }
 
 impl ImportedCharacter {
@@ -203,8 +210,34 @@ pub fn import_character_with_content(
             && build_ids.insert(entry.id)
     }));
 
-    let mut spells: Vec<_> = children_named(build, "magic")
-        .flat_map(|magic| children_named(magic, "spellcasting"))
+    let casting =
+        || children_named(build, "magic").flat_map(|magic| children_named(magic, "spellcasting"));
+    let mut spell_slots = SpellSlots::default();
+    for caster in casting() {
+        let Some(slots) = child(caster, "slots") else {
+            continue;
+        };
+        let pact = ["name", "source"].iter().any(|attribute| {
+            caster
+                .attribute(*attribute)
+                .is_some_and(|value| value.to_ascii_lowercase().contains("warlock"))
+        });
+        let pool = if pact {
+            &mut spell_slots.pact
+        } else {
+            &mut spell_slots.standard
+        };
+        for (index, total) in pool.iter_mut().enumerate() {
+            let name = format!("s{}", index + 1);
+            if let Some(amount) = slots
+                .attribute(name.as_str())
+                .and_then(|value| value.trim().parse::<u16>().ok())
+            {
+                *total = (*total).max(amount);
+            }
+        }
+    }
+    let mut spells: Vec<_> = casting()
         .flat_map(|casting| casting.children())
         .filter(|list| list.has_tag_name("spells") || list.has_tag_name("cantrips"))
         .flat_map(|list| children_named(list, "spell"))
@@ -304,6 +337,7 @@ pub fn import_character_with_content(
     Ok(ImportedCharacter {
         name,
         profile,
+        spell_slots,
         attacks,
         equipment: resolve(equipment),
         spells: resolve(spells),

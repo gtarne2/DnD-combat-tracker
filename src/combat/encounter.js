@@ -6,7 +6,22 @@ const previewEncounter = (() => {
   const emptyFocus = () => ({ active: null, pending: [], last: null, sequence: 0, rules: "2014" });
   const integer = (number) => Number.isSafeInteger(number) && number >= 0;
   let persisted = Boolean(key);
-  let state = { spent: {}, focus: emptyFocus(), companions: null };
+  const reconciliations = [];
+  let state = { spent: {}, focus: emptyFocus(), companions: null, progress: null };
+  let history = [];
+
+  function snapshot(value) {
+    return {
+      spent: Object.fromEntries(Object.entries(value?.spent || {})
+        .filter(([, used]) => integer(used) && used > 0 && used <= 0xffffffff)),
+      focus: focusFrom(value?.focus),
+      companions: Array.isArray(value?.companions?.cards) && Array.isArray(value.companions.seen)
+        && integer(value.companions.sequence) ? value.companions : null,
+      progress: integer(value?.progress?.round) && value.progress.round > 0
+        && integer(value.progress.sequence) && Array.isArray(value.progress.actors)
+        && value.progress.used && Array.isArray(value.progress.resources) ? value.progress : null,
+    };
+  }
 
   function focusFrom(saved) {
     const focus = emptyFocus();
@@ -35,13 +50,8 @@ const previewEncounter = (() => {
       const value = saved === null
         ? { spent: JSON.parse(localStorage.getItem(legacyKey)) }
         : JSON.parse(saved);
-      state = {
-        spent: Object.fromEntries(Object.entries(value?.spent || {})
-          .filter(([, used]) => integer(used) && used > 0 && used <= 0xffffffff)),
-        focus: focusFrom(value?.focus),
-        companions: Array.isArray(value?.companions?.cards) && Array.isArray(value.companions.seen)
-          && integer(value.companions.sequence) ? value.companions : null,
-      };
+      state = snapshot(value);
+      history = Array.isArray(value?.undo) ? value.undo.slice(-32).map(snapshot) : [];
     } catch (error) {
       if (!(error instanceof SyntaxError)) persisted = false;
     }
@@ -51,29 +61,63 @@ const previewEncounter = (() => {
     document.dispatchEvent(new Event("preview-encounter-change"));
   }
 
-  function transact(update) {
-    const run = () => {
-      read();
-      const draft = structuredClone(state);
-      if (update(draft)) {
-        state = draft;
-        if (persisted) {
-          try {
-            localStorage.setItem(key, JSON.stringify(state));
-          } catch {
-            persisted = false;
-          }
-        }
+  function save() {
+    while (persisted) {
+      try {
+        localStorage.setItem(key, JSON.stringify({ ...state, undo: history }));
+        break;
+      } catch (error) {
+        if (error?.name === "QuotaExceededError" && history.length) history.shift();
+        else persisted = false;
       }
+    }
+  }
+
+  function locked(run) {
+    const refreshAndRun = () => {
+      read();
+      run();
       refresh();
     };
     if (persisted && navigator.locks) {
-      navigator.locks.request(key, run).catch(() => {
+      navigator.locks.request(key, refreshAndRun).catch(() => {
         status.textContent = "Could not record the update. Try again.";
       });
     } else {
-      run();
+      refreshAndRun();
     }
+  }
+
+  function transact(update, { undo = true } = {}) {
+    locked(() => {
+      const draft = structuredClone(state);
+      if (!update(draft)) return;
+      for (const reconcile of reconciliations) reconcile(draft);
+      if (JSON.stringify(draft) === JSON.stringify(state)) return;
+      if (undo) history = [...history, state].slice(-32);
+      state = draft;
+      save();
+    });
+  }
+
+  function undo() {
+    locked(() => {
+      const previous = history.pop();
+      if (!previous) return;
+      // Keep IDs monotonic so a stale confirmation or save cannot target a later event.
+      previous.focus.sequence = Math.max(previous.focus.sequence, state.focus.sequence);
+      if (state.companions) {
+        previous.companions ||= {cards: [], seen: [], sequence: 0, owner: null};
+        previous.companions.sequence = Math.max(previous.companions.sequence, state.companions.sequence);
+      }
+      if (state.progress) {
+        previous.progress ||= {round: 1, current: null, hp: null, actors: [], sequence: 0, used: {}, resources: []};
+        previous.progress.sequence = Math.max(previous.progress.sequence, state.progress.sequence);
+      }
+      for (const reconcile of reconciliations) reconcile(previous);
+      state = previous;
+      save();
+    });
   }
 
   window.addEventListener("storage", (event) => {
@@ -83,5 +127,6 @@ const previewEncounter = (() => {
     }
   });
   read();
-  return { transact, current: () => state, isPersisted: () => persisted };
+  return { transact, undo, current: () => state, isPersisted: () => persisted,
+    canUndo: () => history.length > 0, reconcile: (callback) => reconciliations.push(callback) };
 })();

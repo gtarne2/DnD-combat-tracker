@@ -155,6 +155,7 @@
     }
     renderStats();
     renderPins();
+    document.dispatchEvent(new Event("preview-stat-overrides"));
     savePreferences("Stat overrides saved.");
   });
 

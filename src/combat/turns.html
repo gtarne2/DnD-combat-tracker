@@ -1,0 +1,49 @@
+<section id="encounter" aria-labelledby="encounter-heading">
+  <h2 id="encounter-heading">Encounter</h2>
+  <div class="focus-panel">
+    <p><strong id="round-number">Round 1</strong> <span id="current-turn">Ready to start</span></p>
+    <div class="focus-form">
+      <button type="button" id="next-turn">Start turns</button>
+      <button type="button" id="undo-turn" disabled>Undo combat update</button>
+      <span id="encounter-storage"></span>
+    </div>
+    <div>
+      <h3>Initiative</h3>
+      <form class="focus-form" id="encounter-owner">
+        <label>Your initiative <input name="initiative" type="number" min="-2147483648" max="2147483647"></label>
+        <button>Save initiative</button>
+      </form>
+      <ol id="turn-order"></ol>
+      <details class="panel" id="combatant-panel">
+        <summary>Add or edit combatant</summary>
+        <form class="panel-body focus-form" id="combatant-form">
+          <label>Combatant name <input name="name" maxlength="80" required></label>
+          <label>Initiative score <input name="score" type="number" min="-2147483648" max="2147483647" required></label>
+          <label>Combatant HP <input name="hp" type="number" min="0" max="4294967295"></label>
+          <button>Save combatant</button>
+          <button type="button" id="cancel-combatant" hidden>Cancel edit</button>
+        </form>
+      </details>
+    </div>
+    <div>
+      <h3>Hit points</h3>
+      <p id="encounter-hp">Unavailable</p>
+      <form class="focus-form" id="encounter-hp-form">
+        <label>Your current HP <input name="current" type="number" min="0" max="4294967295" required></label>
+        <label>Your maximum HP <input name="max" type="number" min="0" max="4294967295"></label>
+        <button>Set HP</button>
+      </form>
+      <details class="panel" id="resource-panel">
+        <summary>Spell slots and feature uses</summary>
+        <div class="panel-body">
+          <ul id="encounter-resources"></ul>
+          <form class="focus-form" id="encounter-resource-form">
+            <label>Resource name <input name="name" maxlength="80" required></label>
+            <label>Maximum uses <input name="capacity" type="number" min="1" max="4294967295" required></label>
+            <button>Add resource</button>
+          </form>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>

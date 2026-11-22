@@ -6,6 +6,7 @@ use crate::aurora::{
 };
 use crate::companion::{CompanionRoster, CompanionTemplate, companion_templates};
 use crate::concentration::ConcentrationSpell;
+use crate::encounter::EncounterProgress;
 use crate::inventory::{ConsumableUses, consumable_amounts, consumable_key, is_scroll};
 
 mod html;
@@ -101,6 +102,15 @@ pub struct CombatSheet {
     pub groups: [CombatGroup; 4],
     pub companion_templates: Vec<CompanionTemplate>,
     pub companions: CompanionRoster,
+    pub progress: EncounterProgress,
+    pub resources: Vec<CombatResource>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct CombatResource {
+    pub key: String,
+    pub name: String,
+    pub capacity: u32,
 }
 
 impl CombatSheet {
@@ -119,6 +129,8 @@ impl CombatSheet {
             profile: character.profile.clone(),
             companion_templates: companion_templates(character),
             companions,
+            progress: EncounterProgress::default(),
+            resources: Vec::new(),
             groups: ActionGroup::ALL.map(|action| CombatGroup {
                 action,
                 options: Vec::new(),
@@ -216,6 +228,7 @@ impl CombatSheet {
             );
         }
         sheet.add_features(character);
+        sheet.resources = resources(character, &sheet.groups);
         sheet
     }
 
@@ -412,6 +425,63 @@ impl CombatSheet {
     fn push(&mut self, action: ActionGroup, option: CombatOption) {
         self.groups[action as usize].options.push(option);
     }
+}
+
+fn resources(character: &ImportedCharacter, groups: &[CombatGroup]) -> Vec<CombatResource> {
+    let mut result = Vec::new();
+    for (pool, levels) in [
+        ("Spell slot", &character.spell_slots.standard),
+        ("Pact Magic slot", &character.spell_slots.pact),
+    ] {
+        for (index, &capacity) in levels.iter().enumerate().filter(|(_, total)| **total > 0) {
+            let level = index + 1;
+            result.push(CombatResource {
+                key: format!("{pool}:{level}"),
+                name: format!("Level {level} {pool}"),
+                capacity: capacity.into(),
+            });
+        }
+    }
+    let mut features = std::collections::BTreeMap::new();
+    for option in groups
+        .iter()
+        .flat_map(|group| &group.options)
+        .filter(|option| option.kind == OptionKind::Feature)
+    {
+        let Some(key) = &option.pin_key else { continue };
+        for detail in option
+            .details
+            .iter()
+            .filter(|detail| detail.label == "Uses")
+        {
+            let Some((amount, _)) = detail.value.split_once('/') else {
+                continue;
+            };
+            let Ok(capacity) = amount.trim().parse::<u32>() else {
+                continue;
+            };
+            if capacity == 0 {
+                continue;
+            }
+            features
+                .entry(key)
+                .and_modify(|entry: &mut Option<(&str, u32)>| {
+                    if entry.is_some_and(|(_, previous)| previous != capacity) {
+                        *entry = None;
+                    }
+                })
+                .or_insert(Some((&option.name, capacity)));
+        }
+    }
+    result.extend(features.into_iter().filter_map(|(key, entry)| {
+        let (name, capacity) = entry?;
+        Some(CombatResource {
+            key: key.clone(),
+            name: name.to_owned(),
+            capacity,
+        })
+    }));
+    result
 }
 
 struct DefinitionOption<'a> {

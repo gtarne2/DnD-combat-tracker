@@ -24,6 +24,8 @@ Select **Concentrate** on a concentration spell or use its scroll. In **Concentr
 
 In **Companions**, add an imported template or a custom companion. Edit the card to change HP, duration, command costs, and turn mode. Open **Companion initiative** to view separate entries and companions that act with their owner.
 
+In **Encounter**, enter your initiative and add other combatants. Start the turn order, then use **Next turn** to advance it. Set or adjust HP, and open **Spell slots and feature uses** to spend or restore resources. The damage form applies damage and handles concentration in one update. The preview saves progress locally, and **Undo combat update** reverses the latest change.
+
 To try the cannon variants and a ranger companion, generate the companion playtest sheet.
 
 ```powershell
