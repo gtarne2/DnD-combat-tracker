@@ -72,8 +72,16 @@ pub struct ImportedReference {
     pub saved_name: Option<String>,
     pub saved_kind: Option<String>,
     pub spellcasting: Option<SpellcastingStats>,
+    pub inventory: Option<InventoryEntry>,
     /// None when the supplied XML has no definition for this ID.
     pub definition: Option<ContentDefinition>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct InventoryEntry {
+    pub identifier: Option<String>,
+    /// A missing amount attribute represents one unit. A malformed amount is unknown.
+    pub quantity: Option<u32>,
 }
 
 impl ImportedReference {
@@ -268,6 +276,13 @@ pub fn import_character_with_content(
                 saved_name: reference.node.attribute("name").map(str::to_owned),
                 saved_kind: reference.kind.map(str::to_owned),
                 spellcasting: reference.spellcasting(),
+                inventory: reference.node.has_tag_name("item").then(|| InventoryEntry {
+                    identifier: nonempty(reference.node.attribute("identifier")).map(str::to_owned),
+                    quantity: reference
+                        .node
+                        .attribute("amount")
+                        .map_or(Some(1), |amount| amount.trim().parse().ok()),
+                }),
                 definition: definitions
                     .get(reference.id)
                     .and_then(Option::as_ref)

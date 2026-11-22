@@ -4,6 +4,7 @@ use crate::aurora::{
     CharacterProfile, ContentDefinition, ContentElement, ContentNode, ImportedCharacter,
     SpellcastingStats, is_feature_kind,
 };
+use crate::inventory::{ConsumableUses, consumable_amounts, consumable_key, is_scroll};
 
 mod html;
 
@@ -69,6 +70,13 @@ pub struct CombatOption {
     pub kind: OptionKind,
     pub details: Vec<CombatDetail>,
     pub description: Vec<ContentNode>,
+    pub consumable: Option<ConsumableAmount>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsumableAmount {
+    pub key: String,
+    pub remaining: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +100,13 @@ pub struct CombatSheet {
 
 impl CombatSheet {
     pub fn from_character(character: &ImportedCharacter) -> Self {
+        Self::with_consumable_uses(character, &ConsumableUses::default())
+    }
+
+    pub(crate) fn with_consumable_uses(
+        character: &ImportedCharacter,
+        uses: &ConsumableUses,
+    ) -> Self {
         let mut sheet = Self {
             character_name: character.name.clone(),
             profile: character.profile.clone(),
@@ -126,10 +141,23 @@ impl CombatSheet {
                     linked_spell: None,
                     spellcasting: spell.spellcasting.as_ref(),
                     kind: OptionKind::Spell,
+                    consumable: None,
                 },
             );
         }
+        let mut amounts = consumable_amounts(character);
         for item in &character.equipment {
+            let consumable = if let Some(key) = consumable_key(item) {
+                let Some(amount) = amounts.remove(&key) else {
+                    continue;
+                };
+                Some(ConsumableAmount {
+                    remaining: uses.remaining(&key, amount),
+                    key,
+                })
+            } else {
+                None
+            };
             let definition = item.definition.as_ref();
             let kind = if is_scroll(&item.content_id, definition) {
                 OptionKind::Scroll
@@ -153,6 +181,7 @@ impl CombatSheet {
                         .flatten(),
                     spellcasting: None,
                     kind,
+                    consumable,
                 },
             );
         }
@@ -173,6 +202,7 @@ impl CombatSheet {
                     linked_spell: None,
                     spellcasting: None,
                     kind: OptionKind::Attack,
+                    consumable: None,
                 },
             );
         }
@@ -229,6 +259,7 @@ impl CombatSheet {
                     linked_spell: None,
                     spellcasting: None,
                     kind: OptionKind::Feature,
+                    consumable: None,
                 },
             );
         }
@@ -242,11 +273,13 @@ impl CombatSheet {
             linked_spell,
             spellcasting,
             kind,
+            consumable,
         } = source;
         let name = name
             .or_else(|| definition.and_then(|value| value.name.as_deref()))
             .unwrap_or(id);
         let mut option = CombatOption::new(kind, name);
+        option.consumable = consumable;
         option.pin_key = Some(
             match spellcasting.and_then(|casting| casting.source_id.as_deref()) {
                 Some(caster) => format!("{}:{id}:{caster}", kind.label()),
@@ -355,6 +388,7 @@ struct DefinitionOption<'a> {
     linked_spell: Option<&'a ContentDefinition>,
     spellcasting: Option<&'a SpellcastingStats>,
     kind: OptionKind,
+    consumable: Option<ConsumableAmount>,
 }
 
 impl CombatOption {
@@ -365,6 +399,7 @@ impl CombatOption {
             kind,
             details: Vec::new(),
             description: Vec::new(),
+            consumable: None,
         }
     }
 
@@ -394,12 +429,6 @@ fn setter(definition: Option<&ContentDefinition>, key: &str) -> Option<String> {
 
 fn lookup<'a>(character: &'a ImportedCharacter, id: &str) -> Option<&'a ContentDefinition> {
     character.definitions.get(id)?.as_ref()
-}
-
-fn is_scroll(id: &str, definition: Option<&ContentDefinition>) -> bool {
-    id.contains("_SPELL_SCROLL_")
-        || setter(definition, "type").as_deref() == Some("Scroll")
-        || setter(definition, "category").as_deref() == Some("Scrolls")
 }
 
 fn scroll_spell<'a>(

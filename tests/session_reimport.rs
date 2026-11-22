@@ -7,6 +7,8 @@ use std::{
 
 use aurora_combat_tracker::{
     aurora::{ImportError, import_character_with_content},
+    combat::{CombatSheet, ConsumableAmount},
+    inventory::ConsumableUseError,
     session::{CharacterSession, Pin},
 };
 
@@ -151,6 +153,84 @@ fn changing_content_sources_keeps_pins_for_references_whose_definitions_are_miss
 
     assert!(session.reimport().unwrap().is_empty());
     assert!(session.character().companions[0].definition.is_none());
+}
+
+#[test]
+fn consumable_use_is_per_stack_and_survives_an_inventory_refresh() {
+    let files = TestFiles::new();
+    let save = files.save();
+    fs::copy(fixture("combat-sheet.dnd5e"), &save).unwrap();
+    let before = fs::read_to_string(&save).unwrap();
+    let mut session = CharacterSession::open(
+        save.clone(),
+        vec![fixture("combat-sheet.xml")],
+        encounter(),
+        layout(),
+    )
+    .unwrap();
+    let key = stack(&session.combat_sheet(), "Healing Draught (belt)")
+        .key
+        .clone();
+
+    assert_eq!(session.use_consumable(&key), Ok(1));
+    let sheet = session.combat_sheet();
+    assert_eq!(stack(&sheet, "Healing Draught (belt)").remaining, Some(1));
+    assert_eq!(stack(&sheet, "Healing Draught (pack)").remaining, Some(4));
+    assert_eq!(session.use_consumable(&key), Ok(0));
+    assert_eq!(
+        session.use_consumable(&key),
+        Err(ConsumableUseError::Depleted)
+    );
+    let unavailable = &stack(&sheet, "Uncertain Draught Stack").key;
+    assert_eq!(
+        session.use_consumable(unavailable),
+        Err(ConsumableUseError::QuantityUnavailable)
+    );
+    assert_eq!(
+        session.use_consumable("removed-item"),
+        Err(ConsumableUseError::UnknownStack)
+    );
+    assert_eq!(fs::read_to_string(&save).unwrap(), before);
+
+    let refreshed = before.replace(
+        "identifier=\"belt-potion\" amount=\"2\"",
+        "identifier=\"belt-potion\" amount=\"5\"",
+    );
+    fs::write(&save, &refreshed).unwrap();
+    session.reimport().unwrap();
+    assert_eq!(
+        stack(&session.combat_sheet(), "Healing Draught (belt)").remaining,
+        Some(3)
+    );
+    assert_eq!(session.encounter, encounter());
+
+    fs::write(
+        &save,
+        refreshed.replace(
+            "identifier=\"belt-potion\"",
+            "identifier=\"replacement-potion\"",
+        ),
+    )
+    .unwrap();
+    session.reimport().unwrap();
+    assert_eq!(
+        session.use_consumable(&key),
+        Err(ConsumableUseError::UnknownStack)
+    );
+    assert_eq!(
+        stack(&session.combat_sheet(), "Healing Draught (belt)").remaining,
+        Some(5)
+    );
+}
+
+fn stack<'a>(sheet: &'a CombatSheet, name: &str) -> &'a ConsumableAmount {
+    sheet
+        .groups
+        .iter()
+        .flat_map(|group| &group.options)
+        .find(|option| option.name == name)
+        .and_then(|option| option.consumable.as_ref())
+        .unwrap()
 }
 
 fn fixture(name: &str) -> PathBuf {

@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use crate::aurora::{ABILITIES, CharacterProfile, ContentNode, KeyStats, ProfileSection};
 
-use super::{ActionGroup, CombatSheet};
+use super::{ActionGroup, CombatSheet, ConsumableAmount};
 
 /// Renders a standalone preview without a network connection or client-side dependencies.
 pub fn render_html(sheet: &CombatSheet) -> String {
@@ -43,6 +43,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_stats(&mut html, &sheet.profile.stats);
     html.push_str("<section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
     render_layout(&mut html, sheet);
+    html.push_str("<p id=\"consumable-status\" class=\"visually-hidden\" role=\"status\"></p>");
     html.push_str("<div id=\"action-groups\">");
     for group in &sheet.groups {
         if group.action == ActionGroup::Other && group.options.is_empty() {
@@ -78,6 +79,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
                 }
                 html.push_str("</dl>");
             }
+            if let Some(consumable) = &option.consumable {
+                render_consumable(&mut html, consumable, &option.name);
+            }
             if !option.description.is_empty() {
                 html.push_str(
                     "<details><summary>Full description</summary><div class=\"description\">",
@@ -93,8 +97,33 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_full_sheet(&mut html, &sheet.profile);
     html.push_str("</main><script>");
     html.push_str(include_str!("preferences.js"));
+    html.push_str(include_str!("consumables.js"));
     html.push_str("</script></body></html>");
     html
+}
+
+fn render_consumable(html: &mut String, consumable: &ConsumableAmount, name: &str) {
+    html.push_str("<div class=\"consumable\" data-consumable=\"");
+    escape(html, &consumable.key);
+    html.push('"');
+    if let Some(amount) = consumable.remaining {
+        write!(html, " data-amount=\"{amount}\"").unwrap();
+    }
+    html.push_str("><span>Quantity <strong data-remaining>");
+    if let Some(amount) = consumable.remaining {
+        write!(html, "{amount}").unwrap();
+    } else {
+        html.push_str("Unavailable");
+    }
+    html.push_str("</strong></span><button type=\"button\" data-use=\"");
+    escape(html, name);
+    html.push_str("\" aria-label=\"Use ");
+    escape(html, name);
+    html.push('"');
+    if !consumable.remaining.is_some_and(|amount| amount > 0) {
+        html.push_str(" disabled");
+    }
+    html.push_str(">Use</button></div>");
 }
 
 fn render_stats(html: &mut String, stats: &KeyStats) {

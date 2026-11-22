@@ -39,7 +39,12 @@
   <element id="ID_TEST_ITEM_ROD" name="Signal Rod" type="Magic Item" source="Synthetic Test Content">
     <description><p>As an action, you can spend one charge to light a signal.</p></description>
     <sheet usage="3/Day" />
-    <setters><set name="range">90 feet</set></setters>
+    <setters><set name="range">90 feet</set><set name="stackable">true</set></setters>
+  </element>
+  <element id="ID_TEST_POTION_HEALING" name="Healing Draught" type="Magic Item" source="Synthetic Test Content">
+    <description><p>Drink the draught to regain 2d4 hit points.</p></description>
+    <setters><set name="type">Potion</set></setters>
+    <sheet action="Bonus Action" />
   </element>
   <element id="ID_TEST_FEATURE_TURRET" name="Signal Turret" type="Class Feature" source="Synthetic Test Content">
     <description><p>Choose a signal mode.</p><div element="ID_TEST_TURRET_MODES" /></description>

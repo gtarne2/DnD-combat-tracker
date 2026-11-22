@@ -184,3 +184,45 @@ fn leaves_unsupplied_stats_available_for_local_correction() {
     assert!(html.contains("data-stat=\"hp\">Unavailable"));
     assert!(html.contains("Save stat overrides"));
 }
+
+#[test]
+fn imports_consumable_quantities_without_treating_reusable_charges_as_units() {
+    let sheet = sheet();
+    let belt = option(&sheet, ActionGroup::BonusAction, "Healing Draught (belt)")
+        .consumable
+        .as_ref()
+        .unwrap();
+    let pack = option(&sheet, ActionGroup::BonusAction, "Healing Draught (pack)")
+        .consumable
+        .as_ref()
+        .unwrap();
+    assert_ne!(belt.key, pack.key);
+    assert_eq!(belt.remaining, Some(2));
+    assert_eq!(pack.remaining, Some(4));
+    assert_eq!(
+        option(&sheet, ActionGroup::Reaction, "Scroll of Shield Flash")
+            .consumable
+            .as_ref()
+            .unwrap()
+            .remaining,
+        Some(1)
+    );
+    let legacy: Vec<_> = sheet
+        .groups
+        .iter()
+        .flat_map(|group| &group.options)
+        .filter(|option| option.name == "Scroll of Twin Signal")
+        .collect();
+    assert_eq!(legacy.len(), 1);
+    assert_eq!(legacy[0].consumable.as_ref().unwrap().remaining, Some(3));
+    assert!(
+        option(&sheet, ActionGroup::Action, "Signal Rod")
+            .consumable
+            .is_none()
+    );
+
+    let html = render_html(&sheet);
+    assert!(html.contains("aria-label=\"Use Empty Draught Stack\" disabled"));
+    assert!(html.contains("aria-label=\"Use Uncertain Draught Stack\" disabled"));
+    assert!(!html.contains("aria-label=\"Use Signal Rod\""));
+}

@@ -1,6 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use crate::aurora::{ImportError, ImportedCharacter, import_character_with_content};
+use crate::{
+    aurora::{ImportError, ImportedCharacter, import_character_with_content},
+    combat::CombatSheet,
+    inventory::{ConsumableUseError, ConsumableUses},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Pin {
@@ -32,6 +36,7 @@ pub struct CharacterSession<Encounter, Layout> {
     save_path: PathBuf,
     content_paths: Vec<PathBuf>,
     character: ImportedCharacter,
+    consumable_uses: ConsumableUses,
     pub encounter: Encounter,
     pub layout: Layout,
     pub pins: Vec<Pin>,
@@ -49,6 +54,7 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
             save_path,
             content_paths,
             character,
+            consumable_uses: ConsumableUses::default(),
             encounter,
             layout,
             pins: Vec::new(),
@@ -57,6 +63,15 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
 
     pub fn character(&self) -> &ImportedCharacter {
         &self.character
+    }
+
+    pub fn combat_sheet(&self) -> CombatSheet {
+        CombatSheet::with_consumable_uses(&self.character, &self.consumable_uses)
+    }
+
+    /// Records one unit spent and returns the updated quantity.
+    pub fn use_consumable(&mut self, key: &str) -> Result<u32, ConsumableUseError> {
+        self.consumable_uses.use_one(&self.character, key)
     }
 
     /// Rereads the saved character and content files. Returns the pins whose targets disappeared.

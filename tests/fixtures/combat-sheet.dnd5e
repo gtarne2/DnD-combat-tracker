@@ -29,8 +29,13 @@ They now chart the fog.</backstory>
     <equipment>
       <item id="ID_TEST_ITEM_ROD" name="Signal Rod" />
       <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_SHIELD_FLASH" name="Scroll of Shield Flash" />
-      <item id="ID_TEST_ITEM_SCROLL_FLARE" name="Scroll of Flare" />
+      <item id="ID_TEST_ITEM_SCROLL_FLARE" name="Scroll of Flare" identifier="flare-scrolls" amount="2" />
       <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_TWIN_SIGNAL" name="Scroll of Twin Signal" />
+      <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_TWIN_SIGNAL" name="Scroll of Twin Signal" amount="2" />
+      <item id="ID_TEST_POTION_HEALING" name="Healing Draught (belt)" identifier="belt-potion" amount="2" />
+      <item id="ID_TEST_POTION_HEALING" name="Healing Draught (pack)" identifier="pack-potion" amount="4" />
+      <item id="ID_TEST_POTION_HEALING" name="Empty Draught Stack" identifier="empty-potion" amount="0" />
+      <item id="ID_TEST_POTION_HEALING" name="Uncertain Draught Stack" identifier="uncertain-potion" amount="several" />
       <item id="ID_TEST_ITEM_UNKNOWN" name="Unidentified Vial" />
       <item id="ID_TEST_ARMOR_SCALE" name="Signal Scale"><equipped location="Armor">true</equipped></item>
       <item id="ID_TEST_ARMOR_SHIELD" name="Signal Shield"><equipped location="Secondary Hand">true</equipped></item>
