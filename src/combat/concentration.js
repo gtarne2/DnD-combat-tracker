@@ -167,14 +167,13 @@ const concentrationControls = (() => {
     previewEncounter.transact((state) => {
       const focus = state.focus;
       if (focus.active?.remaining == null) return false;
-      focus.active.remaining = Math.max(0, focus.active.remaining - seconds);
-      if (focus.active.remaining === 0) {
-        clear(focus);
+      const updated = effectControls.advanceTime(state, seconds);
+      if (updated.concentrationExpired) {
         status.textContent = "Concentration expired.";
       } else {
         status.textContent = "Concentration duration updated.";
       }
-      return true;
+      return updated.changed;
     });
   });
 

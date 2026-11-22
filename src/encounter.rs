@@ -1,6 +1,9 @@
 use std::{cmp::Reverse, collections::BTreeMap};
 
-use crate::companion::{CompanionRoster, CompanionTurn};
+use crate::{
+    companion::{CompanionRoster, CompanionTurn},
+    effects::Effects,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum InitiativeId {
@@ -30,6 +33,7 @@ pub struct EncounterProgress {
     pub owner_hp: Option<HitPoints>,
     pub combatants: Vec<Combatant>,
     pub spent: BTreeMap<String, u32>,
+    pub effects: Effects,
     next_id: u64,
 }
 
@@ -41,6 +45,7 @@ impl Default for EncounterProgress {
             owner_hp: None,
             combatants: Vec::new(),
             spent: BTreeMap::new(),
+            effects: Effects::default(),
             next_id: 0,
         }
     }
@@ -49,6 +54,7 @@ impl Default for EncounterProgress {
 impl EncounterProgress {
     pub(crate) fn keep_sequence(&mut self, newer: &Self) {
         self.next_id = self.next_id.max(newer.next_id);
+        self.effects.keep_sequence(&newer.effects);
     }
 
     pub fn add_combatant(&mut self, name: String, initiative: i32, hp: Option<HitPoints>) -> u64 {

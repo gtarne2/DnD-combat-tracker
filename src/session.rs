@@ -7,10 +7,12 @@ use crate::{
     aurora::{ImportError, ImportedCharacter, import_character_with_content},
     combat::CombatSheet,
     companion::CompanionRoster,
+    companion::CompanionTurn,
     concentration::{
         Concentration, ConcentrationCast, ConcentrationRules, ConcentrationSave,
         ConcentrationStart, RecordedSave, Replacement, SaveResult, StartError,
     },
+    effects::TurnBoundary,
     encounter::{EncounterProgress, InitiativeId},
     inventory::{ConsumableUseError, ConsumableUses},
 };
@@ -159,9 +161,21 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
 
     pub fn next_turn(&mut self) -> Option<InitiativeId> {
         let before = self.snapshot();
+        let previous = before.progress.current.filter(|current| {
+            before
+                .progress
+                .ordered(&self.companions)
+                .iter()
+                .any(|(id, _)| id == current)
+        });
         self.progress.advance(&self.companions)?;
+        if let Some(previous) = previous {
+            self.effect_boundary(TurnBoundary::End, previous);
+        }
         if before.progress.round != self.progress.round {
             self.concentration.elapse(6);
+            self.progress.effects.advance_round();
+            self.progress.effects.elapse(6);
             for card in &mut self.companions.cards {
                 if let Some(rounds) = &mut card.remaining_rounds {
                     *rounds = rounds.saturating_sub(1);
@@ -169,8 +183,27 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
             }
             self.progress.reconcile_turn(&self.companions);
         }
+        if let Some(current) = self.progress.current {
+            self.effect_boundary(TurnBoundary::Start, current);
+        }
         self.remember(before);
         self.progress.current
+    }
+
+    fn effect_boundary(&mut self, boundary: TurnBoundary, current: InitiativeId) {
+        let companions = &self.companions.cards;
+        self.progress
+            .effects
+            .boundary(boundary, current, |target| match target {
+                InitiativeId::Companion(id) => companions
+                    .iter()
+                    .find(|card| card.id == id && card.remaining_rounds != Some(0))
+                    .map(|card| match card.turn {
+                        CompanionTurn::WithOwner => InitiativeId::Owner,
+                        CompanionTurn::Separate(_) => target,
+                    }),
+                _ => Some(target),
+            });
     }
 
     pub fn record_damage(
@@ -213,6 +246,7 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
     pub fn advance_concentration_time(&mut self, seconds: u32) -> bool {
         let before = self.snapshot();
         let expired = self.concentration.elapse(seconds);
+        self.progress.effects.elapse(seconds);
         self.remember(before);
         expired
     }

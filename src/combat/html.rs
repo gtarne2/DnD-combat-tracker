@@ -26,7 +26,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         html.push_str("</p>");
     }
     html.push_str("</div></header><nav aria-label=\"Combat options\"><div>");
-    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#encounter\">Encounter</a><a href=\"#concentration\">Concentration</a><a href=\"#companions\">Companions</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
+    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#encounter\">Encounter</a><a href=\"#concentration\">Concentration</a><a href=\"#effects\">Effects</a><a href=\"#companions\">Companions</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
     for group in &sheet.groups {
         if group.action != ActionGroup::Other || !group.options.is_empty() {
             write!(
@@ -43,6 +43,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_stats(&mut html, &sheet.profile.stats);
     render_encounter(&mut html, sheet);
     html.push_str(include_str!("concentration.html"));
+    html.push_str(include_str!("effects.html"));
     render_companions(&mut html, sheet);
     html.push_str("<section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
     render_layout(&mut html, sheet);
@@ -122,6 +123,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("encounter.js"));
     html.push_str(include_str!("companions.js"));
     html.push_str(include_str!("turns.js"));
+    html.push_str(include_str!("effects.js"));
     html.push_str(include_str!("consumables.js"));
     html.push_str(include_str!("concentration.js"));
     html.push_str("</script></body></html>");

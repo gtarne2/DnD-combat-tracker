@@ -106,6 +106,15 @@ article[data-pin] h3 { margin-right: 3.65rem; }
 #turn-order button, #encounter-resources button { margin-left: .4rem; }
 #encounter .panel { margin-top: .6rem; }
 #encounter .panel-body input:not([type="number"]) { width: min(16rem, 100%); }
+.effect-tools { margin-bottom: .5rem; }
+#effect-feedback:empty { display: none; }
+#effect-list, #ended-effects { margin-top: .65rem; }
+.effect-notes { white-space: pre-wrap; }
+#effect-editor {
+  width: min(94%, 34rem); max-height: 90vh; overflow: auto; padding: 1rem;
+  color: inherit; background: #fffdf6; border: 1px solid var(--edge); border-radius: .45rem;
+}
+#effect-editor::backdrop { background: #17251d99; }
 button, input { font: inherit; color: inherit; }
 button {
   color: var(--accent); background: #f5f7f1; border: 1px solid #a7b8a8;

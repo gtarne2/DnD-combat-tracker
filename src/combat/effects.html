@@ -1,0 +1,40 @@
+<section id="effects" aria-labelledby="effects-heading">
+  <h2 id="effects-heading">Ongoing effects</h2>
+  <div class="focus-form effect-tools">
+    <button type="button" id="add-effect">Add effect</button>
+    <form id="effect-clock" class="focus-form">
+      <label>Elapsed game time <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
+      <label for="effect-clock-unit">Game time unit</label>
+      <select id="effect-clock-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select>
+      <button>Advance game time</button>
+    </form>
+  </div>
+  <p id="effect-feedback" role="status"></p>
+  <div id="effect-list" class="companion-grid"></div>
+  <details id="ended-effects" class="panel" hidden>
+    <summary>Ended effects</summary>
+    <div id="ended-effect-list" class="panel-body companion-grid"></div>
+  </details>
+</section>
+<dialog id="effect-editor" aria-labelledby="effect-heading">
+  <form id="effect-form">
+    <h2 id="effect-heading">Ongoing effect</h2>
+    <div class="companion-fields">
+      <label>Effect name <input name="name" maxlength="120" placeholder="Berserk" required></label>
+      <div><label for="effect-target">Applies to</label><select id="effect-target" name="target"></select></div>
+      <div><label for="effect-kind">Ends after</label>
+        <select id="effect-kind" name="kind"><option value="manual">Manually ended</option><option value="rounds">Combat rounds</option><option value="seconds">In-game time</option><option value="start">Start of turn</option><option value="end">End of turn</option></select>
+      </div>
+      <label id="effect-amount">Remaining <input name="remaining" type="number" min="1" max="4294967295" value="1"></label>
+      <div id="effect-time-unit"><label for="effect-duration-unit">Duration unit</label>
+        <select id="effect-duration-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select>
+      </div>
+      <div id="effect-anchor"><label for="effect-turn">Whose turn</label><select id="effect-turn" name="anchor"></select></div>
+      <label class="companion-wide">Notes <textarea name="notes" rows="3" maxlength="2000"></textarea></label>
+    </div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="effect-cancel">Cancel</button>
+      <button>Save effect</button>
+    </div>
+  </form>
+</dialog>

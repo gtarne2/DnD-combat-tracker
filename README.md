@@ -26,6 +26,8 @@ In **Companions**, add an imported template or a custom companion. Edit the card
 
 In **Encounter**, enter your initiative and add other combatants. Start the turn order, then use **Next turn** to advance it. Set or adjust HP, and open **Spell slots and feature uses** to spend or restore resources. The damage form applies damage and handles concentration in one update. The preview saves progress locally, and **Undo combat update** reverses the latest change.
 
+In **Effects**, add a custom effect such as **Berserk**, choose its target, and set when it ends. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
+
 To try the cannon variants and a ranger companion, generate the companion playtest sheet.
 
 ```powershell

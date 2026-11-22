@@ -6,7 +6,7 @@ const encounterTracker = (() => {
   }));
   const keyHp = () => document.querySelector("#key-stats [data-stat=hp]").textContent;
   let hpBaseline = keyHp();
-  const blank = () => ({round: 1, current: null, hp: null, actors: [], sequence: 0, used: {}, resources: []});
+  const blank = () => ({round: 1, current: null, hp: null, actors: [], sequence: 0, used: {}, resources: [], effects: []});
   const get = (state) => state.progress || blank();
   const owner = byId("encounter-owner");
   const hpForm = byId("encounter-hp-form");
@@ -117,12 +117,13 @@ const encounterTracker = (() => {
     previewEncounter.transact((state) => operation(state.progress ||= blank(), state));
   }
 
-  previewEncounter.reconcile((state) => {
+  function reconcileCurrent(state) {
     const progress = state.progress;
     if (!progress?.current) return;
     const rows = turns(state);
     if (!rows.some((row) => row.key === progress.current)) progress.current = rows[0]?.key || null;
-  });
+  }
+  previewEncounter.reconcile(reconcileCurrent);
 
   byId("next-turn").addEventListener("click", () => {
     update((progress, state) => {
@@ -130,18 +131,18 @@ const encounterTracker = (() => {
       if (!rows.length) return false;
       const index = rows.findIndex((row) => row.key === progress.current);
       const wrap = index === rows.length - 1;
+      if (index >= 0) effectControls.boundary(state, "end", rows[index].key);
       progress.current = rows[wrap ? 0 : index + 1].key;
       if (wrap) {
         progress.round += 1;
-        const focus = state.focus;
-        if (focus.active?.remaining != null) {
-          focus.active.remaining = Math.max(0, focus.active.remaining - 6);
-          if (!focus.active.remaining) { focus.active = null; focus.pending = []; }
-        }
+        effectControls.advanceRound(state);
+        effectControls.advanceTime(state, 6);
         for (const card of state.companions?.cards || []) {
           if (card.rounds > 0) card.rounds -= 1;
         }
       }
+      reconcileCurrent(state);
+      if (progress.current) effectControls.boundary(state, "start", progress.current);
       return true;
     });
   });
@@ -274,5 +275,5 @@ const encounterTracker = (() => {
   document.addEventListener("preview-stat-overrides", () => { hpBaseline = keyHp(); render(); });
   document.addEventListener("preview-encounter-change", render);
   render();
-  return {damageOwner};
+  return {damageOwner, update, ownerName: baseline.dataset.owner, turns};
 })();

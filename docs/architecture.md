@@ -63,3 +63,9 @@ Initiative uses stable participant IDs and descending scores, with the owner fir
 Aurora can repeat multiclass spell slot totals on more than one spellcasting entry. The importer takes the highest exported shared total per slot level and keeps Warlock Pact Magic separate. Unambiguous feature capacities come from their imported usage labels. The preview supports manually adding resource pools and editing capacities.
 
 Rust commands keep an encounter undo history. The standalone preview saves turns, HP, resources, companions, concentration, consumables, and up to 32 previous snapshots together in browser storage, keyed by the character save. Re-imported source data and layout preferences live outside the undo snapshots. Undo restores the previous combat state, including compound updates such as damage plus a concentration prompt.
+
+## Ongoing effects
+
+Custom effects belong to stable character, companion, or combatant IDs. Each has a name, notes, and an expiration rule. Round durations tick when initiative wraps, advancing the in-game clock by six seconds. Explicit elapsed time advances time-based effects and concentration. Turn-boundary durations count the matching starts or ends of the selected participant's turn. A companion acting with its owner uses the owner's turn.
+
+Starting initiative processes the first start boundary. Advancing processes the outgoing end boundary, any round rollover, and the incoming start boundary in one update. Reordering initiative leaves durations as they were. Expired or manually ended effects are available for review and editing, and can be removed. Effects are included in the same saved encounter and undo history as initiative.
