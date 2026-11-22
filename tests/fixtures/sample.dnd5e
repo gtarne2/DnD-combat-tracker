@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<character version="1.0.3" preview="false">
+  <build>
+    <input>
+      <name>Rowan &amp; Co.</name>
+    </input>
+    <equipment>
+      <item identifier="00000000-0000-4000-8000-000000000001" name="Rowan's Lantern" id="ID_TEST_ITEM_LANTERN" />
+      <item identifier="00000000-0000-4000-8000-000000000002" name="Rowan's Lantern" id="ID_TEST_ITEM_MISSING" />
+    </equipment>
+  </build>
+</character>

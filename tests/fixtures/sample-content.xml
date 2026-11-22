@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element id="ID_TEST_ITEM_LANTERN" name="Signal Lantern" type="Item" source="Synthetic Test Content" />
+</elements>
