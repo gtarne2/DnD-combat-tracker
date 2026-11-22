@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <info><update version="3.0" /></info>
+  <element id="ID_TEST_SPELL_BEACON" name="Guiding Beacon" type="Spell" source="Synthetic Revision">
+    <setters><set name="range">90 feet</set></setters>
+  </element>
+  <element id="ID_TEST_SPELL_LANTERN_FLARE" name="Lantern Flare" type="Spell" source="Synthetic Revision" />
+  <element id="ID_TEST_ITEM_REVISED_ROD" name="Signal Rod" type="Magic Item" source="Synthetic Revision" />
+  <element id="ID_TEST_FEATURE_TURRET" name="Signal Turret" type="Class Feature" source="Synthetic Revision">
+    <rules><grant type="Class Feature" id="ID_TEST_TURRET_FLAME" /></rules>
+  </element>
+</elements>

@@ -17,3 +17,9 @@ The Rust importer reads a UTF-8 character save and local content XML files. It r
 Callers pass content files in Aurora load order. A later file can replace a definition with the same ID, and targeted `append` entries contribute rules and supports in file order. Each resolved definition records its source file and published version when present. It keeps the definition's description markup, sheet text, setters, rule attributes, and other content as data.
 
 The import catalog follows exact IDs named by grants, ID-based selections, and embedded descriptions. This makes related options such as the Artillerist's cannon variants available even when the save names only the parent feature. The catalog records unavailable targets and visits each ID once. Saved selections retain their own lists, and rule data retains conditions such as levels and support expressions for later evaluation by the app.
+
+## Re-importing a character
+
+A Rust character session keeps the Aurora snapshot and its source paths alongside tracker-owned encounter state, layout, and pins. Re-import reads the same save path so a character rename leaves the session attached. The session loads the entire new snapshot before applying it. A failed read or parse leaves the previous snapshot, sources, and tracker state available for retry. Callers can supply an updated list of content files in Aurora load order.
+
+Pins for saved equipment, spells, build elements, and companions follow the exact Aurora content ID in the corresponding list. Pins for linked options follow IDs in the reachable definition catalog. An unresolved ID still qualifies while the refreshed save or catalog references it. Re-import removes pins whose targets disappear and returns them in their previous order. It preserves the order of the remaining pins, tracker-owned pins, and the encounter and layout values.

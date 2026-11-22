@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character version="1.0.3" preview="false">
+  <build>
+    <input><name>Rowan Revised</name></input>
+    <elements>
+      <element type="Class Feature" name="Signal Turret" id="ID_TEST_FEATURE_TURRET" />
+    </elements>
+    <magic>
+      <spellcasting name="Tinkerer" ability="Intelligence">
+        <spells>
+          <spell name="Guiding Beacon" level="1" id="ID_TEST_SPELL_BEACON" />
+          <spell name="Lantern Flare" level="1" id="ID_TEST_SPELL_LANTERN_FLARE" />
+        </spells>
+      </spellcasting>
+    </magic>
+    <equipment>
+      <item identifier="00000000-0000-4000-8000-000000000004" name="Signal Rod" id="ID_TEST_ITEM_REVISED_ROD" />
+    </equipment>
+  </build>
+</character>
