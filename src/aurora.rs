@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashSet},
     error::Error,
     fmt, fs, io,
     path::{Path, PathBuf},
@@ -7,25 +7,55 @@ use std::{
 
 use roxmltree::{Document, Node};
 
+mod content;
+
+pub use content::{ContentDefinition, ContentElement, ContentNode};
+
+use content::ContentIndex;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedCharacter {
     pub name: Option<String>,
     pub equipment: Vec<ImportedItem>,
+    pub spells: Vec<ImportedReference>,
+    pub build_elements: Vec<ImportedReference>,
+    pub companions: Vec<ImportedReference>,
+    /// Definitions reachable from the save. A present key with no value marks missing content.
+    pub definitions: BTreeMap<String, Option<ContentDefinition>>,
 }
 
+impl ImportedCharacter {
+    /// Features recorded as selections in the save. Related options are in the definition catalog.
+    pub fn features(&self) -> impl Iterator<Item = &ImportedReference> {
+        self.build_elements.iter().filter(|reference| {
+            reference.kind().is_some_and(|kind| {
+                matches!(
+                    kind,
+                    "Feat" | "Feature" | "Racial Trait" | "Companion Trait"
+                ) || kind.ends_with(" Feature")
+            })
+        })
+    }
+}
+
+pub type ImportedItem = ImportedReference;
+
 #[derive(Debug, PartialEq, Eq)]
-pub struct ImportedItem {
+pub struct ImportedReference {
     pub content_id: String,
     pub saved_name: Option<String>,
+    pub saved_kind: Option<String>,
     /// None when the supplied XML has no definition for this ID.
     pub definition: Option<ContentDefinition>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct ContentDefinition {
-    pub name: Option<String>,
-    pub kind: Option<String>,
-    pub source: Option<String>,
+impl ImportedReference {
+    pub fn kind(&self) -> Option<&str> {
+        self.definition
+            .as_ref()
+            .and_then(|definition| definition.kind.as_deref())
+            .or(self.saved_kind.as_deref())
+    }
 }
 
 #[derive(Debug)]
@@ -68,10 +98,18 @@ impl Error for ImportError {
     }
 }
 
-/// Reads a UTF-8 Aurora save and resolves its equipment against one content XML file.
+/// Reads a UTF-8 Aurora save and resolves its references against one content XML file.
 pub fn import_character(
     save_path: &Path,
     content_path: &Path,
+) -> Result<ImportedCharacter, ImportError> {
+    import_character_with_content(save_path, &[content_path])
+}
+
+/// Resolves a UTF-8 Aurora save using content files in Aurora load order, with overrides last.
+pub fn import_character_with_content(
+    save_path: &Path,
+    content_paths: &[&Path],
 ) -> Result<ImportedCharacter, ImportError> {
     let save_xml = read_xml(save_path)?;
     let save = parse_xml(&save_xml, save_path, "character")?;
@@ -84,42 +122,115 @@ pub fn import_character(
         .filter(|name| !name.is_empty())
         .map(str::to_owned);
 
-    let content_xml = read_xml(content_path)?;
-    let content = parse_xml(&content_xml, content_path, "elements")?;
-    let mut definitions = HashMap::new();
-    for element in content
-        .root_element()
-        .children()
+    let equipment = children_named(build, "equipment")
+        .flat_map(|items| children_named(items, "item"))
+        .map(|item| {
+            SavedReference::from_node(item)
+                .ok_or_else(|| structure_error(save_path, "equipment <item> has no content ID"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let build_elements: Vec<_> = children_named(build, "elements")
+        .flat_map(|elements| elements.descendants())
         .filter(|node| node.has_tag_name("element"))
-    {
-        let id = content_id(element)
-            .ok_or_else(|| structure_error(content_path, "content <element> has no ID"))?;
-        if definitions.insert(id, element).is_some() {
-            return Err(structure_error(
-                content_path,
-                format!("duplicate content ID {id}"),
-            ));
-        }
+        .filter_map(SavedReference::from_node)
+        .collect();
+
+    let mut spells: Vec<_> = children_named(build, "magic")
+        .flat_map(|magic| children_named(magic, "spellcasting"))
+        .flat_map(|casting| casting.children())
+        .filter(|list| list.has_tag_name("spells") || list.has_tag_name("cantrips"))
+        .flat_map(|list| children_named(list, "spell"))
+        .filter_map(SavedReference::from_node)
+        .collect();
+    let mut spell_ids: HashSet<_> = spells.iter().map(|spell| spell.id).collect();
+    spells.extend(
+        build_elements
+            .iter()
+            .copied()
+            .filter(|element| element.kind == Some("Spell") && spell_ids.insert(element.id)),
+    );
+
+    let companions: Vec<_> = children_named(build, "companion")
+        .filter_map(SavedReference::from_node)
+        .chain(build_elements.iter().copied().filter(|element| {
+            element.kind == Some("Companion")
+                || element.node.parent_element().is_some_and(|parent| {
+                    parent.has_tag_name("element") && parent.attribute("type") == Some("Companion")
+                })
+        }))
+        .collect();
+
+    let xml = content_paths
+        .iter()
+        .map(|path| read_xml(path))
+        .collect::<Result<Vec<_>, _>>()?;
+    let documents = content_paths
+        .iter()
+        .zip(&xml)
+        .map(|(path, xml)| parse_xml(xml, path, "elements"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut index = ContentIndex::default();
+    for (path, document) in content_paths.iter().zip(&documents) {
+        index.add_file(path, document)?;
     }
 
-    let mut equipment = Vec::new();
-    if let Some(items) = child(build, "equipment") {
-        for item in items.children().filter(|node| node.has_tag_name("item")) {
-            let id = content_id(item)
-                .ok_or_else(|| structure_error(save_path, "equipment <item> has no content ID"))?;
-            equipment.push(ImportedItem {
-                content_id: id.to_owned(),
-                saved_name: item.attribute("name").map(str::to_owned),
-                definition: definitions.get(id).map(|element| ContentDefinition {
-                    name: element.attribute("name").map(str::to_owned),
-                    kind: element.attribute("type").map(str::to_owned),
-                    source: element.attribute("source").map(str::to_owned),
-                }),
-            });
-        }
-    }
+    let roots = equipment
+        .iter()
+        .chain(&spells)
+        .chain(&build_elements)
+        .chain(&companions)
+        .map(|reference| reference.id)
+        .chain(
+            build_elements
+                .iter()
+                .filter(|reference| reference.kind == Some("Level"))
+                .filter_map(|reference| reference.node.attribute("class"))
+                .filter(|id| !id.trim().is_empty()),
+        )
+        .map(str::to_owned)
+        .collect();
+    let definitions = index.resolve_graph(roots);
+    let resolve = |references: Vec<SavedReference<'_, '_>>| {
+        references
+            .into_iter()
+            .map(|reference| ImportedReference {
+                content_id: reference.id.to_owned(),
+                saved_name: reference.node.attribute("name").map(str::to_owned),
+                saved_kind: reference.kind.map(str::to_owned),
+                definition: definitions
+                    .get(reference.id)
+                    .and_then(Option::as_ref)
+                    .cloned(),
+            })
+            .collect()
+    };
 
-    Ok(ImportedCharacter { name, equipment })
+    Ok(ImportedCharacter {
+        name,
+        equipment: resolve(equipment),
+        spells: resolve(spells),
+        build_elements: resolve(build_elements),
+        companions: resolve(companions),
+        definitions,
+    })
+}
+
+#[derive(Clone, Copy)]
+struct SavedReference<'a, 'input> {
+    node: Node<'a, 'input>,
+    id: &'a str,
+    kind: Option<&'a str>,
+}
+
+impl<'a, 'input> SavedReference<'a, 'input> {
+    fn from_node(node: Node<'a, 'input>) -> Option<Self> {
+        Some(Self {
+            node,
+            id: content_id(node)?,
+            kind: node.attribute("type"),
+        })
+    }
 }
 
 fn read_xml(path: &Path) -> Result<String, ImportError> {
@@ -145,6 +256,13 @@ fn parse_xml<'a>(xml: &'a str, path: &Path, root: &str) -> Result<Document<'a>, 
 
 fn child<'a, 'input>(node: Node<'a, 'input>, tag: &str) -> Option<Node<'a, 'input>> {
     node.children().find(|child| child.has_tag_name(tag))
+}
+
+fn children_named<'a, 'input>(
+    node: Node<'a, 'input>,
+    tag: &'static str,
+) -> impl Iterator<Item = Node<'a, 'input>> {
+    node.children().filter(move |child| child.has_tag_name(tag))
 }
 
 fn content_id<'a>(node: Node<'a, '_>) -> Option<&'a str> {

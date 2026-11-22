@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character version="1.0.3" preview="false">
+  <build>
+    <input>
+      <name>Rowan</name>
+    </input>
+    <elements>
+      <element type="Level" name="Level 3" id="ID_LEVEL_3" multiclass="true" class="ID_TEST_CLASS_TINKERER">
+        <element type="Class Feature" name="Signal Turret" id="ID_TEST_FEATURE_TURRET">
+          <element type="Companion" name="Select a companion" registered="true">
+            <element type="Companion" name="Clockwork Finch" id="ID_TEST_COMPANION_FINCH" />
+          </element>
+        </element>
+        <element type="Spell" name="Beacon" id="ID_TEST_SPELL_BEACON" />
+      </element>
+    </elements>
+    <magic>
+      <spellcasting name="Tinkerer" ability="Intelligence">
+        <cantrips>
+          <spell name="Spark" level="0" id="ID_TEST_SPELL_SPARK" />
+        </cantrips>
+        <spells>
+          <spell name="Beacon" level="1" id="ID_TEST_SPELL_BEACON" prepared="true" />
+        </spells>
+      </spellcasting>
+    </magic>
+    <equipment>
+      <item identifier="00000000-0000-4000-8000-000000000003" name="Signal Rod" id="ID_TEST_ITEM_ROD" />
+    </equipment>
+  </build>
+  <sources>
+    <restricted>
+      <element>ID_TEST_SPELL_BEACON_OTHER_EDITION</element>
+    </restricted>
+  </sources>
+</character>

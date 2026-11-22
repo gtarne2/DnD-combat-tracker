@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <info>
+    <update version="2.1" />
+  </info>
+  <element id="ID_TEST_SPELL_BEACON" name="Beacon" type="Spell" source="Synthetic Revision">
+    <description><p>Illuminate a <strong>visible</strong> point.</p></description>
+    <setters><set name="range">60 feet</set></setters>
+  </element>
+  <element id="ID_TEST_COMPANION_FINCH" name="Clockwork Finch" type="Companion" source="Synthetic Revision">
+    <setters><set name="hp">7</set></setters>
+    <rules><grant type="Companion Trait" id="ID_TEST_FINCH_FLASH" /></rules>
+  </element>
+  <element id="ID_TEST_FINCH_FLASH" name="Signal Flash" type="Companion Trait" source="Synthetic Revision">
+    <sheet action="Reaction"><description>Emit a brief flash.</description></sheet>
+  </element>
+  <append id="ID_TEST_FEATURE_TURRET">
+    <supports>Workshop</supports>
+    <rules><grant type="Class Feature" id="ID_TEST_UNAVAILABLE_UPGRADE" level="9" /></rules>
+  </append>
+</elements>
