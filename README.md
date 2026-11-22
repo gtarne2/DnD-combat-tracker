@@ -15,3 +15,5 @@ cargo run --bin combat-sheet -- tests/fixtures/combat-sheet.dnd5e tests/fixtures
 ```
 
 Use your own save and content XML paths to preview your character. Supply multiple content files in Aurora load order, with overrides last.
+
+Use **Layout** to reorder or hide combat sections and override missing or conditional stats. Pin a stat or combat option to keep a copy above the action groups. **Full sheet** opens your character’s background, personality, and lore. The browser saves preferences for each character in that preview.

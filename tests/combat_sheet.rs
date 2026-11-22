@@ -141,3 +141,46 @@ fn renders_all_groups_and_full_linked_descriptions_as_inline_disclosures() {
     assert!(html.contains("Make a ranged spell attack as you release the flash."));
     assert_eq!(html.matches("Choose a signal mode.").count(), 1);
 }
+
+#[test]
+fn shows_character_stats_and_preserves_lore_in_the_full_sheet() {
+    let sheet = sheet();
+    let stats = &sheet.profile.stats;
+    assert_eq!(stats.max_hp, Some(27));
+    assert_eq!(stats.armor_class, Some(18));
+    assert_eq!(stats.speed.as_deref(), Some("40 ft. walk · 40 ft. swim"));
+    assert_eq!(
+        stats.saves,
+        [Some(0), Some(3), Some(6), Some(1), Some(0), Some(-1)]
+    );
+
+    let html = render_html(&sheet);
+    assert!(html.contains("data-pin=\"saved-attack:signal-bow\""));
+    assert!(html.contains("data-pin=\"Spell:ID_TEST_SPELL_FLARE\""));
+    assert!(html.contains("data-stat=\"hp\">27 max"));
+    assert!(html.contains("data-stat=\"ac\">18"));
+    assert!(html.contains("data-stat=\"con\">+6"));
+    let full = html.split_once("id=\"full-sheet\"").unwrap().1;
+    assert!(full.contains("Rowan &amp; Mira kept the coast lit.\nThey now chart the fog."));
+    assert!(full.contains("I always leave a light in the window."));
+    assert!(full.contains("Lamplighters offer a dry bunk."));
+    assert!(full.contains("Lamplighter"));
+}
+
+#[test]
+fn leaves_unsupplied_stats_available_for_local_correction() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &fixtures.join("sample.dnd5e"),
+        &fixtures.join("sample-content.xml"),
+    )
+    .unwrap();
+    let sheet = CombatSheet::from_character(&character);
+    assert!(sheet.profile.stats.max_hp.is_none());
+    assert!(sheet.profile.stats.armor_class.is_none());
+    assert!(sheet.profile.stats.speed.is_none());
+    assert_eq!(sheet.profile.stats.saves, [None; 6]);
+    let html = render_html(&sheet);
+    assert!(html.contains("data-stat=\"hp\">Unavailable"));
+    assert!(html.contains("Save stat overrides"));
+}

@@ -8,14 +8,17 @@ use std::{
 use roxmltree::{Document, Node};
 
 mod content;
+mod profile;
 
 pub use content::{ContentDefinition, ContentElement, ContentNode};
+pub use profile::{ABILITIES, CharacterProfile, KeyStats, ProfileField, ProfileSection};
 
 use content::ContentIndex;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedCharacter {
     pub name: Option<String>,
+    pub profile: CharacterProfile,
     pub attacks: Vec<ImportedAttack>,
     pub equipment: Vec<ImportedItem>,
     pub spells: Vec<ImportedReference>,
@@ -45,6 +48,7 @@ pub(crate) fn is_feature_kind(kind: &str) -> bool {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedAttack {
+    pub identifier: Option<String>,
     pub name: String,
     pub range: Option<String>,
     pub attack: Option<String>,
@@ -55,6 +59,7 @@ pub struct ImportedAttack {
 #[derive(Debug, PartialEq, Eq)]
 pub struct SpellcastingStats {
     pub name: Option<String>,
+    pub source_id: Option<String>,
     pub attack_bonus: Option<i16>,
     pub save_dc: Option<u16>,
 }
@@ -151,6 +156,7 @@ pub fn import_character_with_content(
         .filter(|attack| attack.attribute("displayed") != Some("false"))
         .filter_map(|attack| {
             Some(ImportedAttack {
+                identifier: nonempty(attack.attribute("identifier")).map(str::to_owned),
                 name: nonempty(attack.attribute("name"))?.into(),
                 range: nonempty(attack.attribute("range")).map(str::to_owned),
                 attack: nonempty(attack.attribute("attack")).map(str::to_owned),
@@ -176,18 +182,17 @@ pub fn import_character_with_content(
         .filter_map(SavedReference::from_node)
         .collect();
 
+    let active: Vec<_> = children_named(build, "sum")
+        .flat_map(|summary| children_named(summary, "element"))
+        .filter_map(SavedReference::from_node)
+        .collect();
     let mut build_ids: HashSet<_> = build_elements.iter().map(|entry| entry.id).collect();
-    build_elements.extend(
-        children_named(build, "sum")
-            .flat_map(|summary| children_named(summary, "element"))
-            .filter_map(SavedReference::from_node)
-            .filter(|entry| {
-                entry
-                    .kind
-                    .is_some_and(|kind| kind == "Weapon" || is_feature_kind(kind))
-                    && build_ids.insert(entry.id)
-            }),
-    );
+    build_elements.extend(active.iter().copied().filter(|entry| {
+        entry
+            .kind
+            .is_some_and(|kind| kind == "Weapon" || is_feature_kind(kind))
+            && build_ids.insert(entry.id)
+    }));
 
     let mut spells: Vec<_> = children_named(build, "magic")
         .flat_map(|magic| children_named(magic, "spellcasting"))
@@ -241,6 +246,7 @@ pub fn import_character_with_content(
         .chain(&spells)
         .chain(&build_elements)
         .chain(&companions)
+        .chain(&active)
         .map(|reference| reference.id)
         .chain(
             build_elements
@@ -253,6 +259,7 @@ pub fn import_character_with_content(
         .chain(generated_scroll_spells.values().cloned())
         .collect();
     let definitions = index.resolve_graph(roots);
+    let profile = profile::read_profile(save.root_element(), build, &active, &definitions);
     let resolve = |references: Vec<SavedReference<'_, '_>>| {
         references
             .into_iter()
@@ -271,6 +278,7 @@ pub fn import_character_with_content(
 
     Ok(ImportedCharacter {
         name,
+        profile,
         attacks,
         equipment: resolve(equipment),
         spells: resolve(spells),
@@ -306,6 +314,7 @@ impl<'a, 'input> SavedReference<'a, 'input> {
             .has_tag_name("spellcasting")
             .then(|| SpellcastingStats {
                 name: nonempty(casting.attribute("name")).map(str::to_owned),
+                source_id: nonempty(casting.attribute("source")).map(str::to_owned),
                 attack_bonus: casting
                     .attribute("attack")
                     .and_then(|value| value.parse().ok()),

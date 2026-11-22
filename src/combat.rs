@@ -1,13 +1,13 @@
 use std::collections::{HashSet, VecDeque};
 
 use crate::aurora::{
-    ContentDefinition, ContentElement, ContentNode, ImportedCharacter, SpellcastingStats,
-    is_feature_kind,
+    CharacterProfile, ContentDefinition, ContentElement, ContentNode, ImportedCharacter,
+    SpellcastingStats, is_feature_kind,
 };
 
 mod html;
 
-pub use html::render_html;
+pub use html::{render_html, render_html_with_profile};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionGroup {
@@ -65,6 +65,7 @@ impl OptionKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatOption {
     pub name: String,
+    pub pin_key: Option<String>,
     pub kind: OptionKind,
     pub details: Vec<CombatDetail>,
     pub description: Vec<ContentNode>,
@@ -85,6 +86,7 @@ pub struct CombatGroup {
 #[derive(Debug, PartialEq, Eq)]
 pub struct CombatSheet {
     pub character_name: Option<String>,
+    pub profile: CharacterProfile,
     pub groups: [CombatGroup; 4],
 }
 
@@ -92,6 +94,7 @@ impl CombatSheet {
     pub fn from_character(character: &ImportedCharacter) -> Self {
         let mut sheet = Self {
             character_name: character.name.clone(),
+            profile: character.profile.clone(),
             groups: ActionGroup::ALL.map(|action| CombatGroup {
                 action,
                 options: Vec::new(),
@@ -99,6 +102,10 @@ impl CombatSheet {
         };
         for attack in &character.attacks {
             let mut option = CombatOption::new(OptionKind::Attack, &attack.name);
+            option.pin_key = attack
+                .identifier
+                .as_ref()
+                .map(|id| format!("saved-attack:{id}"));
             option.detail("Range", attack.range.as_deref());
             option.detail("Attack roll", attack.attack.as_deref());
             option.detail("Damage", attack.damage.as_deref());
@@ -240,6 +247,12 @@ impl CombatSheet {
             .or_else(|| definition.and_then(|value| value.name.as_deref()))
             .unwrap_or(id);
         let mut option = CombatOption::new(kind, name);
+        option.pin_key = Some(
+            match spellcasting.and_then(|casting| casting.source_id.as_deref()) {
+                Some(caster) => format!("{}:{id}:{caster}", kind.label()),
+                None => format!("{}:{id}", kind.label()),
+            },
+        );
         let mechanics = linked_spell.or(definition);
         let time = setter(mechanics, "time");
         option.detail("Casting time", time.as_deref());
@@ -348,6 +361,7 @@ impl CombatOption {
     fn new(kind: OptionKind, name: &str) -> Self {
         Self {
             name: name.to_owned(),
+            pin_key: None,
             kind,
             details: Vec::new(),
             description: Vec::new(),

@@ -1,21 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <character version="1.0.3" preview="false">
+  <display-properties>
+    <race>Clockwork Kin</race>
+    <class>Tinkerer</class>
+    <level>3</level>
+    <background>Lamplighter</background>
+  </display-properties>
   <build>
     <input>
       <name>Rowan &amp; Co.</name>
+      <backstory>Rowan &amp; Mira kept the coast lit.
+They now chart the fog.</backstory>
+      <background-traits>I always leave a light in the window.</background-traits>
+      <background-ideals>Everyone deserves a safe harbor.</background-ideals>
+      <background-bonds>I owe Mira my life.</background-bonds>
+      <background-flaws>I rarely ask for help.</background-flaws>
+      <background-trinket>A cracked signal lens</background-trinket>
+      <background><feature name="Safe Harbor"><description>Lamplighters offer a dry bunk.</description></feature></background>
+      <organization><name>The Beacon Guild</name><allies>Mira</allies></organization>
       <attacks>
-        <attack name="Signal Bow" range="80/320 ft." attack="+5 vs AC" damage="1d8+3 piercing" displayed="true">
+        <attack identifier="signal-bow" name="Signal Bow" range="80/320 ft." attack="+5 vs AC" damage="1d8+3 piercing" displayed="true">
           <description>Mark where the arrow lands.</description>
         </attack>
         <attack name="Hidden Attack" displayed="false" />
       </attacks>
     </input>
+    <abilities><strength>10</strength><dexterity>16</dexterity><constitution>14</constitution><intelligence>12</intelligence><wisdom>10</wisdom><charisma>8</charisma></abilities>
     <equipment>
       <item id="ID_TEST_ITEM_ROD" name="Signal Rod" />
       <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_SHIELD_FLASH" name="Scroll of Shield Flash" />
       <item id="ID_TEST_ITEM_SCROLL_FLARE" name="Scroll of Flare" />
       <item id="ID_INTERNAL_MAGIC_ITEM_SPELL_SCROLL_TWIN_SIGNAL" name="Scroll of Twin Signal" />
       <item id="ID_TEST_ITEM_UNKNOWN" name="Unidentified Vial" />
+      <item id="ID_TEST_ARMOR_SCALE" name="Signal Scale"><equipped location="Armor">true</equipped></item>
+      <item id="ID_TEST_ARMOR_SHIELD" name="Signal Shield"><equipped location="Secondary Hand">true</equipped></item>
     </equipment>
     <magic>
       <spellcasting name="Tinkerer" attack="6" dc="15">
@@ -27,9 +45,16 @@
       </spellcasting>
     </magic>
     <elements>
+      <element id="ID_LEVEL_1" type="Level" />
+      <element id="ID_LEVEL_2" type="Level" />
+      <element id="ID_LEVEL_3" type="Level" />
       <element id="ID_TEST_FEATURE_TURRET" type="Class Feature" name="Signal Turret" />
     </elements>
     <sum>
+      <element id="ID_TEST_RACE_CLOCKWORK" type="Race" />
+      <element id="ID_TEST_CLASS_TINKERER" type="Class" />
+      <element id="ID_INTERNAL_OPTION_ALLOW_AVERAGE_HP" type="Option" />
+      <element id="ID_PROFICIENCY_SAVINGTHROW_CONSTITUTION" type="Proficiency" />
       <element id="ID_TEST_TURRET_BALLISTA" type="Class Feature" />
       <element id="ID_TEST_FEATURE_ALARM" type="Racial Trait" />
       <element id="ID_TEST_WEAPON_SPUR" type="Weapon" />

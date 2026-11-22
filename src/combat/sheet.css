@@ -7,6 +7,7 @@
   --accent: #2d5043;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; }
 .heading, nav div, main { width: min(100% - 2rem, 76rem); margin: 0 auto; }
 header { color: #f8f7ee; background: #203c32; padding: 1.5rem 0; }
@@ -22,18 +23,59 @@ nav div { display: flex; gap: .25rem; flex-wrap: wrap; padding: .35rem 0; }
 nav a { color: var(--accent); font-weight: 650; padding: .45rem .65rem; }
 nav a:hover, summary:hover { background: #e8ece1; }
 :focus-visible { outline: 3px solid #42755f; outline-offset: 2px; }
-main {
+main { padding: 1.4rem 0 3rem; }
+main > * + * { margin-top: 1.4rem; }
+#group-navigation { display: contents; }
+#action-groups {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem;
-  padding: 1.4rem 0 3rem; align-items: start;
+  align-items: start;
 }
-section { scroll-margin-top: 6.5rem; min-width: 0; }
-section:last-child#other-options { grid-column: 1 / -1; }
+section, .panel { scroll-margin-top: 9rem; min-width: 0; }
 h2 { color: var(--accent); margin-bottom: .85rem; padding-bottom: .45rem; border-bottom: 2px solid #7a9b88; }
 .empty { color: #52574b; margin: .6rem 0; }
 article {
+  position: relative;
   padding: .9rem; margin: 0 0 .8rem; background: #fffdf6; border: 1px solid var(--edge);
   border-radius: .45rem; overflow-wrap: anywhere;
 }
+article[data-pin] h3 { margin-right: 3.65rem; }
+.pin-button {
+  position: absolute; right: .8rem; top: .8rem;
+  padding: .25rem .55rem; font-size: .78rem;
+}
+button, input { font: inherit; color: inherit; }
+button {
+  color: var(--accent); background: #f5f7f1; border: 1px solid #a7b8a8;
+  border-radius: .3rem; padding: .28rem .55rem; cursor: pointer;
+}
+button:hover:not(:disabled), button[aria-pressed="true"] { background: #e0ebdf; }
+button:disabled { opacity: .46; cursor: default; }
+.stat-grid, #pinned-cards, .profile-fields {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem;
+}
+.stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.65fr); }
+.stat-grid article, #pinned-cards article { margin: 0; }
+.stat-number { margin-top: .35rem; font-size: 1.28rem; font-weight: 650; }
+.saves-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .1rem .65rem;
+}
+.saves-list div { display: flex; justify-content: space-between; min-width: 0; }
+.saves-list dt { font-size: .87rem; }
+.panel { background: #fffdf6; border: 1px solid var(--edge); border-radius: .45rem; }
+.panel > summary { padding: .65rem .9rem; }
+.panel-body { padding: .75rem .9rem 1rem; }
+.panel-body h2 { font-size: 1.17rem; margin-bottom: .5rem; }
+.profile-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.profile-fields dl div { display: block; margin-bottom: .6rem; }
+.profile-fields dd { white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 400; }
+#section-settings { margin: .5rem 0 1rem; padding: 0; list-style: none; max-width: 30rem; }
+#section-settings li { display: grid; grid-template-columns: 1fr auto auto; gap: .4rem; margin-bottom: .25rem; }
+.stat-inputs {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem .8rem; margin: .55rem 0;
+  max-width: 42rem;
+}
+.stat-inputs input { display: block; width: 100%; border: 1px solid var(--edge); padding: .3rem; }
+#layout-status { color: var(--accent); margin-top: .5rem; }
 h3 { font-size: 1.08rem; line-height: 1.35; }
 .kind { font-size: .75rem; font-weight: 650; color: #4e5d50; }
 dl { margin: .65rem 0 0; }
@@ -46,4 +88,9 @@ summary { padding: .55rem .2rem .1rem; color: var(--accent); font-weight: 650; c
 .description p, .description ul, .description ol { margin: 0 0 .55rem; }
 .description table { border-collapse: collapse; white-space: normal; }
 .description th, .description td { padding: .25rem .45rem; border: 1px solid var(--edge); }
-@media (max-width: 55rem) { main { grid-template-columns: 1fr; } }
+@media (max-width: 65rem) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 55rem) { #action-groups, #pinned-cards { grid-template-columns: 1fr; } }
+@media (max-width: 32rem) {
+  .saves-card { grid-column: 1 / -1; }
+  .profile-fields, .stat-inputs { grid-template-columns: 1fr; }
+}
