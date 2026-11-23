@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character>
+  <display-properties><level>6</level></display-properties>
+  <build>
+    <input><name>Test Scout</name></input>
+    <abilities><strength>8</strength><dexterity>16</dexterity><constitution>12</constitution><intelligence>14</intelligence><wisdom>14</wisdom><charisma>10</charisma></abilities>
+    <magic><spellcasting name="Test Casting" ability="Intelligence" attack="6" dc="14" /></magic>
+    <sum>
+      <element id="ID_PROFICIENCY_SKILL_PERCEPTION" type="Proficiency" />
+      <element id="ID_PROFICIENCY_SKILL_SLEIGHTOFHAND" type="Proficiency" />
+      <element id="ID_PROFICIENCY_SAVINGTHROW_CONSTITUTION" type="Proficiency" />
+      <element id="ID_PROFICIENCY_TOOL_PROFICIENCY_THIEVES_TOOLS" type="Proficiency" name="Thieves' Tools" />
+      <element id="ID_PROFICIENCY_TOOL_PROFICIENCY_TINKERS_TOOLS" type="Proficiency" name="Tinker's Tools" />
+      <element id="ID_TEST_FEATURE_ROLLS" type="Class Feature" name="Scout Training" />
+      <element id="ID_WOTC_PHB_CLASS_FEATURE_BARD_JACK_OF_ALL_TRADES" type="Class Feature" name="General Training" />
+      <element id="ID_WOTC_TCOE_CLASS_FEATURE_ARTIFICER_TOOL_EXPERTISE" type="Class Feature" name="Tool Expertise" />
+    </sum>
+  </build>
+</character>

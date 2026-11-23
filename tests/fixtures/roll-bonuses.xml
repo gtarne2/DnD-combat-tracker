@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element id="ID_WOTC_PHB_CLASS_FEATURE_BARD_JACK_OF_ALL_TRADES" name="General Training" type="Class Feature" source="Synthetic Test Content">
+    <description><p>Apply partial training to a check where eligible.</p></description>
+    <sheet display="false" />
+  </element>
+  <element id="ID_TEST_FEATURE_ROLLS" name="Scout Training" type="Class Feature" source="Synthetic Test Content">
+    <description><p>Use your training to survey locations.</p></description>
+    <rules>
+      <stat name="perception:proficiency" value="proficiency" bonus="double" />
+      <stat name="perception:misc" value="1" bonus="scout" />
+      <stat name="perception:misc" value="2" bonus="scout" />
+      <stat name="perception:passive" value="4" />
+      <stat name="stealth:misc" value="proficiency:half:up" requirements="!ID_PROFICIENCY_SKILL_STEALTH" />
+      <stat name="sleight of hand:misc" value="proficiency:half:up" requirements="!ID_PROFICIENCY_SKILL_SLEIGHTOFHAND" />
+      <stat name="constitution:save:misc" value="-1" />
+      <stat name="intelligence:check:misc" value="1" />
+      <stat name="initiative" value="wisdom:modifier" />
+      <stat name="initiative" value="proficiency" bonus="proficiency" />
+      <stat name="thieves tools:proficiency" value="proficiency" bonus="double" />
+      <stat name="nature:misc" value="unsupported:formula" />
+    </rules>
+  </element>
+</elements>

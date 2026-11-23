@@ -1,0 +1,36 @@
+<character>
+  <display-properties><class>Pugilist</class><level>8</level><background>Harbor Worker</background></display-properties>
+  <build>
+    <input><name>Mara Flint</name><background><feature name="Harbor Contacts"><description>Find a reliable guide near a working dock.</description></feature></background>
+      <attacks><attack identifier="sparring-strike" item-id="wraps-1" name="Sparring Strike" range="5 ft." attack="+6 vs AC" damage="1d8+3"><description>A practiced strike with wrapped fists.</description></attack></attacks>
+    </input>
+    <abilities><strength>16</strength><dexterity>11</dexterity><constitution>14</constitution><intelligence>8</intelligence><wisdom>10</wisdom><charisma>12</charisma></abilities>
+    <equipment><item id="ID_TEST_ITEM_TRAINING_WRAPS" identifier="wraps-1" amount="1"><equipped>true</equipped><notes>Marked with a blue thread.</notes></item></equipment>
+    <magic><spellcasting name="Ancestry"><cantrips><spell id="ID_TEST_SPELL_SPARK" name="Docklight" level="0" /></cantrips></spellcasting></magic>
+    <elements>
+      <element id="ID_LEVEL_1" type="Level" class="ID_DMSG_PUGL_CLASS_PUGILIST" />
+      <element id="ID_LEVEL_2" type="Level" class="ID_DMSG_PUGL_CLASS_PUGILIST" />
+      <element id="ID_LEVEL_3" type="Level" class="ID_DMSG_PUGL_CLASS_PUGILIST" />
+      <element id="ID_LEVEL_4" type="Level" class="ID_DMSG_PUGL_CLASS_PUGILIST" />
+      <element id="ID_LEVEL_5" type="Level" class="ID_DMSG_PUGL_CLASS_PUGILIST" />
+      <element id="ID_LEVEL_6" type="Level" class="ID_DMSG_PUGL_CLASS_PUGILIST" />
+      <element id="ID_LEVEL_7" type="Level" class="ID_TEST_CLASS_OTHER" />
+      <element id="ID_LEVEL_8" type="Level" class="ID_TEST_CLASS_OTHER" />
+    </elements>
+    <sum>
+      <element id="ID_DMSG_PUGL_CLASS_PUGILIST" type="Class" />
+      <element id="ID_TEST_CLASS_OTHER" type="Class" />
+      <element id="ID_TEST_RACE" type="Race" />
+      <element id="ID_TEST_VISION" type="Vision" />
+      <element id="ID_LANGUAGE_COMMON" type="Language" name="Common" />
+      <element id="ID_LANGUAGE_DWARVISH" type="Language" name="Dwarvish" />
+      <element id="ID_PROFICIENCY_TOOL_PROFICIENCY_CARTOGRAPHERS_TOOLS" type="Proficiency" name="Cartographer's tools" />
+      <element id="ID_PROFICIENCY_SKILL_PERSUASION" type="Proficiency" />
+      <element id="ID_PROFICIENCY_SAVINGTHROW_CONSTITUTION" type="Proficiency" />
+      <element id="ID_DMSG_PUGL_CLASS_FEATURE_MOXIE" type="Class Feature" />
+      <element id="ID_TEST_BLOODIED" type="Class Feature" />
+      <element id="ID_TEST_DIRTY_TRICKS" type="Class Feature" />
+      <element id="ID_TEST_STREET_SMART" type="Class Feature" />
+    </sum>
+  </build>
+</character>

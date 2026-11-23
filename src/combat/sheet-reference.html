@@ -1,0 +1,33 @@
+<dialog id="sheet-reference" aria-labelledby="sheet-reference-heading">
+  <div class="dialog-heading"><h2 id="sheet-reference-heading">Find on sheet</h2><form method="dialog"><button>Close</button></form></div>
+  <div id="sheet-reference-search">
+    <label for="sheet-reference-query" class="visually-hidden">Search character sheet</label>
+    <input id="sheet-reference-query" type="search" placeholder="Search skills, features, spells, and gear" autofocus>
+    <div id="sheet-reference-results"></div>
+    <p id="sheet-reference-empty" class="empty" role="status" hidden>No matching entries.</p>
+  </div>
+  <div id="sheet-reference-detail" hidden>
+    <button type="button" id="sheet-reference-back" class="quiet-button" hidden>← Back</button>
+    <div id="sheet-reference-body"></div>
+  </div>
+</dialog>
+<dialog id="reference-notes" aria-labelledby="reference-notes-heading">
+  <form id="reference-notes-form">
+    <h2 id="reference-notes-heading">Table notes</h2>
+    <label>Notes <textarea name="notes" rows="5" maxlength="4000"></textarea></label>
+    <label id="reference-gear-label">Linked gear <select name="gear"></select></label>
+    <div class="focus-form companion-edit-actions"><button type="button" id="cancel-reference-notes">Cancel</button><button class="gold-button">Save notes</button></div>
+  </form>
+</dialog>
+<dialog id="feature-group-editor" aria-labelledby="feature-group-heading">
+  <div class="dialog-heading"><h2 id="feature-group-heading">Organize feature groups</h2><form method="dialog"><button>Close</button></form></div>
+  <form id="feature-group-form">
+    <div class="group-editor-fields"><label>Group <select id="feature-group-choice"></select></label><label>Group name <input name="name" maxlength="60" required></label></div>
+    <div class="group-editor-columns">
+      <section aria-labelledby="group-included-heading"><h3 id="group-included-heading">In this group</h3><ol id="group-included"></ol></section>
+      <section aria-labelledby="group-available-heading"><h3 id="group-available-heading">Add features</h3><label for="group-picker-query" class="visually-hidden">Filter available features</label><input id="group-picker-query" type="search" placeholder="Filter features"><ul id="group-available"></ul></section>
+    </div>
+    <p id="feature-group-feedback" class="empty" role="status"></p>
+    <div class="focus-form companion-edit-actions"><button type="button" id="remove-feature-group" class="danger-outline" hidden>Remove group</button><button class="gold-button">Save group</button></div>
+  </form>
+</dialog>

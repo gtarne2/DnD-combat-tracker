@@ -7,7 +7,7 @@ function setupQuickActions(groups, updateAction) {
   const pins = new Map();
   const staticActions = new Map();
   const creations = new Map();
-  let lastRender = "";
+  let lastRender;
 
   function node(tag, text) {
     const result = document.createElement(tag);
@@ -58,6 +58,7 @@ function setupQuickActions(groups, updateAction) {
     toggle.textContent = value ? "Show" : "Hide";
     toggle.setAttribute("aria-label", (value ? "Show" : "Hide") + " Quick Actions");
     toggle.setAttribute("aria-expanded", String(!value));
+    if (!value) sessionView.restoreScroll(items);
   }
   function setPinned(entry, pinned) {
     layoutPreferences.setQuickAction(entry, pinned);
@@ -132,6 +133,7 @@ function setupQuickActions(groups, updateAction) {
       container.append(playbook.followupButton(entry.action, state, label, label + " · used"));
       if (entry.action.detail) {
         const details = node("details");
+        details.dataset.viewDisclosure = "quick-action:" + entry.key;
         details.append(node("summary", entry.action.roll || "Rules"), node("p", entry.action.detail));
         container.append(details);
       }
@@ -161,8 +163,9 @@ function setupQuickActions(groups, updateAction) {
     for (const [key, name] of layoutPreferences.quickActions()) shown.push(actions.get(key) || {key, name});
     const next = shown.map((entry) => renderEntry(entry, state));
     const signature = next.map((entry) => entry.outerHTML).join("");
-    if (signature === lastRender && items.childElementCount) return;
+    if (signature === lastRender) return;
     lastRender = signature;
+    toggle.hidden = next.length === 0;
     const expanded = new Set([...items.querySelectorAll("details[open]")]
       .map((details) => details.closest("[data-quick-entry]").dataset.quickEntry));
     const focused = document.activeElement.closest("[data-quick-entry]");
@@ -170,9 +173,13 @@ function setupQuickActions(groups, updateAction) {
     const focusedRemove = document.activeElement.matches(".quick-remove");
     for (const entry of next) {
       const details = entry.querySelector("details");
-      if (details && expanded.has(entry.dataset.quickEntry)) details.open = true;
+      if (details) {
+        details.open = expanded.has(entry.dataset.quickEntry);
+        sessionView.restoreDisclosure(details);
+      }
     }
-    items.replaceChildren(...(next.length ? next : [node("p", "Pin an action you use often.")]));
+    items.replaceChildren(...next);
+    sessionView.restoreScroll(items);
     if (focusedKey) {
       const replacement = next.find((entry) => entry.dataset.quickEntry === focusedKey)
         ?.querySelector(focusedRemove ? ".quick-remove" : "button:not(:disabled)");

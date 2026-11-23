@@ -13,6 +13,7 @@ const encounterTracker = (() => {
   const actorForm = byId("combatant-form");
   const resourceForm = byId("encounter-resource-form");
   const resourceChoice = byId("resource-choice");
+  const moxieKey = "Resource:moxie";
   const order = byId("turn-order");
   const resources = byId("encounter-resources");
   let editId = null;
@@ -84,13 +85,18 @@ const encounterTracker = (() => {
     paintKeyHp(progress);
     if (signature === lastRender) return;
     lastRender = signature;
-    const active = rows.find((row) => row.key === progress.current) || rows[0];
-    byId("round-number").textContent = `Round ${progress.round}`;
-    byId("current-turn").textContent = rows.length > 1 ? "Turn: " + active.name : "Solo turn";
+    const running = progress.active !== false;
+    const active = running ? rows.find((row) => row.key === progress.current) || rows[0] : null;
+    byId("round-number").textContent = running ? `Round ${progress.round}` : "Encounter inactive";
+    byId("current-turn").textContent = !running ? "" : rows.length > 1 ? "Turn: " + active.name : "Solo turn";
+    byId("current-turn").hidden = !running;
+    byId("end-encounter").hidden = !running;
+    byId("next-turn").hidden = !running;
+    byId("start-encounter").hidden = running;
     const lastAttack = byId("last-attack");
     lastAttack.hidden = !progress.lastAttack;
     lastAttack.textContent = progress.lastAttack
-      ? "Last attack · " + progress.lastAttack.name + " · Round " + progress.lastAttack.round : "";
+      ? `Last attack · ${progress.lastAttack.name}${progress.lastAttack.round == null ? "" : ` · Round ${progress.lastAttack.round}`}` : "";
     const undo = byId("undo-turn");
     undo.disabled = !previewEncounter.canUndo();
     undo.title = undoLabel ? "Undo " + undoLabel : "Undo combat update";
@@ -122,7 +128,7 @@ const encounterTracker = (() => {
         hp.className = "initiative-hp";
         item.append(hp);
       }
-      if (row.key === active.key) item.setAttribute("aria-current", "true");
+      if (row.key === active?.key) item.setAttribute("aria-current", "true");
       if (row.rank === 2) {
         const controls = html("span");
         const edit = button("Edit", row.name, "edit", row.id);
@@ -144,7 +150,7 @@ const encounterTracker = (() => {
       const item = html("li");
       const spellSlot = /^(Spell slot|Pact Magic slot):/.test(resource.key);
       item.classList.toggle("spell-slot-pool", spellSlot);
-      const label = html(resource.key.startsWith("Feature:") ? "button" : "span", resource.name);
+      const label = html(resource.key.startsWith("Feature:") || resource.key === moxieKey ? "button" : "span", resource.name);
       if (label.tagName === "BUTTON") {
         label.type = "button";
         label.dataset.resourceDetail = resource.key;
@@ -162,7 +168,7 @@ const encounterTracker = (() => {
       const group = html("div");
       group.className = "resource-label";
       group.append(label, count);
-      if (spellSlot && resource.capacity <= 12) {
+      if ((spellSlot || resource.key === moxieKey) && resource.capacity <= 12) {
         const pips = html("span");
         pips.className = "slot-pips";
         pips.setAttribute("aria-hidden", "true");
@@ -172,6 +178,10 @@ const encounterTracker = (() => {
           pips.append(pip);
         }
         group.append(pips);
+      }
+      if (resource.key === moxieKey && resource.recovery) {
+        item.classList.add("moxie-pool");
+        group.append(html("small", resource.recovery === "short" ? "Short rest" : "Long rest"));
       }
       item.append(group, spend, restore);
       resources.append(item);
@@ -190,8 +200,30 @@ const encounterTracker = (() => {
   }
   previewEncounter.reconcile(reconcileCurrent);
 
+  const endDialog = byId("end-encounter-dialog");
+  endDialog.querySelector("form").addEventListener("submit", (event) => {
+    if (event.submitter?.value !== "end") return;
+    update((progress) => {
+      if (progress.active === false) return false;
+      progress.active = false;
+      return "ending the encounter";
+    });
+  });
+  byId("start-encounter").addEventListener("click", () => {
+    update((progress, state) => {
+      if (progress.active !== false) return false;
+      progress.active = true;
+      progress.round = 1;
+      progress.current = turns(state)[0].key;
+      progress.turnSequence = (progress.turnSequence || 0) + 1;
+      progress.followupUses = {};
+      delete progress.lastAttack;
+      return "starting a new encounter";
+    });
+  });
   byId("next-turn").addEventListener("click", () => {
     update((progress, state) => {
+      if (progress.active === false) return false;
       const rows = turns(state);
       const index = Math.max(0, rows.findIndex((row) => row.key === progress.current));
       const wrap = index === rows.length - 1;
@@ -200,11 +232,7 @@ const encounterTracker = (() => {
       progress.current = rows[wrap ? 0 : index + 1].key;
       if (wrap) {
         progress.round += 1;
-        effectControls.advanceRound(state);
-        effectControls.advanceTime(state, 6);
-        for (const card of state.companions?.cards || []) {
-          if (card.rounds > 0) card.rounds -= 1;
-        }
+        effectControls.advanceRounds(state, 1);
       }
       reconcileCurrent(state);
       if (progress.current) effectControls.boundary(state, "start", progress.current);
@@ -295,10 +323,23 @@ const encounterTracker = (() => {
     resourceForm.elements.recovery.value = resource?.recovery ?? "";
     resourceForm.querySelector("button").textContent = resource ? "Save resource" : "Add resource";
   }
-  document.querySelector('[data-dialog="resource-settings"]').addEventListener("click", () => {
+  function chooseResourcePool(key = "") {
     const choices = resourceList(get(previewEncounter.current())).map((entry) => new Option(entry.name, entry.key));
+    if (key === moxieKey && !choices.some((choice) => choice.value === key)) choices.push(new Option("Moxie", key));
     resourceChoice.replaceChildren(new Option("New resource", ""), ...choices);
+    resourceChoice.value = key;
     chooseResource();
+    if (key === moxieKey && !resourceForm.elements.name.value) {
+      resourceForm.elements.name.value = "Moxie";
+      resourceForm.elements.recovery.value = "short";
+    }
+  }
+  document.querySelector('[data-dialog="resource-settings"]').addEventListener("click", () => chooseResourcePool());
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-configure-moxie]")) return;
+    chooseResourcePool(moxieKey);
+    byId("resource-settings").showModal();
+    resourceForm.elements.capacity.focus();
   });
   resourceChoice.addEventListener("change", chooseResource);
   resourceForm.addEventListener("submit", (event) => {
@@ -326,12 +367,7 @@ const encounterTracker = (() => {
       const pool = resourceList(progress).find((resource) => resource.key === key);
       if (!pool) return false;
       if (action === "spend") return spendResource(state, key) && "spending " + pool.name;
-      const used = progress.used[key] || 0;
-      if (action === "restore" && used > 0) {
-        if (used === 1) delete progress.used[key];
-        else progress.used[key] = used - 1;
-      } else return false;
-      return "restoring " + pool.name;
+      return action === "restore" && restoreResource(state, key) && "restoring " + pool.name;
     });
   });
 
@@ -364,13 +400,23 @@ const encounterTracker = (() => {
     progress.used[key] = used + cost;
     return true;
   }
+  function restoreResource(state, key, amount = 1) {
+    const progress = state.progress;
+    const used = progress?.used[key] || 0;
+    const pool = resourceList(get(state)).find((resource) => resource.key === key);
+    if (!used || !pool) return false;
+    const remaining = Math.max(0, Math.min(used, pool.capacity) - amount);
+    if (remaining > 0) progress.used[key] = remaining;
+    else delete progress.used[key];
+    return true;
+  }
   function recordAttack(name) {
     update((progress) => {
-      progress.lastAttack = {name, round: progress.round, sequence: ++progress.sequence};
+      progress.lastAttack = {name, round: progress.active === false ? null : progress.round, sequence: ++progress.sequence};
       byId("encounter-status").textContent = "Recorded attack with " + name + ".";
       return "attacking with " + name;
     });
   }
-  return {damageOwner, healOwner, spendResource, recordAttack, hp: (state) => state.progress?.hp || initialHp(),
+  return {damageOwner, healOwner, spendResource, restoreResource, recordAttack, hp: (state) => state.progress?.hp || initialHp(),
     update, ownerName: baseline.dataset.owner, turns, resources: (state) => resourceList(get(state))};
 })();

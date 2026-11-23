@@ -1,0 +1,27 @@
+<elements>
+  <element id="ID_DMSG_PUGL_CLASS_PUGILIST" type="Class" name="Pugilist" />
+  <element id="ID_TEST_CLASS_OTHER" type="Class" name="Scout" />
+  <element id="ID_TEST_RACE" type="Race" name="Harbor Folk"><rules><stat name="innate speed" value="30" /><stat name="speed:swim" value="20" /></rules></element>
+  <element id="ID_TEST_VISION" type="Vision" name="Darkvision" />
+  <element id="ID_TEST_ITEM_TRAINING_WRAPS" type="Magic Item" name="Training Wraps"><description><p>Waxed wraps for sparring practice.</p></description></element>
+  <element id="ID_TEST_SPELL_SPARK" type="Spell" name="Docklight"><description><p>Make a small light that stays near the dock.</p></description><setters><set name="time">1 action</set><set name="level">0</set></setters></element>
+  <element id="ID_DMSG_PUGL_CLASS_FEATURE_MOXIE" type="Class Feature" name="Moxie">
+    <description><p>Moxie fuels the Pugilist’s special moves.</p></description>
+    <sheet><description>You have {{moxie:usages}} moxie points and get them back on a short rest.</description></sheet>
+    <rules>
+      <stat name="moxie:usages" value="2" level="2" /><stat name="moxie:usages" value="1" level="4" /><stat name="moxie:usages" value="1" level="6" /><stat name="moxie:usages" value="1" level="8" />
+      <grant type="Class Feature" id="ID_TEST_BRACE" requirements="!ID_TEST_HOUND" /><grant type="Class Feature" id="ID_TEST_ONE_TWO" /><grant type="Class Feature" id="ID_TEST_STICK" />
+      <grant type="Class Feature" id="ID_TEST_LOCKED" level="9" />
+    </rules>
+  </element>
+  <element id="ID_TEST_BRACE" type="Class Feature" name="Brace Up"><sheet action="Bonus Action"><description>Spend 1 moxie point to gain temporary HP.</description></sheet></element>
+  <element id="ID_TEST_ONE_TWO" type="Class Feature" name="The Old One-Two"><sheet action="Bonus Action"><description>After the Attack action, spend 1 moxie point to strike twice.</description></sheet></element>
+  <element id="ID_TEST_STICK" type="Class Feature" name="Stick and Move"><sheet action="Bonus Action"><description>Expend 1 moxie point to shove or dash.</description></sheet></element>
+  <element id="ID_TEST_BLOODIED" type="Class Feature" name="Bloodied But Unbowed"><sheet usage="1/Short Rest"><description>On reaching half HP from damage, use your reaction to gain temporary HP and regain all expended moxie points.</description></sheet></element>
+  <element id="ID_TEST_DIRTY_TRICKS" type="Class Feature" name="Dirty Tricks"><sheet display="false" /><rules><grant type="Class Feature" id="ID_TEST_LOW_BLOW" /><grant type="Class Feature" id="ID_TEST_HEEL" /><grant type="Class Feature" id="ID_TEST_SAND" /></rules></element>
+  <element id="ID_TEST_LOW_BLOW" type="Class Feature" name="Low Blow"><sheet usage="1/Short Rest"><description>When you deal damage with an unarmed hit, the target makes a Strength save. On a failure, you gain 1 moxie point and they fall prone.</description></sheet></element>
+  <element id="ID_TEST_HEEL" type="Class Feature" name="Heelstomper"><sheet usage="1/Short Rest"><description>When you deal damage with an unarmed hit, ask for a Dexterity save. On a failure, you gain 1 moxie point and slow the target.</description></sheet></element>
+  <element id="ID_TEST_SAND" type="Class Feature" name="Pocket Sand"><sheet action="Bonus Action" usage="1/Short Rest"><description>The nearby target rolls a Constitution save. On a failure, you gain 1 moxie point and briefly blind them.</description></sheet></element>
+  <element id="ID_TEST_STREET_SMART" type="Class Feature" name="Street Smart"><sheet><description>After spending several hours socializing in a settlement, learn its public places.</description></sheet></element>
+  <element id="ID_TEST_LOCKED" type="Class Feature" name="Future Technique" />
+</elements>

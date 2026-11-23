@@ -40,11 +40,25 @@ Expand a card in the **Companions** sidebar to adjust HP, track charges, add a c
 
 Use **Initiative** in the **Encounter** panel to set the order. **Next Turn** advances to the next participant. Without other initiative entries, each click advances one round. **Undo** reverses the last combat change shown in the panel. The HP card holds **Set HP**, **Damage**, and **Rest**. Damage uses temporary HP first. Long rests heal to known maximum HP and clear temporary HP. For a short rest, enter the healing you rolled. The preview saves progress locally.
 
+Use **End Encounter** to pause initiative while keeping HP, resources, companions, concentration, and effects. **Start Encounter** begins again at round one with the same roster. Use **Undo** to return to the previous turn and round.
+
 Choose an action tab or search across visible groups. Selecting a row opens its details beside the list on desktop and within the row on narrow screens. Drag the desktop divider to resize the panes, or use **Hide details** to widen the action list. Select an ability tile to inspect its check and saving throw. **Attack** records your latest weapon attack for the encounter. **Character** opens the full sheet and **Layout** opens display preferences.
+
+Open **Roll Bonuses** below the ability tiles to search skills, saves, ability checks, attack and spell rolls, initiative, and tool proficiencies. Expand a roll to see its available components.
+
+**Character** puts skills, saves, passive scores, and exploration information together. In Combat, select **Skills** to show the list in the details pane. Use **Find on sheet** or press `/` to look up a feature, spell, check, or item from any page.
+
+During exploration or roleplay, use **Character**, **Companions**, **Inventory**, **Journal**, or **Notes**. The header keeps HP, abilities, resources, and concentration in reach, and active effects remain alongside the page. The sheet remembers your tab, selected action, scroll positions, and open panels when you return or reopen it.
 
 Use **Pin to Quick Actions** in the inspector or **Pin action** in the strip to add a direct execution shortcut. The star keeps an option in **Favorites** for browsing. The strip also offers cannon creation and activation for imported variants. Use the × next to a shortcut to unpin it.
 
 Use **Traits** to find features and **Track uses or effect** to set up a counter or toggle. Create a shared pool such as Ki in **Manage resources**, then choose it and set the cost on each ability. **Tracked abilities** also holds custom imbuements and known Artificer infusions. During a long rest, you can review prepared spells and switch which imbuements and infusions are active. **Bonus Action** lists supported ongoing actions, such as Heat Metal and active Eldritch Cannons.
+
+Expand a tracked ability by selecting its name. In **Add** or **Edit**, search for a spell, feature, item, or ongoing effect to link, and enter any custom description or notes.
+
+On **Features & Traits**, choose **Organize groups** to collect and reorder the features you use together. Moxie has a shared counter in Resources. Spending points, using a limited feature, and recording a failed save update the shared pool and the individual feature counters. **Set up Moxie** lets you enter a maximum when it is missing from the import.
+
+Open an item in **Inventory** to follow its linked attacks. Use **Table notes** on an item or attack to add a reminder or choose which gear a saved attack uses.
 
 In **Active effects**, add a condition or effect such as **Berserk**, choose its target, and set when it ends. Include a mechanical note such as **Advantage on Strength checks**. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
 

@@ -180,6 +180,7 @@ const layoutPreferences = (() => {
   renderPins();
   openPanel(location.hash);
   return {
+    statOverride: (key) => overrides.get(key),
     inspectorSplit,
     setInspectorSplit(value) {
       inspectorSplit = value;

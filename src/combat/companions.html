@@ -1,6 +1,6 @@
 <aside id="companion-roster-home" aria-label="Companion sidebar"><section id="companions" aria-label="Companion roster">
   <div class="rail-heading"><h2>Companions</h2><button type="button" id="toggle-companions" aria-controls="companion-roster-content" aria-expanded="true">Hide</button></div>
-  <div id="companion-roster-content">
+  <div id="companion-roster-content" data-view-scroll="companion-sidebar">
   <form id="add-companion" class="focus-form">
     <div><label for="companion-template">Template</label>
       <select id="companion-template" name="template" required><option value="" disabled selected>Choose template…</option><option value="custom">Custom companion</option></select></div>
@@ -11,7 +11,7 @@
 </div>
 </section>
 </aside>
-<section class="sheet-page" id="companion-roster-dialog" hidden><h1>Companions</h1>
+<section class="sheet-page" id="companion-roster-dialog" data-view-scroll="companions" aria-labelledby="companion-page-title" hidden><h2 id="companion-page-title">Companions</h2>
   <div id="companion-roster-body"></div>
 </section>
 <dialog id="companion-editor" aria-labelledby="companion-editor-title">

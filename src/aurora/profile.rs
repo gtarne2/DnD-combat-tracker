@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use roxmltree::Node;
 
+use super::rolls::{RollBonuses, read_rolls};
 use super::{
     ContentDefinition, ContentElement, ContentNode, SavedReference, child, children_named,
 };
@@ -62,6 +63,9 @@ pub struct ProfileField {
 pub struct CharacterProfile {
     pub stats: KeyStats,
     pub fields: Vec<ProfileField>,
+    pub rolls: RollBonuses,
+    pub senses: Vec<String>,
+    pub languages: Vec<String>,
 }
 
 pub(super) fn read_profile(
@@ -184,25 +188,7 @@ pub(super) fn read_profile(
         let bonus = stat_bonus(&modifiers, &key);
         Some((base + bonus - 10).div_euclid(2))
     });
-    let saves = std::array::from_fn(|index| {
-        let modifier = ability_modifiers[index]?;
-        if active.is_empty() {
-            return None;
-        }
-        let proficient = active.contains(
-            format!(
-                "ID_PROFICIENCY_SAVINGTHROW_{}",
-                ABILITIES[index].to_ascii_uppercase()
-            )
-            .as_str(),
-        );
-        let proficiency = if proficient { 2 + (level? - 1) / 4 } else { 0 };
-        let bonus = stat_bonus(
-            &modifiers,
-            &format!("{}:save:misc", ABILITIES[index].to_ascii_lowercase()),
-        );
-        Some(modifier + proficiency + bonus)
-    });
+    let rolls = read_rolls(summary, definitions, &active, level, ability_modifiers);
     let max_hp = max_hp(&levels, summary, definitions, &active, ability_modifiers[2])
         .map(|base| base + stat_bonus(&modifiers, "hp"));
     let armor_class = armor_class(build, definitions, ability_modifiers[1])
@@ -214,11 +200,43 @@ pub(super) fn read_profile(
             armor_class,
             speed,
             modifiers: ability_modifiers,
-            saves,
-            checks: ability_modifiers,
+            saves: rolls.saves.map(|roll| roll.total()),
+            checks: rolls.checks.map(|roll| roll.total()),
         },
         fields,
+        rolls,
+        senses: reference_names(summary, definitions, &["Vision", "Sense"]),
+        languages: reference_names(summary, definitions, &["Language"]),
     }
+}
+
+fn reference_names(
+    summary: &[SavedReference<'_, '_>],
+    definitions: &BTreeMap<String, Option<ContentDefinition>>,
+    kinds: &[&str],
+) -> Vec<String> {
+    summary
+        .iter()
+        .filter_map(|reference| {
+            let definition = definition(definitions, reference.id);
+            let kind = reference.kind.or_else(|| definition?.kind.as_deref())?;
+            if !kinds.contains(&kind) {
+                return None;
+            }
+            definition
+                .and_then(|definition| definition.name.as_deref())
+                .or_else(|| reference.node.attribute("name"))
+                .map(str::to_owned)
+                .or_else(|| {
+                    reference
+                        .id
+                        .strip_prefix("ID_LANGUAGE_")
+                        .map(|name| name.to_ascii_lowercase().replace('_', " "))
+                })
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 fn text(node: Node<'_, '_>) -> Option<String> {
@@ -244,24 +262,33 @@ fn definition<'a>(
 
 fn active_stat(rule: &ContentElement, active: &BTreeSet<&str>) -> bool {
     if rule.tag != "stat"
-        || rule
-            .attributes
-            .keys()
-            .any(|key| !matches!(key.as_str(), "name" | "value" | "bonus" | "requirements"))
+        || rule.attributes.keys().any(|key| {
+            !matches!(
+                key.as_str(),
+                "name" | "value" | "bonus" | "requirements" | "alt"
+            )
+        })
     {
         return false;
     }
-    match rule.attributes.get("requirements").map(String::as_str) {
-        None | Some("") => true,
-        Some(value) => {
-            let id = value.strip_prefix('!').unwrap_or(value);
-            id.starts_with("ID_")
-                && id
-                    .bytes()
-                    .all(|ch| ch.is_ascii_alphanumeric() || ch == b'_')
-                && active.contains(id) != value.starts_with('!')
-        }
-    }
+    stat_requirement(rule, active) == Some(true)
+}
+
+pub(super) fn stat_requirement(rule: &ContentElement, active: &BTreeSet<&str>) -> Option<bool> {
+    let Some(value) = rule
+        .attributes
+        .get("requirements")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    else {
+        return Some(true);
+    };
+    let id = value.strip_prefix('!').unwrap_or(value);
+    (id.starts_with("ID_")
+        && id
+            .bytes()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == b'_'))
+    .then(|| active.contains(id) != value.starts_with('!'))
 }
 
 fn stat_bonus(rules: &[&ContentElement], name: &str) -> i32 {

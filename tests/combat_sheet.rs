@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use aurora_combat_tracker::{
-    aurora::import_character,
+    aurora::{RollProficiency, SKILLS, import_character},
     combat::{ActionGroup, CombatOption, CombatSheet, OptionKind, render_html},
 };
 
@@ -39,6 +39,7 @@ fn detail<'a>(option: &'a CombatOption, label: &str) -> Option<&'a str> {
 fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
     let sheet = sheet();
     let bow = option(&sheet, ActionGroup::Action, "Signal Bow");
+    assert!(bow.inventory.is_none());
     assert_eq!(bow.kind, OptionKind::Attack);
     assert_eq!(detail(bow, "Range"), Some("80/320 ft."));
     assert_eq!(detail(bow, "Attack roll"), Some("+5 vs AC"));
@@ -65,6 +66,7 @@ fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
     );
 
     let rod = option(&sheet, ActionGroup::Action, "Signal Rod");
+    assert_eq!(rod.inventory.unwrap().quantity, Some(1));
     assert_eq!(rod.kind, OptionKind::Item);
     assert_eq!(detail(rod, "Cost"), Some("1 charge"));
     assert_eq!(detail(rod, "Uses"), Some("3/Day"));
@@ -146,6 +148,8 @@ fn renders_all_groups_and_full_linked_descriptions_as_inline_disclosures() {
     assert!(html.contains("Rowan &amp; Co."));
     assert!(html.contains("Lvl 3 · Tinkerer · Beacon Keeper"));
     assert!(html.contains("id=\"inspector-divider\" role=\"separator\""));
+    assert!(html.contains("id=\"inventory-page\" data-view-scroll=\"inventory\""));
+    assert!(html.contains("id=\"notes-page\" data-view-scroll=\"notes\""));
     assert!(html.contains("data-record-attack=\"Signal Bow\""));
     assert!(html.contains("data-ritual-cast"));
     assert!(html.contains("<details><summary>Full description</summary>"));
@@ -211,6 +215,10 @@ fn shows_saved_hp_rolls_equipped_speed_and_unresolved_spell_levels() {
         "data-infusion=\"ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE\">Enhanced Defense"
     ));
     assert!(html.contains("data-infusion=\"ID_TEST_ARTIFICER_INFUSION_REPLICATE_MAGIC_ITEM_OPTION_CLOAK\">Cloak of Hiding"));
+    assert!(html.contains(
+        "data-ability-source=\"option:Feature:ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE\""
+    ));
+    assert!(html.contains("The infusion reinforces the equipment."));
 }
 
 #[test]
@@ -226,9 +234,126 @@ fn leaves_unsupplied_stats_available_for_local_correction() {
     assert!(sheet.profile.stats.armor_class.is_none());
     assert!(sheet.profile.stats.speed.is_none());
     assert_eq!(sheet.profile.stats.saves, [None; 6]);
+    assert!(
+        sheet
+            .profile
+            .rolls
+            .skills
+            .iter()
+            .all(|roll| roll.total().is_none())
+    );
+    assert_eq!(sheet.profile.rolls.passive, [None; 3]);
     let html = render_html(&sheet);
     assert!(html.contains("data-stat=\"hp\">Unavailable"));
     assert!(html.contains("Save stat overrides"));
+}
+
+#[test]
+fn projects_shared_moxie_separate_from_feature_uses_and_links_gear() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &fixtures.join("pugilist-reference.dnd5e"),
+        &fixtures.join("pugilist-reference.xml"),
+    )
+    .unwrap();
+    let sheet = CombatSheet::from_character(&character);
+    let pool = sheet
+        .resources
+        .iter()
+        .find(|pool| pool.key == "Resource:moxie")
+        .unwrap();
+    assert_eq!((pool.capacity, pool.recovery), (4, "short"));
+    for key in [
+        "ID_TEST_BLOODIED",
+        "ID_TEST_LOW_BLOW",
+        "ID_TEST_HEEL",
+        "ID_TEST_SAND",
+    ] {
+        let uses = sheet
+            .resources
+            .iter()
+            .find(|pool| pool.key == format!("Feature:{key}"))
+            .unwrap();
+        assert_eq!((uses.capacity, uses.recovery), (1, "short"));
+    }
+    assert!(
+        option(&sheet, ActionGroup::BonusAction, "Brace Up")
+            .moxie
+            .is_some()
+    );
+    assert!(
+        option(&sheet, ActionGroup::Reaction, "Bloodied But Unbowed")
+            .moxie
+            .is_some()
+    );
+    assert!(
+        sheet
+            .groups
+            .iter()
+            .flat_map(|group| &group.options)
+            .all(|entry| entry.name != "Future Technique")
+    );
+    let attack = option(&sheet, ActionGroup::Action, "Sparring Strike");
+    let item = option(&sheet, ActionGroup::Other, "Training Wraps");
+    assert_eq!(attack.linked_item, item.inventory_key);
+    assert_eq!(detail(item, "Equipped"), Some("Yes"));
+    assert_eq!(
+        detail(item, "Item notes"),
+        Some("Marked with a blue thread.")
+    );
+    assert_eq!(sheet.profile.senses, ["Darkvision"]);
+    assert_eq!(sheet.profile.languages, ["Common", "Dwarvish"]);
+    let html = render_html(&sheet);
+    assert_eq!(html.matches("data-open-roll=\"skills|").count(), 21);
+    assert!(html.contains("data-moxie-action=\"failed-save\""));
+    assert!(html.contains("30 ft. walk · 20 ft. swim"));
+}
+
+#[test]
+fn reads_roll_components_and_preserves_exported_spellcasting_totals() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &fixtures.join("roll-bonuses.dnd5e"),
+        &fixtures.join("roll-bonuses.xml"),
+    )
+    .unwrap();
+    let sheet = CombatSheet::from_character(&character);
+    let rolls = &sheet.profile.rolls;
+    let skill = |name| rolls.skills[SKILLS.iter().position(|&(skill, _)| skill == name).unwrap()];
+    let perception = skill("Perception");
+    assert_eq!(
+        (
+            perception.ability,
+            perception.proficiency,
+            perception.other,
+            perception.total()
+        ),
+        (Some(2), Some(6), Some(2), Some(10))
+    );
+    assert_eq!(perception.training, RollProficiency::Expertise);
+    assert_eq!(rolls.passive, [Some(24), Some(14), Some(13)]);
+    assert_eq!(skill("Sleight of Hand").total(), Some(6));
+    assert_eq!(skill("Stealth").training, RollProficiency::HalfRoundedUp);
+    assert_eq!(skill("Stealth").total(), Some(5));
+    assert_eq!(skill("Nature").total(), None);
+    assert_eq!(rolls.saves[2].total(), Some(3));
+    assert_eq!(sheet.profile.stats.checks[3], Some(4));
+    assert_eq!(rolls.initiative.total(), Some(8));
+    assert_eq!(rolls.tools[0].bonus, Some(6));
+    assert_eq!(rolls.tools[1].bonus, Some(6));
+    assert_eq!(sheet.casting_rolls[0].attack_bonus, Some(6));
+    assert_eq!(sheet.casting_rolls[0].save_dc, Some(14));
+    let html = render_html(&sheet);
+    assert!(html.contains("Passive Perception</span><strong>24"));
+    assert!(html.contains("Test Casting"));
+    assert!(html.contains("Intelligence modifier +2 · Character proficiency +3"));
+    assert!(
+        !html.contains("data-pin=\"Feature:ID_WOTC_PHB_CLASS_FEATURE_BARD_JACK_OF_ALL_TRADES\"")
+    );
+    assert!(html.contains(
+        "data-ability-source=\"option:Feature:ID_WOTC_PHB_CLASS_FEATURE_BARD_JACK_OF_ALL_TRADES\""
+    ));
+    assert!(html.contains("Apply partial training to a check where eligible."));
 }
 
 #[test]

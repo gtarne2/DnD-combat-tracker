@@ -28,6 +28,7 @@ pub struct Combatant {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncounterProgress {
+    pub active: bool,
     pub round: u32,
     pub current: Option<InitiativeId>,
     pub owner_hp: Option<HitPoints>,
@@ -40,6 +41,7 @@ pub struct EncounterProgress {
 impl Default for EncounterProgress {
     fn default() -> Self {
         Self {
+            active: true,
             round: 1,
             current: None,
             owner_hp: None,
@@ -100,6 +102,9 @@ impl EncounterProgress {
     }
 
     pub fn advance(&mut self, companions: &CompanionRoster) -> Option<InitiativeId> {
+        if !self.active {
+            return None;
+        }
         let rows = self.ordered(companions);
         let first = rows.first()?.0;
         self.current = Some(

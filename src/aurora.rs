@@ -9,9 +9,11 @@ use roxmltree::{Document, Node};
 
 mod content;
 mod profile;
+mod rolls;
 
 pub use content::{ContentDefinition, ContentElement, ContentNode};
 pub use profile::{ABILITIES, CharacterProfile, KeyStats, ProfileField, ProfileSection};
+pub use rolls::{RollBonuses, RollModifier, RollProficiency, SKILLS, ToolProficiency};
 
 use content::ContentIndex;
 
@@ -20,11 +22,14 @@ pub struct ImportedCharacter {
     pub name: Option<String>,
     pub profile: CharacterProfile,
     pub spell_slots: SpellSlots,
+    pub spellcasting: Vec<SpellcastingStats>,
     pub attacks: Vec<ImportedAttack>,
     pub equipment: Vec<ImportedItem>,
     pub spells: Vec<ImportedReference>,
     pub build_elements: Vec<ImportedReference>,
     pub companions: Vec<ImportedReference>,
+    pub class_levels: BTreeMap<String, u32>,
+    pub active_ids: BTreeSet<String>,
     pub infusions: Vec<(String, String)>,
     /// Definitions reachable from the save. A present key with no value marks missing content.
     pub definitions: BTreeMap<String, Option<ContentDefinition>>,
@@ -58,6 +63,7 @@ pub(crate) fn is_feature_kind(kind: &str) -> bool {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedAttack {
     pub identifier: Option<String>,
+    pub item_id: Option<String>,
     pub name: String,
     pub range: Option<String>,
     pub attack: Option<String>,
@@ -69,8 +75,26 @@ pub struct ImportedAttack {
 pub struct SpellcastingStats {
     pub name: Option<String>,
     pub source_id: Option<String>,
+    pub ability: Option<String>,
     pub attack_bonus: Option<i16>,
     pub save_dc: Option<u16>,
+}
+
+impl SpellcastingStats {
+    fn read(node: Node<'_, '_>) -> Self {
+        let attribute = |key| nonempty(node.attribute(key)).map(str::to_owned);
+        Self {
+            name: attribute("name"),
+            source_id: attribute("source"),
+            ability: attribute("ability"),
+            attack_bonus: node
+                .attribute("attack")
+                .and_then(|value| value.trim().parse().ok()),
+            save_dc: node
+                .attribute("dc")
+                .and_then(|value| value.trim().parse().ok()),
+        }
+    }
 }
 
 pub type ImportedItem = ImportedReference;
@@ -91,6 +115,8 @@ pub struct ImportedReference {
 #[derive(Debug, PartialEq, Eq)]
 pub struct InventoryEntry {
     pub identifier: Option<String>,
+    pub equipped: bool,
+    pub notes: Option<String>,
     /// A missing amount attribute represents one unit. A malformed amount is unknown.
     pub quantity: Option<u32>,
 }
@@ -176,6 +202,7 @@ pub fn import_character_with_content(
         .filter_map(|attack| {
             Some(ImportedAttack {
                 identifier: nonempty(attack.attribute("identifier")).map(str::to_owned),
+                item_id: nonempty(attack.attribute("item-id")).map(str::to_owned),
                 name: nonempty(attack.attribute("name"))?.into(),
                 range: nonempty(attack.attribute("range")).map(str::to_owned),
                 attack: nonempty(attack.attribute("attack")).map(str::to_owned),
@@ -205,6 +232,35 @@ pub fn import_character_with_content(
         .flat_map(|summary| children_named(summary, "element"))
         .filter_map(SavedReference::from_node)
         .collect();
+    let active_ids = active.iter().map(|entry| entry.id.to_owned()).collect();
+    let saved_levels: Vec<_> = build_elements
+        .iter()
+        .filter(|entry| entry.kind == Some("Level"))
+        .collect();
+    let classes: BTreeSet<_> = active
+        .iter()
+        .chain(&build_elements)
+        .filter(|entry| entry.kind == Some("Class"))
+        .map(|entry| entry.id)
+        .collect();
+    let mut class_levels = BTreeMap::new();
+    for entry in &saved_levels {
+        if let Some(class) = nonempty(entry.node.attribute("class")) {
+            *class_levels.entry(class.to_owned()).or_insert(0) += 1;
+        }
+    }
+    if let Some(&class) = classes.first().filter(|_| classes.len() == 1) {
+        let level = child(save.root_element(), "display-properties")
+            .and_then(|display| child(display, "level"))
+            .and_then(|level| level.text()?.trim().parse::<u32>().ok())
+            .filter(|level| *level > 0)
+            .unwrap_or(saved_levels.len() as u32);
+        if level > 0 {
+            class_levels.insert(class.to_owned(), level);
+        }
+    } else if class_levels.values().sum::<u32>() != saved_levels.len() as u32 {
+        class_levels.clear();
+    }
     let mut build_ids: HashSet<_> = build_elements.iter().map(|entry| entry.id).collect();
     build_elements.extend(active.iter().copied().filter(|entry| {
         entry
@@ -216,7 +272,20 @@ pub fn import_character_with_content(
     let casting =
         || children_named(build, "magic").flat_map(|magic| children_named(magic, "spellcasting"));
     let mut spell_slots = SpellSlots::default();
+    let mut spellcasting = Vec::new();
     for caster in casting() {
+        let stats = SpellcastingStats::read(caster);
+        if (stats.attack_bonus.is_some()
+            || stats.save_dc.is_some()
+            || stats.ability.is_some()
+            || caster.children().any(|list| {
+                matches!(list.tag_name().name(), "cantrips" | "spells")
+                    && children_named(list, "spell").next().is_some()
+            }))
+            && !spellcasting.contains(&stats)
+        {
+            spellcasting.push(stats);
+        }
         let Some(slots) = child(caster, "slots") else {
             continue;
         };
@@ -373,6 +442,16 @@ pub fn import_character_with_content(
                 spellcasting: reference.spellcasting(),
                 inventory: reference.node.has_tag_name("item").then(|| InventoryEntry {
                     identifier: nonempty(reference.node.attribute("identifier")).map(str::to_owned),
+                    equipped: child(reference.node, "equipped")
+                        .and_then(|node| node.text())
+                        .map(str::trim)
+                        == Some("true"),
+                    notes: ["notes", "description"]
+                        .into_iter()
+                        .find_map(|tag| {
+                            child(reference.node, tag).and_then(|node| nonempty(node.text()))
+                        })
+                        .map(str::to_owned),
                     quantity: reference
                         .node
                         .attribute("amount")
@@ -390,11 +469,14 @@ pub fn import_character_with_content(
         name,
         profile,
         spell_slots,
+        spellcasting,
         attacks,
         equipment: resolve(equipment),
         spells: resolve(spells),
         build_elements: resolve(build_elements),
         companions: resolve(companions),
+        class_levels,
+        active_ids,
         infusions,
         definitions,
         companion_definitions,
@@ -425,14 +507,7 @@ impl<'a, 'input> SavedReference<'a, 'input> {
         let casting = self.node.parent_element()?.parent_element()?;
         casting
             .has_tag_name("spellcasting")
-            .then(|| SpellcastingStats {
-                name: nonempty(casting.attribute("name")).map(str::to_owned),
-                source_id: nonempty(casting.attribute("source")).map(str::to_owned),
-                attack_bonus: casting
-                    .attribute("attack")
-                    .and_then(|value| value.parse().ok()),
-                save_dc: casting.attribute("dc").and_then(|value| value.parse().ok()),
-            })
+            .then(|| SpellcastingStats::read(casting))
     }
 
     fn preparation(self) -> Option<bool> {

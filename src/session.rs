@@ -190,6 +190,26 @@ impl<Encounter, Layout> CharacterSession<Encounter, Layout> {
         self.progress.current
     }
 
+    pub fn end_encounter(&mut self) -> bool {
+        if !self.progress.active {
+            return false;
+        }
+        self.edit_combat(|progress, _| progress.active = false);
+        true
+    }
+
+    pub fn start_encounter(&mut self) -> bool {
+        if self.progress.active {
+            return false;
+        }
+        self.edit_combat(|progress, companions| {
+            progress.active = true;
+            progress.round = 1;
+            progress.current = progress.ordered(companions).first().map(|&(id, _)| id);
+        });
+        true
+    }
+
     fn effect_boundary(&mut self, boundary: TurnBoundary, current: InitiativeId) {
         let companions = &self.companions.cards;
         self.progress

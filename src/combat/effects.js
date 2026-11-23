@@ -51,10 +51,21 @@ const effectControls = (() => {
     }
   }
 
-  function advanceRound(state) {
+  function advanceRounds(state, rounds) {
+    let changed = false;
     for (const effect of entries(state)) {
-      if (active(effect) && effect.kind === "rounds") effect.remaining -= 1;
+      if (active(effect) && effect.kind === "rounds") {
+        effect.remaining = Math.max(0, effect.remaining - rounds);
+        changed = true;
+      }
     }
+    for (const card of state.companions?.cards || []) {
+      if (card.rounds > 0) {
+        card.rounds = Math.max(0, card.rounds - rounds);
+        changed = true;
+      }
+    }
+    return advanceTime(state, rounds * 6).changed || changed;
   }
 
   function advanceTime(state, seconds) {
@@ -96,7 +107,10 @@ const effectControls = (() => {
       case "manual": return "Until ended manually";
       case "short": return "Until the next short or long rest";
       case "long": return "Until the next long rest";
-      case "rounds": return `${effect.remaining} round${effect.remaining === 1 ? "" : "s"} remaining · start of round ${(state.progress?.round || 1) + effect.remaining}`;
+      case "rounds": {
+        const remaining = `${effect.remaining} round${effect.remaining === 1 ? "" : "s"} remaining`;
+        return state.progress?.active === false ? remaining : `${remaining} · start of round ${(state.progress?.round || 1) + effect.remaining}`;
+      }
       case "seconds": return `${displayTime(effect.remaining)} of game time remaining`;
       default: {
         const anchor = effect.anchor || effect.target;
@@ -105,7 +119,7 @@ const effectControls = (() => {
         const shared = entry === "owner" && anchor !== "owner" ? " (with owner)" : "";
         const phase = effect.kind === "start" ? "Start" : "End";
         const count = effect.remaining === 1 ? "next matching turn" : `${effect.remaining} matching turns remaining`;
-        const waiting = order.has(entry) ? "" : " · waiting for an initiative entry";
+        const waiting = state.progress?.active === false ? " · encounter inactive" : order.has(entry) ? "" : " · waiting for an initiative entry";
         return `${phase} of turn: ${name}${shared} · ${count}${waiting}`;
       }
     }
@@ -182,7 +196,7 @@ const effectControls = (() => {
     const state = previewEncounter.current();
     const effects = entries(state);
     const display = view(state);
-    const signature = JSON.stringify([effects, [...display.names], [...display.order], state.progress?.round, Boolean(state.focus.active)]);
+    const signature = JSON.stringify([effects, [...display.names], [...display.order], state.progress?.round, state.progress?.active, Boolean(state.focus.active)]);
     if (signature === lastRender) return;
     lastRender = signature;
     const expired = effects.filter((effect) => activeBefore.has(effect.id) && !effect.ended && !active(effect));
@@ -299,13 +313,15 @@ const effectControls = (() => {
   clock.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(clock);
-    const seconds = Number(data.get("elapsed")) * Number(data.get("unit"));
+    const elapsed = Number(data.get("elapsed"));
+    const rounds = data.get("unit") === "rounds";
+    const seconds = elapsed * (rounds ? 6 : Number(data.get("unit")));
     if (!Number.isInteger(seconds) || seconds < 1 || seconds > 0xffffffff) {
       feedback.textContent = "Enter a shorter elapsed time.";
       return;
     }
     previewEncounter.transact((state) => {
-      const { changed } = advanceTime(state, seconds);
+      const changed = rounds ? advanceRounds(state, elapsed) : advanceTime(state, seconds).changed;
       feedback.textContent = changed ? "In-game time advanced." : "No in-game timers are active.";
       return changed && "advancing game time";
     });
@@ -314,5 +330,5 @@ const effectControls = (() => {
   document.addEventListener("preview-encounter-change", render);
   document.addEventListener("preview-encounter-undo", () => { feedback.textContent = ""; });
   render();
-  return { boundary, advanceRound, advanceTime, displayTime, endForRemovedTarget, indicators, view };
+  return { boundary, advanceRounds, advanceTime, displayTime, endForRemovedTarget, indicators, view, entries, active };
 })();

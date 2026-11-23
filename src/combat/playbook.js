@@ -9,25 +9,50 @@ const playbook = (() => {
   const protector = byId("protector-dialog");
   const protectorForm = byId("protector-form");
   const protectorFeedback = byId("protector-feedback");
+  const linkSearch = byId("ability-link-search");
+  const referenceDialog = byId("ability-reference");
+  const moxieOutcome = byId("moxie-outcome");
+  const moxieKey = "Resource:moxie";
   const cannonRolls = byId("cannon-rolls")?.dataset;
   let pendingProtector;
   const knownInfusions = [...document.querySelectorAll("[data-infusion]")]
     .map((node) => [node.dataset.infusion, node.textContent])
     .sort(([, a], [, b]) => a.localeCompare(b));
+  const infusionKeys = new Set(knownInfusions.map(([id]) => `option:Feature:${id}`));
   byId("known-infusion-panel").hidden = knownInfusions.length === 0;
   const abilities = (state) => state.progress?.abilities || [];
   const resets = (recovery, kind) => recovery === "short" || (recovery === "long" && kind === "long");
   const spells = new Map();
+  const importedSources = new Map();
+  const moxieFeatures = new Map();
   for (const row of document.querySelectorAll("#action-groups [data-pin]")) {
-    const prepared = row.querySelector(".option-body").dataset.prepared;
-    if (prepared === undefined) continue;
+    const body = row.querySelector(".option-body");
+    const prepared = body.dataset.prepared;
     const name = row.querySelector(".option-title").textContent;
-    const level = row.querySelector(".spell-level")?.textContent;
-    spells.set(row.dataset.pin, { name, level, prepared: prepared === "true" });
+    if (prepared !== undefined) {
+      const level = row.querySelector(".spell-level")?.textContent;
+      spells.set(row.dataset.pin, { name, level, prepared: prepared === "true" });
+    }
+    const key = `option:${row.dataset.pin}`;
+    if (body.dataset.moxieAction) moxieFeatures.set(row.dataset.pin, {name, action: body.dataset.moxieAction, cost: Number(body.dataset.moxieCost || 0)});
+    const category = body.dataset.inventoryIndex !== undefined ? "Item" : body.querySelector("[data-kind]").dataset.kind;
+    if (category !== "Attack") addImportedSource(key, name, category, body);
+  }
+  for (const source of byId("ability-imported-references").children) {
+    addImportedSource(source.dataset.abilitySource, source.querySelector("h3").textContent, "Feature", source);
+  }
+
+  function addImportedSource(key, name, category, body) {
+    if (importedSources.has(key)) return;
+    const facts = [...body.querySelectorAll(".option-facts > div")];
+    const reference = facts.find((fact) => fact.querySelector("dt").textContent === "Source")?.querySelector("dd").textContent;
+    importedSources.set(key, {name, category: infusionKeys.has(key) ? "Infusion" : category,
+      reference, facts, description: body.querySelector(".description")});
   }
   let editing;
   let pendingRest;
   let lastSignature;
+  let openReference;
 
   function make(tag, text) {
     const node = document.createElement(tag);
@@ -79,7 +104,19 @@ const playbook = (() => {
     const ability = abilities(state).find((entry) => entry.source === key);
     const resourceKey = ability ? ability.pool : key;
     const pool = pools(state).find((entry) => entry.key === resourceKey);
-    if (!ability && !pool) return null;
+    const moxie = !ability && moxieFeatures.get(key);
+    if (!ability && !pool && !moxie) return null;
+    if (moxie) {
+      const shared = pools(state).find((entry) => entry.key === moxieKey);
+      const remaining = shared && Math.max(0, shared.capacity - (state.progress?.used[moxieKey] || 0));
+      const spent = state.progress?.used[key] || 0;
+      const label = !shared ? "Set up Moxie" : moxie.action === "spend" ? `Spend ${moxie.cost} Moxie`
+        : moxie.action === "refill" ? "Record reaction and refill Moxie" : "Record trick";
+      const reason = pool && spent >= pool.capacity ? `${pool.name} has no uses left.`
+        : shared && remaining < moxie.cost ? `Requires ${moxie.cost} Moxie (${remaining} left).` : "";
+      const limits = pool ? `${Math.max(0, pool.capacity - spent)} / ${pool.capacity} uses · ` : "";
+      return {moxie, pool, setup: !shared, label, reason, summary: shared ? `${limits}${remaining} / ${shared.capacity} Moxie` : "Set your Moxie maximum to track this feature."};
+    }
     const label = ability?.kind === "use" ? "Use feature" : ability?.active ? "Deactivate" : "Activate";
     const remaining = pool ? Math.max(0, pool.capacity - (state.progress?.used[resourceKey] || 0)) : 0;
     const cost = ability?.cost ?? 1;
@@ -96,6 +133,18 @@ const playbook = (() => {
       activate(use.ability.id);
       return;
     }
+    if (use.moxie) {
+      if (use.setup) {
+        byId("configure-moxie").click();
+      } else if (use.moxie.action === "failed-save") {
+        moxieOutcome.dataset.feature = key;
+        byId("moxie-outcome-heading").textContent = use.moxie.name;
+        moxieOutcome.showModal();
+      } else {
+        recordMoxieFeature(key);
+      }
+      return;
+    }
     previewEncounter.transact((state) => {
       const current = featureUse(key, state);
       if (!current || current.ability || !encounterTracker.spendResource(state, key)) {
@@ -106,6 +155,56 @@ const playbook = (() => {
       return "using " + current.pool.name;
     });
   }
+
+  function recordMoxieFeature(key, failed = false) {
+    previewEncounter.transact((state) => {
+      const use = featureUse(key, state);
+      if (!use?.moxie || use.setup || use.reason) {
+        useFeedback(use?.reason || "The feature changed. Choose it again.");
+        return false;
+      }
+      const {action, cost, name} = use.moxie;
+      // Availability for both pools was checked against the same draft.
+      if (use.pool) encounterTracker.spendResource(state, use.pool.key);
+      if (action === "spend") encounterTracker.spendResource(state, moxieKey, cost);
+      if (action === "refill") encounterTracker.restoreResource(state, moxieKey, Infinity);
+      if (action === "failed-save" && failed) encounterTracker.restoreResource(state, moxieKey);
+      useFeedback(name + " recorded.");
+      return "using " + name;
+    });
+  }
+  moxieOutcome.querySelector("form").addEventListener("submit", (event) => {
+    const result = event.submitter?.value;
+    if (result === "failed" || result === "used") recordMoxieFeature(moxieOutcome.dataset.feature, result === "failed");
+  });
+
+  function linkKey(ability) {
+    return ability.link ?? (ability.source ? `option:${ability.source}` : "");
+  }
+
+  function linkedSources(state) {
+    const sources = new Map(importedSources);
+    const display = effectControls.view(state);
+    for (const effect of effectControls.entries(state)) {
+      const category = effectControls.active(effect) ? "Active effect" : "Ended effect";
+      sources.set(`effect:${effect.id}`, {name: effect.name, category,
+        target: display.names.get(effect.target), duration: display.remaining(effect), notes: effect.notes});
+    }
+    return sources;
+  }
+
+  function filterLinks(value = form.elements.link.value) {
+    const query = linkSearch.value.trim().toLowerCase();
+    const sources = linkedSources(previewEncounter.current());
+    const options = [...sources].filter(([key, source]) => key === value ||
+      `${source.name} ${source.category} ${source.reference || ""}`.toLowerCase().includes(query))
+      .sort(([, a], [, b]) => a.name.localeCompare(b.name))
+      .map(([key, source]) => new Option(`${source.name} · ${source.category}`, key));
+    if (value && !sources.has(value)) options.push(new Option("Unavailable linked source", value));
+    form.elements.link.replaceChildren(new Option("No linked source", ""), ...options);
+    form.elements.link.value = value;
+  }
+
   function openAbility(values = {}) {
     editing = values;
     const options = pools(previewEncounter.current()).map((pool) => new Option(pool.name, pool.key));
@@ -113,19 +212,22 @@ const playbook = (() => {
       options.push(new Option("Unavailable resource", values.pool));
     }
     form.elements.pool.replaceChildren(new Option("No shared resource", ""), ...options);
-    for (const field of ["name", "kind", "pool", "cost", "reset", "followup", "notes"]) {
+    for (const field of ["name", "kind", "pool", "cost", "reset", "followup", "notes", "category", "reference", "summary", "description"]) {
       form.elements[field].value = values[field] ?? ({kind: "use", cost: 1}[field] || "");
     }
+    linkSearch.value = "";
+    filterLinks(linkKey(values));
     byId("remove-ability").hidden = !values.id;
     editor.showModal();
   }
   byId("add-ability").addEventListener("click", () => openAbility());
+  linkSearch.addEventListener("input", () => filterLinks());
   byId("cancel-ability").addEventListener("click", () => editor.close());
   byId("remove-ability").addEventListener("click", () => {
     const id = editing.id;
-    encounterTracker.update((progress) => {
-      progress.abilities = (progress.abilities || []).filter((entry) => entry.id !== id);
-      return true;
+    updateAbility(id, (ability, progress) => {
+      progress.abilities = progress.abilities.filter((entry) => entry.id !== id);
+      return "removing " + ability.name;
     });
     editor.close();
   });
@@ -143,9 +245,10 @@ const playbook = (() => {
         if (values.kind === "use") saved.active = false;
         Object.assign(saved, values);
       } else {
+        if (source.id != null) return false;
         progress.abilities.push({...values, source: source.source, id: ++progress.sequence, active: false, uses: 0});
       }
-      return true;
+      return (saved ? "editing " : "tracking ") + values.name;
     });
     editor.close();
   });
@@ -158,8 +261,7 @@ const playbook = (() => {
     const article = control.closest("article");
     const name = (article.querySelector(".option-title") || article.querySelector("h3")).textContent.trim();
     const pool = pools(previewEncounter.current()).find((pool) => pool.key === source);
-    openAbility(current || {source, name, pool: pool?.key, reset: pool?.recovery,
-      notes: body.querySelector(".description")?.innerText.trim().slice(0, 4000)});
+    openAbility(current || {source, name, pool: pool?.key, reset: pool?.recovery});
   });
 
   function followups(state) {
@@ -273,15 +375,62 @@ const playbook = (() => {
     return control;
   }
 
+  function abilityDetails(ability, source) {
+    const content = make("div");
+    content.className = "tracked-details";
+    const facts = make("dl");
+    facts.className = "option-facts";
+    const fact = (label, value) => {
+      if (!value) return;
+      const row = make("div");
+      row.append(make("dt", label), make("dd", value));
+      facts.append(row);
+    };
+    fact("Reference", ability.reference);
+    if (source) {
+      fact(source.category, source.name);
+      fact("Applies to", source.target);
+      fact("Duration", source.duration);
+      for (const row of source.facts || []) facts.append(row.cloneNode(true));
+    } else if (linkKey(ability)) {
+      fact("Linked source", "Unavailable");
+    }
+    if (facts.childElementCount) content.append(facts);
+    for (const text of [ability.description, ability.notes, source?.notes].filter(Boolean)) {
+      const paragraph = make("p", text);
+      paragraph.className = "companion-text";
+      content.append(paragraph);
+    }
+    if (source?.description) content.append(source.description.cloneNode(true));
+    if (!content.childElementCount) content.append(make("p", "No description available."));
+    return content;
+  }
+
+  function renderReference(ability, source) {
+    byId("ability-reference-heading").textContent = ability.name;
+    byId("ability-reference-content").replaceChildren(abilityDetails(ability, source));
+  }
+
   function render() {
     const state = previewEncounter.current();
     const actions = followups(state);
+    const sources = linkedSources(state);
+    const tracked = abilities(state);
+    const linkedEffects = tracked.map((ability) => linkKey(ability)).filter((key) => key.startsWith("effect:"))
+      .map((key) => sources.get(key));
     const signature = JSON.stringify([abilities(state), pools(state), state.progress?.used,
-      actions, state.progress?.turnSequence, state.progress?.followupUses, state.progress?.infusions]);
+      actions, state.progress?.turnSequence, state.progress?.followupUses, state.progress?.infusions, linkedEffects]);
     if (signature === lastSignature) return;
     lastSignature = signature;
+    const openCards = new Map([...byId("playbook").querySelectorAll("details[data-view-disclosure]")]
+      .map((details) => [details.dataset.viewDisclosure, details.open]));
+    function restoreCard(details, key) {
+      details.dataset.viewDisclosure = key;
+      if (openCards.has(key)) details.open = openCards.get(key);
+      else sessionView.restoreDisclosure(details);
+    }
     list.replaceChildren();
-    if (!abilities(state).length) list.append(make("p", "Track a trait, effect, or imbuement."));
+    if (!tracked.length) list.append(make("p", "Track a trait, effect, or imbuement."));
     const activeInfusions = state.progress?.infusions || [];
     byId("known-infusion-heading").textContent = `Artificer infusions · ${knownInfusions.filter(([id]) => activeInfusions.includes(id)).length} active`;
     const infusionList = byId("known-infusion-list");
@@ -299,34 +448,52 @@ const playbook = (() => {
         });
       });
       toggle.setAttribute("aria-label", `${toggle.textContent} ${name}`);
-      row.append(make("span", name), toggle);
+      const details = make("details");
+      details.append(make("summary", name), abilityDetails({}, sources.get(`option:Feature:${id}`)));
+      restoreCard(details, `infusion:${id}`);
+      row.append(details, toggle);
       infusionList.append(row);
     }
-    for (const ability of abilities(state)) {
+    for (const ability of tracked) {
       const row = make("article");
-      row.append(make("h3", ability.name));
+      const source = sources.get(linkKey(ability));
       const pool = pools(state).find((entry) => entry.key === ability.pool);
       const available = pool && Math.max(0, pool.capacity - (state.progress?.used[pool.key] || 0));
-      const summary = [ability.kind === "imbuement" ? "Imbuement" : "",
+      const category = ability.category || source?.category || (ability.kind === "imbuement" ? "Imbuement" : "");
+      const summary = [category || ability.reference,
         ability.kind === "use" ? "" : ability.active ? "Active" : "Inactive",
         ability.kind === "imbuement" ? "" : `${ability.uses || 0} used`,
         pool ? `${available} / ${pool.capacity} ${pool.name}` : ""];
-      row.append(make("p", summary.filter(Boolean).join(" · ") || "0 used"));
-      if (ability.notes) {
-        const details = make("details");
-        const notes = make("p", ability.notes);
-        notes.className = "companion-text";
-        details.append(make("summary", "Details"), notes);
-        row.append(details);
-      }
+      const details = make("details");
+      const title = make("summary");
+      title.append(make("strong", ability.name), make("small", summary.filter(Boolean).join(" · ")));
+      if (ability.summary) title.append(make("span", ability.summary));
+      const content = abilityDetails(ability, source);
       const controls = make("div");
       controls.className = "companion-card-actions";
+      controls.append(button("Edit", () => openAbility(ability)));
+      if (content.textContent.length > 650 || content.querySelector("table")) {
+        controls.prepend(button("Open full details", () => {
+          openReference = ability.id;
+          renderReference(ability, source);
+          referenceDialog.showModal();
+        }));
+      }
+      details.append(title, content, controls);
+      restoreCard(details, `tracked-ability:${ability.id}`);
       const label = ability.kind === "use" ? "Record use" : ability.active ? "Deactivate" : "Activate";
       const use = button(label, () => activate(ability.id));
       use.disabled = !ability.active && Boolean(ability.pool) && (!pool || available < ability.cost);
-      controls.append(use, button("Edit", () => openAbility(ability)));
-      row.append(controls);
+      const useControls = make("div");
+      useControls.className = "companion-card-actions";
+      useControls.append(use);
+      row.append(details, useControls);
       list.append(row);
+    }
+    if (referenceDialog.open) {
+      const ability = tracked.find((entry) => entry.id === openReference);
+      if (ability) renderReference(ability, sources.get(linkKey(ability)));
+      else referenceDialog.close();
     }
     followupList.replaceChildren();
     for (const action of actions) {

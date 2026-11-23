@@ -1,19 +1,19 @@
-<section id="effects" aria-labelledby="effects-heading">
+<section id="effects" data-view-scroll="active-effects" aria-labelledby="effects-heading">
   <div class="rail-heading"><h2 id="effects-heading">Active effects</h2><button type="button" id="add-effect">Add effect</button></div>
   <article id="effect-concentration" hidden><span class="status-chip" data-status-kind="concentration">Concentration</span><h3 id="effect-concentration-name"></h3><p id="effect-concentration-duration"></p><button type="button" id="effect-end-concentration">End concentration</button></article>
   <div class="focus-form effect-tools">
-    <details class="effect-time-controls"><summary>Advance game time</summary>
+    <details class="effect-time-controls" data-view-disclosure="effect-clock"><summary>Advance game time</summary>
     <form id="effect-clock" class="focus-form">
       <label>Elapsed game time <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
       <label for="effect-clock-unit">Game time unit</label>
-      <select id="effect-clock-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select>
+      <select id="effect-clock-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option><option value="rounds">Rounds (6 seconds each)</option></select>
       <button>Advance game time</button>
     </form>
     </details>
   </div>
   <p id="effect-feedback" role="status"></p>
   <div id="effect-list" class="companion-grid"></div>
-  <details id="ended-effects" class="panel" hidden>
+  <details id="ended-effects" class="panel" data-view-disclosure="ended-effects" hidden>
     <summary>Ended effects</summary>
     <div id="ended-effect-list" class="panel-body companion-grid"></div>
   </details>

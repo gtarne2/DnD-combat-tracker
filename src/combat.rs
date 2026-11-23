@@ -10,6 +10,7 @@ use crate::encounter::EncounterProgress;
 use crate::inventory::{ConsumableUses, consumable_amounts, consumable_key, is_scroll};
 
 mod html;
+mod moxie;
 
 pub use html::{render_html, render_html_with_profile};
 
@@ -78,8 +79,19 @@ pub struct CombatOption {
     pub kind: OptionKind,
     pub details: Vec<CombatDetail>,
     pub description: Vec<ContentNode>,
+    pub inventory: Option<InventoryListing>,
+    pub inventory_key: Option<String>,
+    pub linked_item: Option<String>,
+    pub summary: Option<String>,
+    pub moxie: Option<moxie::MoxieUse>,
     pub consumable: Option<ConsumableAmount>,
     pub concentration: Option<ConcentrationSpell>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InventoryListing {
+    pub index: usize,
+    pub quantity: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,6 +123,7 @@ pub struct CombatSheet {
     pub resources: Vec<CombatResource>,
     pub casting_rolls: Vec<SpellcastingStats>,
     pub infusions: Vec<(String, String)>,
+    pub reference_features: Vec<CombatOption>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -139,13 +152,31 @@ impl CombatSheet {
             companions,
             progress: EncounterProgress::default(),
             resources: Vec::new(),
-            casting_rolls: Vec::new(),
+            casting_rolls: character.spellcasting.clone(),
             infusions: character.infusions.clone(),
+            reference_features: Vec::new(),
             groups: ActionGroup::ALL.map(|action| CombatGroup {
                 action,
                 options: Vec::new(),
             }),
         };
+        let mut item_counts = std::collections::BTreeMap::new();
+        let item_keys: Vec<_> = character
+            .equipment
+            .iter()
+            .map(|item| {
+                if let Some(id) = item
+                    .inventory
+                    .as_ref()
+                    .and_then(|entry| entry.identifier.as_deref())
+                {
+                    return format!("item:{}:{id}", item.content_id);
+                }
+                let occurrence = item_counts.entry(item.content_id.as_str()).or_insert(0);
+                *occurrence += 1;
+                format!("item:{}:entry-{occurrence}", item.content_id)
+            })
+            .collect();
         for attack in &character.attacks {
             let mut option = CombatOption::new(OptionKind::Attack, &attack.name);
             option.pin_key = attack
@@ -155,6 +186,43 @@ impl CombatSheet {
             option.detail("Range", attack.range.as_deref());
             option.detail("Attack roll", attack.attack.as_deref());
             option.detail("Damage", attack.damage.as_deref());
+            let candidates = |matches: &dyn Fn(&crate::aurora::ImportedReference) -> bool| {
+                let mut rows = character
+                    .equipment
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, item)| matches(item));
+                let first = rows.next()?.0;
+                rows.next().is_none().then_some(first)
+            };
+            let linked = if let Some(id) = &attack.item_id {
+                candidates(&|item| {
+                    &item.content_id == id
+                        || item
+                            .inventory
+                            .as_ref()
+                            .and_then(|entry| entry.identifier.as_ref())
+                            == Some(id)
+                })
+            } else {
+                let by_identifier = attack.identifier.as_ref().and_then(|id| {
+                    candidates(&|item| {
+                        item.inventory
+                            .as_ref()
+                            .and_then(|entry| entry.identifier.as_ref())
+                            == Some(id)
+                    })
+                });
+                by_identifier.or_else(|| {
+                    candidates(&|item| {
+                        item.saved_name
+                            .as_deref()
+                            .or_else(|| item.definition.as_ref()?.name.as_deref())
+                            .is_some_and(|name| name.eq_ignore_ascii_case(&attack.name))
+                    })
+                })
+            };
+            option.linked_item = linked.map(|index| item_keys[index].clone());
             if let Some(description) = &attack.description {
                 option
                     .description
@@ -163,11 +231,6 @@ impl CombatSheet {
             sheet.push(ActionGroup::Action, option);
         }
         for spell in &character.spells {
-            if let Some(casting) = &spell.spellcasting
-                && !sheet.casting_rolls.contains(casting)
-            {
-                sheet.casting_rolls.push(casting.clone());
-            }
             sheet.add_definition(
                 character,
                 DefinitionOption {
@@ -179,12 +242,13 @@ impl CombatSheet {
                     saved_spell_level: spell.saved_spell_level,
                     preparation: spell.preparation,
                     kind: OptionKind::Spell,
+                    inventory: None,
                     consumable: None,
                 },
             );
         }
         let mut amounts = consumable_amounts(character);
-        for item in &character.equipment {
+        for (index, item) in character.equipment.iter().enumerate() {
             let consumable = if let Some(key) = consumable_key(item) {
                 let Some(amount) = amounts.remove(&key) else {
                     continue;
@@ -221,6 +285,10 @@ impl CombatSheet {
                     saved_spell_level: None,
                     preparation: None,
                     kind,
+                    inventory: Some(InventoryListing {
+                        index,
+                        quantity: item.inventory.as_ref().and_then(|entry| entry.quantity),
+                    }),
                     consumable,
                 },
             );
@@ -244,12 +312,24 @@ impl CombatSheet {
                     saved_spell_level: None,
                     preparation: None,
                     kind: OptionKind::Attack,
+                    inventory: None,
                     consumable: None,
                 },
             );
         }
         sheet.add_features(character);
-        sheet.resources = resources(character, &sheet.groups);
+        for option in sheet.groups.iter_mut().flat_map(|group| &mut group.options) {
+            if let Some(item) = option.inventory {
+                option.inventory_key = Some(item_keys[item.index].clone());
+                if let Some(entry) = &character.equipment[item.index].inventory {
+                    if entry.equipped {
+                        option.detail("Equipped", Some("Yes"));
+                    }
+                    option.detail("Item notes", entry.notes.as_deref());
+                }
+            }
+        }
+        sheet.resources = resources(character, &sheet.groups, &sheet.reference_features);
         sheet
     }
 
@@ -272,10 +352,11 @@ impl CombatSheet {
             if let Some(definition) = definition {
                 for grant in definition.rules().filter(|rule| rule.tag == "grant") {
                     let attributes = &grant.attributes;
-                    // Level/prerequisite-dependent grants need a saved selection.
+                    // Resolve simple saved-ID prerequisites and leave level-gated grants to the save.
                     if attributes
                         .keys()
-                        .any(|key| !matches!(key.as_str(), "id" | "type"))
+                        .any(|key| !matches!(key.as_str(), "id" | "type" | "requirements"))
+                        || !moxie::matches_requirements(attr(grant, "requirements"), character)
                         || !attributes
                             .get("type")
                             .is_some_and(|kind| is_feature_kind(kind))
@@ -290,6 +371,12 @@ impl CombatSheet {
                 if sheets.peek().is_some()
                     && sheets.all(|sheet| attr(sheet, "display") == Some("false"))
                 {
+                    self.reference_features.push(feature_reference(
+                        character,
+                        id,
+                        name,
+                        Some(definition),
+                    ));
                     continue;
                 }
             }
@@ -304,9 +391,20 @@ impl CombatSheet {
                     saved_spell_level: None,
                     preparation: None,
                     kind: OptionKind::Feature,
+                    inventory: None,
                     consumable: None,
                 },
             );
+        }
+        for (id, name) in &character.infusions {
+            if seen.insert(id) {
+                self.reference_features.push(feature_reference(
+                    character,
+                    id,
+                    Some(name),
+                    lookup(character, id),
+                ));
+            }
         }
     }
 
@@ -320,6 +418,7 @@ impl CombatSheet {
             saved_spell_level,
             preparation,
             kind,
+            inventory,
             consumable,
         } = source;
         let name = name
@@ -327,6 +426,7 @@ impl CombatSheet {
             .unwrap_or(id);
         let mut option = CombatOption::new(kind, name);
         option.preparation = preparation;
+        option.inventory = inventory;
         option.consumable = consumable;
         option.pin_key = Some(
             match spellcasting.and_then(|casting| casting.source_id.as_deref()) {
@@ -400,13 +500,43 @@ impl CombatSheet {
         option.detail("Damage", damage.as_deref());
 
         option.description = description(character, id, definition);
+        let text = plain_text(&option.description);
+        if kind == OptionKind::Feature {
+            option.summary = feature_summary(definition);
+            let summary = option.summary.as_deref().unwrap_or(text.as_str());
+            option.moxie = moxie::feature_use(id, name, Some(summary), definition);
+            if moxie::is_pool(id, name) {
+                if let Some(pool) = moxie::pool(character, definition, Some(summary)) {
+                    option.summary = Some(format!(
+                        "{} Moxie points. Recovers on a {} rest.",
+                        pool.capacity,
+                        if pool.recovery == "short" {
+                            "short or long"
+                        } else {
+                            "long"
+                        }
+                    ));
+                }
+            }
+            if let Some(use_kind) = option.moxie {
+                option.detail("Trigger", use_kind.trigger);
+            }
+        }
+        add_reference_facts(&mut option, definition.or(linked_spell));
+        if !matches!(kind, OptionKind::Spell | OptionKind::Scroll) {
+            option.detail("Duration", setter(definition, "duration"));
+        }
         if let Some(spell) = linked_spell {
             let spell_id = attr(&spell.element, "id").unwrap_or(id);
             option
                 .description
                 .extend(description(character, spell_id, Some(spell)));
         }
-        let text = plain_text(&option.description);
+        let text = if linked_spell.is_some() {
+            plain_text(&option.description)
+        } else {
+            text
+        };
         let lower = text.to_ascii_lowercase();
         if damage.is_none() {
             let dice = dice_in(&text);
@@ -468,7 +598,10 @@ impl CombatSheet {
         let fallback = match time.as_deref() {
             Some(time) => ActionGroup::from_label(time),
             None if kind == OptionKind::Attack => Some(ActionGroup::Action),
-            None => activation_in(&lower),
+            None => option
+                .moxie
+                .and_then(|usage| usage.timing)
+                .or_else(|| activation_in(&lower)),
         };
         if definition.is_none() && linked_spell.is_none() {
             option.detail("Aurora content", Some("Definition unavailable"));
@@ -486,8 +619,81 @@ impl CombatSheet {
     }
 }
 
-fn resources(character: &ImportedCharacter, groups: &[CombatGroup]) -> Vec<CombatResource> {
+fn feature_reference(
+    character: &ImportedCharacter,
+    id: &str,
+    name: Option<&str>,
+    definition: Option<&ContentDefinition>,
+) -> CombatOption {
+    let name = name
+        .or_else(|| definition.and_then(|definition| definition.name.as_deref()))
+        .unwrap_or(id);
+    let mut option = CombatOption::new(OptionKind::Feature, name);
+    option.pin_key = Some(format!("Feature:{id}"));
+    option.description = description(character, id, definition);
+    option.summary = feature_summary(definition);
+    add_reference_facts(&mut option, definition);
+    option.detail("Duration", setter(definition, "duration"));
+    option
+}
+
+fn feature_summary(definition: Option<&ContentDefinition>) -> Option<String> {
+    let definition = definition?;
+    definition
+        .element
+        .children_named("sheet")
+        .flat_map(|sheet| sheet.children_named("description"))
+        .map(|node| {
+            plain_text(&node.children)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .find(|summary| !summary.is_empty())
+}
+
+fn add_reference_facts(option: &mut CombatOption, definition: Option<&ContentDefinition>) {
+    let Some(definition) = definition else { return };
+    option.detail("Source", definition.source.as_deref());
+    option.detail(
+        "Requirements",
+        definition
+            .element
+            .children_named("prerequisite")
+            .next()
+            .or_else(|| definition.element.children_named("requirements").next())
+            .map(|node| plain_text(&node.children))
+            .filter(|value| !value.trim().is_empty()),
+    );
+}
+
+fn resources(
+    character: &ImportedCharacter,
+    groups: &[CombatGroup],
+    references: &[CombatOption],
+) -> Vec<CombatResource> {
     let mut result = Vec::new();
+    let moxie = groups
+        .iter()
+        .flat_map(|group| &group.options)
+        .chain(references)
+        .find_map(|option| {
+            let id = option.pin_key.as_deref()?.strip_prefix("Feature:")?;
+            moxie::is_pool(id, &option.name)
+                .then(|| {
+                    let definition = lookup(character, id);
+                    moxie::pool(
+                        character,
+                        definition,
+                        Some(
+                            &feature_summary(definition)
+                                .unwrap_or_else(|| plain_text(&option.description)),
+                        ),
+                    )
+                })
+                .flatten()
+        });
+    result.extend(moxie);
     for (pool, levels) in [
         ("Spell slot", &character.spell_slots.standard),
         ("Pact Magic slot", &character.spell_slots.pact),
@@ -568,6 +774,7 @@ struct DefinitionOption<'a> {
     saved_spell_level: Option<u8>,
     preparation: Option<bool>,
     kind: OptionKind,
+    inventory: Option<InventoryListing>,
     consumable: Option<ConsumableAmount>,
 }
 
@@ -584,6 +791,11 @@ impl CombatOption {
             kind,
             details: Vec::new(),
             description: Vec::new(),
+            inventory: None,
+            inventory_key: None,
+            linked_item: None,
+            summary: None,
+            moxie: None,
             consumable: None,
             concentration: None,
         }

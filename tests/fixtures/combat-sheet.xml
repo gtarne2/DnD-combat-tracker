@@ -100,7 +100,9 @@
   <element id="ID_TEST_BOOTS" name="Pace Boots" type="Magic Item">
     <rules><stat name="speed:misc" value="5" /></rules>
   </element>
-  <element id="ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE" name="Enhanced Defense" type="Class Feature" />
+  <element id="ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE" name="Enhanced Defense" type="Class Feature">
+    <description><p>The infusion reinforces the equipment.</p></description>
+  </element>
   <element id="ID_TEST_ARTIFICER_INFUSION_REPLICATE_MAGIC_ITEM_OPTION_CLOAK" name="Cloak of Hiding" type="Class Feature" />
   <element id="ID_TEST_PACK_BOOTS" name="Spare Boots" type="Magic Item">
     <rules><stat name="speed:misc" value="10" /></rules>

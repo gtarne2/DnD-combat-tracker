@@ -75,6 +75,7 @@ const companionControls = (() => {
     toggle.textContent = hide ? "Show" : "Hide";
     toggle.setAttribute("aria-label", hide ? "Show companion sidebar" : "Hide companion sidebar");
     toggle.setAttribute("aria-expanded", String(!hide));
+    if (inSidebar && !hide) sessionView.restoreScroll(byId("companion-roster-content"));
   }
   const openSidebar = byId("open-companion-sidebar");
   toggle.onclick = () => {
@@ -94,7 +95,9 @@ const companionControls = (() => {
   };
   function place(onCompanionsPage) {
     inSidebar = !onCompanionsPage;
-    byId(inSidebar ? "companion-roster-home" : "companion-roster-body").append(byId("companions"));
+    const parent = byId(inSidebar ? "companion-roster-home" : "companion-roster-body");
+    const roster = byId("companions");
+    if (roster.parentElement !== parent) parent.append(roster);
     setCollapsed();
   }
   function showCard(id) {
@@ -176,7 +179,9 @@ const companionControls = (() => {
     const panel = node("details");
     panel.className = "companion-card";
     panel.dataset.companionId = card.id;
+    panel.dataset.viewDisclosure = "companion:" + card.id;
     panel.open = old?.open || false;
+    if (!old) sessionView.restoreDisclosure(panel);
     const hp = card.currentHp == null
       ? card.maxHp == null ? "HP unavailable" : card.maxHp + " max HP"
       : "HP " + card.currentHp + (card.maxHp == null ? "" : " / " + card.maxHp);
@@ -247,6 +252,10 @@ const companionControls = (() => {
     if (card.rounds > 0) controls.append(button("−1 round", "advance", "Advance one round: " + card.name));
     controls.append(button("Remove", "remove", "Remove " + card.name));
     panel.append(controls);
+    for (const section of panel.querySelectorAll("[data-companion-section]")) {
+      section.dataset.viewDisclosure = panel.dataset.viewDisclosure + ":" + section.dataset.companionSection;
+      if (!old) sessionView.restoreDisclosure(section);
+    }
     return panel;
   }
 

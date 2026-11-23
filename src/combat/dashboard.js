@@ -6,6 +6,11 @@
   const columns = optionList.parentElement;
   const divider = byId("inspector-divider");
   const toggle = byId("toggle-inspector");
+  const skillToggle = byId("toggle-skills-dock");
+  const skillsDock = byId("skills-dock");
+  const skillPanel = byId("character-skills").cloneNode(true);
+  skillPanel.removeAttribute("id");
+  skillsDock.append(skillPanel);
   const query = byId("option-search");
   const showUnprepared = byId("show-unprepared");
   showUnprepared.closest("label").hidden = !playbook.hasPreparation;
@@ -13,12 +18,20 @@
   const tabs = () => [...workspace.querySelectorAll("[data-nav], [data-filter]")];
   const wide = matchMedia("(min-width: 1080px)");
   const kindOf = (card) => card.querySelector("[data-kind]").dataset.kind;
-  const rosterDialog = byId("companion-roster-dialog");
-  let filter;
+  const pages = new Map([
+    ["combat", workspace], ["character", byId("character-dialog")], ["companions", byId("companion-roster-dialog")],
+    ["features", byId("features-page")],
+    ["inventory", byId("inventory-page")], ["journal", byId("journal-page")], ["notes", byId("notes-page")],
+  ]);
+  const navigation = document.querySelector(".command-nav");
+  let page;
+  let filter = sessionView.get("filter");
   let selected;
   let split = layoutPreferences.inspectorSplit;
-  let collapsed = false;
-  const remembered = new Map();
+  let collapsed = sessionView.get("inspectorCollapsed") === true;
+  let docked = sessionView.get("skillsDocked") === true;
+  query.value = typeof sessionView.get("query") === "string" ? sessionView.get("query") : "";
+  showUnprepared.checked = playbook.hasPreparation && sessionView.get("showUnprepared") === true;
 
   const categories = [
     ["Attack", "Attacks"], ["Spell", "Spells"], ["Feature", "Features"],
@@ -42,35 +55,66 @@
 
   function updateInspectorVisibility() {
     columns.classList.toggle("inspector-collapsed", collapsed);
-    toggle.textContent = collapsed ? "Show details" : "Hide details";
-    toggle.setAttribute("aria-expanded", String(!collapsed));
-    selected?.querySelector("[data-inspect]").setAttribute("aria-expanded", String(!wide.matches || !collapsed));
+    const showingSkills = wide.matches && docked && !collapsed;
+    skillsDock.hidden = !showingSkills;
+    inspector.hidden = showingSkills;
+    skillToggle.setAttribute("aria-pressed", String(showingSkills));
+    toggle.textContent = collapsed || showingSkills ? "Show details" : "Hide details";
+    toggle.setAttribute("aria-expanded", String(!collapsed && !showingSkills));
+    if (selected) {
+      const control = selected.querySelector("[data-inspect]");
+      control.setAttribute("aria-expanded", String(!wide.matches || (!collapsed && !showingSkills)));
+      if (wide.matches) control.setAttribute("aria-controls", inspector.id);
+      else control.removeAttribute("aria-controls");
+    }
   }
 
-  function setSplit(position, save = false) {
+  function splitBounds() {
     const width = columns.clientWidth;
-    if (!width || !wide.matches || collapsed) return;
+    if (!width || !wide.matches || collapsed) return null;
     const style = getComputedStyle(columns);
     const minimum = parseFloat(style.getPropertyValue("--list-min"));
     const maximum = width - parseFloat(style.getPropertyValue("--inspector-min")) - divider.offsetWidth;
-    const clamped = Math.max(minimum, Math.min(position, maximum));
-    split = 100 * clamped / width;
-    columns.style.setProperty("--list-width", split + "%");
+    return {width, minimum, maximum: Math.max(minimum, maximum)};
+  }
+
+  function updateDivider() {
+    const bounds = splitBounds();
+    if (!bounds) return;
+    const {width, minimum, maximum} = bounds;
     divider.setAttribute("aria-valuemin", String(Math.round(100 * minimum / width)));
     divider.setAttribute("aria-valuemax", String(Math.round(100 * maximum / width)));
-    divider.setAttribute("aria-valuenow", String(Math.round(split)));
+    divider.setAttribute("aria-valuenow", String(Math.round(100 * optionList.offsetWidth / width)));
+  }
+
+  function setSplit(position, save = false) {
+    const bounds = splitBounds();
+    if (!bounds) return;
+    const {width, minimum, maximum} = bounds;
+    split = 100 * Math.max(minimum, Math.min(position, maximum)) / width;
+    columns.style.setProperty("--list-width", split + "%");
+    updateDivider();
     if (save) layoutPreferences.setInspectorSplit(split);
   }
 
   function setCollapsed(value) {
     collapsed = value;
+    sessionView.set("inspectorCollapsed", value);
     updateInspectorVisibility();
-    if (!collapsed) setSplit(columns.clientWidth * split / 100);
+    updateDivider();
+    if (!collapsed) sessionView.restoreScroll(inspector);
   }
 
   columns.style.setProperty("--list-width", split + "%");
-  new ResizeObserver(() => setSplit(columns.clientWidth * split / 100)).observe(columns);
-  toggle.onclick = () => setCollapsed(!collapsed);
+  updateInspectorVisibility();
+  new ResizeObserver(updateDivider).observe(columns);
+  function setDocked(value) {
+    docked = value;
+    sessionView.set("skillsDocked", value);
+    setCollapsed(false);
+  }
+  toggle.onclick = () => docked ? setDocked(false) : setCollapsed(!collapsed);
+  skillToggle.onclick = () => wide.matches ? setDocked(!docked) : rollReference.open("skills");
   divider.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     divider.setPointerCapture(event.pointerId);
@@ -146,7 +190,26 @@
   const quick = setupQuickActions(groups, updateAction);
   companionControls.start();
 
+  function optionKey(card) {
+    const body = card.querySelector(".option-body");
+    const stack = card.querySelector("[data-consumable]")?.dataset.consumable;
+    return JSON.stringify([
+      body.dataset.actionGroup,
+      card.dataset.pin || card.querySelector(".option-title").textContent,
+      stack || body.dataset.inventoryIndex || "",
+    ]);
+  }
+
+  function prepareDescription(description, key) {
+    if (!description) return;
+    description.dataset.viewDisclosure = key;
+    description.open = true;
+    sessionView.restoreDisclosure(description);
+  }
+
   function select(card) {
+    if (selected === card) return;
+    sessionView.rememberScroll(inspector);
     if (selected) {
       selected.classList.remove("selected-option");
       selected.querySelector("[data-inspect]").setAttribute("aria-expanded", "false");
@@ -154,6 +217,7 @@
     selected = card;
     inspector.replaceChildren();
     if (!card) {
+      delete inspector.dataset.viewScroll;
       const message = document.createElement("p");
       message.className = "empty";
       message.textContent = "Select an option to read its details.";
@@ -172,16 +236,19 @@
     const badges = card.querySelector(".option-badges").cloneNode(true);
     badges.querySelector(".row-quantity")?.remove();
     const tools = card.querySelector(".option-execute").cloneNode(true);
-    const description = body.querySelector("details");
-    if (description) description.open = true;
+    const key = "option-description:" + optionKey(card);
+    prepareDescription(body.querySelector("details"), key);
+    prepareDescription(card.querySelector(".option-body details"), key);
     const header = document.createElement("header");
     header.append(kind, heading, badges, tools);
     const quickPin = quick.pinButton(card);
     if (quickPin) tools.append(quickPin);
     article.append(header, body);
+    sheetReference.addOptionLinks(article, card.dataset.sheetEntry);
     inspector.append(article);
+    inspector.dataset.viewScroll = key;
     updateAction(article, previewEncounter.current());
-    inspector.scrollTop = 0;
+    sessionView.restoreScroll(inspector);
   }
 
   function showOptions() {
@@ -192,7 +259,10 @@
     }
     const term = query.value.trim().toLowerCase();
     const shown = term && !["pinned", "traits"].includes(filter) ? "all" : filter;
+    const changedView = workspace.dataset.view !== shown;
+    if (changedView) sessionView.rememberScroll(optionList);
     workspace.dataset.view = shown;
+    optionList.dataset.viewScroll = "option-list:" + shown;
     for (const tab of tabs()) {
       tab.toggleAttribute("data-current", (tab.dataset.nav || tab.dataset.filter) === shown);
       if (tab.hasAttribute("data-current")) tab.setAttribute("aria-current", "true");
@@ -235,11 +305,12 @@
       || shown === "pinned" || active.some((section) => section.querySelector(":scope > .empty"))));
     showFollowups();
     byId("no-groups").classList.toggle("view-hidden", shown === "pinned");
-    if (!candidates.includes(selected)) {
-      const previous = remembered.get(shown);
-      const preferred = previous && candidates.find(card => card.dataset.pin === previous);
-      select(wide.matches ? preferred || candidates[0] : null);
+    const previous = sessionView.get("selection:" + shown);
+    const preferred = previous && candidates.find((card) => optionKey(card) === previous);
+    if ((changedView && preferred) || !candidates.includes(selected)) {
+      select(preferred || (wide.matches ? candidates[0] : null));
     }
+    if (changedView) sessionView.restoreScroll(optionList);
     const state = previewEncounter.current();
     for (const card of candidates) updateAction(card, state);
     const detail = inspector.querySelector("article");
@@ -254,27 +325,44 @@
     byId("bonus-action").querySelector(":scope > .empty")?.toggleAttribute("hidden", hasFollowups);
   }
   document.addEventListener("followups-changed", showFollowups);
-  showUnprepared.addEventListener("change", showOptions);
+  showUnprepared.addEventListener("change", () => {
+    sessionView.set("showUnprepared", showUnprepared.checked);
+    showOptions();
+  });
 
-  function navigate(next, control) {
-    workspace.hidden = next !== "combat";
-    document.body.classList.toggle("reading-page", next !== "combat");
-    byId("character-dialog").hidden = next !== "character";
-    rosterDialog.hidden = next !== "companions";
-    byId("reference-dialog").hidden = next !== "reference";
+  function restoreVisibleScroll() {
+    document.querySelectorAll("[data-view-scroll]").forEach(sessionView.restoreScroll);
+  }
+
+  function navigate(next) {
+    if (!pages.has(next) || page === next) return;
+    if (page) {
+      document.querySelectorAll("[data-view-scroll]").forEach(sessionView.rememberScroll);
+      if (!wide.matches) sessionView.setPosition("page:" + page, window.scrollY);
+    }
+    page = next;
+    document.body.dataset.sessionPage = next;
+    for (const [name, section] of pages) section.hidden = name !== next;
     companionControls.place(next === "companions");
-    document.querySelectorAll(".command-nav [aria-current]").forEach(link => link.removeAttribute("aria-current"));
-    control.setAttribute("aria-current", "page");
-    window.scrollTo(0, 0);
+    for (const control of navigation.querySelectorAll("[data-session-nav]")) {
+      if (control.dataset.sessionNav === next) control.setAttribute("aria-current", "page");
+      else control.removeAttribute("aria-current");
+    }
+    if (next === "combat") showOptions();
+    restoreVisibleScroll();
+    if (!wide.matches) window.scrollTo(0, sessionView.position("page:" + next));
+    sessionView.set("page", next);
   }
   document.addEventListener("preview-encounter-change", showOptions);
-  byId("companions-nav").onclick = event => navigate("companions", event.currentTarget);
-  byId("character-nav").onclick = event => navigate("character", event.currentTarget);
-  byId("combat-nav").onclick = event => {
+  document.addEventListener("click", (event) => {
+    const control = event.target.closest("[data-session-nav]");
+    if (!control) return;
     event.preventDefault();
-    navigate("combat", event.currentTarget);
-    showOptions();
-  };
+    navigate(control.dataset.sessionNav);
+  });
+  window.addEventListener("scroll", () => {
+    if (page && !wide.matches) sessionView.setPosition("page:" + page, window.scrollY);
+  });
 
   // The backdrop dispatches events to the dialog itself. Padding clicks stay inside.
   for (const dialog of document.querySelectorAll("dialog")) {
@@ -297,18 +385,24 @@
       event.preventDefault();
       filter = tab.dataset.nav || tab.dataset.filter;
       query.value = "";
+      sessionView.set("filter", filter);
+      sessionView.set("query", "");
       showOptions();
-      optionList.scrollTop = 0;
       return;
     }
     const button = event.target.closest("[data-inspect]");
     const card = event.target.closest(".option-row");
     if (!card || (!button && event.target.closest("button, .option-body"))) return;
     if (!button) card.querySelector("[data-inspect]").focus();
-    remembered.set(workspace.dataset.view, card.dataset.pin);
+    if (wide.matches && docked) setDocked(false);
     if (wide.matches && collapsed) setCollapsed(false);
-    if (card !== selected) select(card);
-    else if (!wide.matches) select(null);
+    if (!wide.matches && card === selected) {
+      sessionView.set("selection:" + workspace.dataset.view, null);
+      select(null);
+    } else {
+      sessionView.set("selection:" + workspace.dataset.view, optionKey(card));
+      select(card);
+    }
   });
 
   document.addEventListener("click", (event) => {
@@ -333,11 +427,33 @@
     }
     const resource = event.target.closest("[data-resource-detail]");
     if (resource) {
+      if (resource.dataset.resourceDetail === "Resource:moxie") {
+        const moxie = sheetReference.entries().find((entry) => entry.moxiePool);
+        if (moxie) sheetReference.open(moxie.id);
+        else byId("configure-moxie").click();
+        return;
+      }
       const card = groups.flatMap((group) => [...group.querySelectorAll("[data-pin]")])
         .find((card) => card.dataset.pin === resource.dataset.resourceDetail);
       if (!card) return;
+      if (page !== "combat") {
+        const content = card.querySelector(".option-body").cloneNode(true);
+        content.querySelector("[data-track-feature]")?.remove();
+        const rules = content.querySelector("details");
+        if (rules) {
+          rules.removeAttribute("data-view-disclosure");
+          rules.open = true;
+        }
+        byId("resource-reference-title").textContent = card.querySelector(".option-title").textContent;
+        byId("resource-reference-content").replaceChildren(content);
+        byId("resource-reference").showModal();
+        return;
+      }
       filter = "traits";
       query.value = "";
+      sessionView.set("filter", filter);
+      sessionView.set("query", "");
+      sessionView.set("selection:traits", optionKey(card));
       showOptions();
       if (wide.matches) setCollapsed(false);
       select(card);
@@ -349,60 +465,39 @@
     const dialog = byId(control.dataset.dialog);
     if (!dialog.open) dialog.showModal();
   });
-  for (const control of document.querySelectorAll("[data-reference]")) {
-    control.addEventListener("click", () => {
-      const title = control.dataset.reference;
-      const content = byId("reference-content");
-      content.replaceChildren();
-      byId("reference-title").textContent = title;
-      if (title === "Inventory") {
-        for (const row of groups.flatMap(group => [...group.querySelectorAll(".option-row")])) {
-          if (!["Scroll", "Item"].includes(kindOf(row))) continue;
-          const entry = document.createElement("details");
-          const label = document.createElement("summary");
-          label.textContent = row.querySelector(".option-title").textContent + " " + (row.querySelector(".row-quantity")?.textContent || "");
-          entry.append(label, row.querySelector(".description")?.cloneNode(true) || "");
-          content.append(entry);
-        }
-        if (!content.children.length) content.textContent = "No inventory items in this sheet.";
-      } else {
-        for (const field of byId("full-sheet").querySelectorAll("dt")) {
-          const isNote = field.textContent === "Notes";
-          if (title === "Notes" ? !isNote : isNote || field.closest("section")?.querySelector("h2")?.textContent !== "Lore") continue;
-          const heading = document.createElement("h3");
-          heading.textContent = field.textContent;
-          content.append(heading, field.nextElementSibling.cloneNode(true));
-        }
-        const label = document.createElement("label");
-        label.textContent = title === "Notes" ? "Session notes" : "Session journal";
-        const area = document.createElement("textarea");
-        const key = JSON.stringify(["aurora-session-writing", document.body.dataset.profile || location.pathname, title]);
-        const status = document.createElement("p");
-        status.setAttribute("role", "status");
-        try { area.value = localStorage.getItem(key) || ""; } catch { status.textContent = "Local storage unavailable."; }
-        area.oninput = () => {
-          try { localStorage.setItem(key, area.value); status.textContent = "Saved locally"; }
-          catch { status.textContent = "Could not save locally."; }
-        };
-        label.append(area);
-        content.append(label, status);
-      }
-      navigate("reference", control);
-    });
-  }
-  query.addEventListener("input", showOptions);
-  wide.addEventListener("change", () => {
-    updateInspectorVisibility();
+  query.addEventListener("input", () => {
+    sessionView.set("query", query.value);
     showOptions();
   });
+  wide.addEventListener("change", () => {
+    updateInspectorVisibility();
+    if (selected) {
+      const scope = wide.matches ? inspector : selected;
+      const description = scope.querySelector(".option-body details");
+      if (description) sessionView.restoreDisclosure(description);
+    }
+    showOptions();
+    restoreVisibleScroll();
+  });
   document.addEventListener("combat-options-change", showOptions);
+  const rows = groups.flatMap((group) => [...group.querySelectorAll(".option-row")]);
+  sheetReference.setup(rows);
+  setupReferencePages(rows);
+  setupFeatureGroups();
+  document.querySelectorAll("details[data-view-disclosure]").forEach(sessionView.restoreDisclosure);
   document.documentElement.classList.add("dashboard-ready");
   const hash = location.hash.slice(1);
-  if (hash === "full-sheet") byId("character-nav").click();
-  else if (hash === "sheet-layout") {
-    byId(hash).closest("dialog").showModal();
-  } else if (hash === "pinned" || groups.some((group) => group.id === hash)) {
-    filter = hash;
+  let initialPage = pages.has(sessionView.get("page")) ? sessionView.get("page") : "combat";
+  if (hash === "full-sheet") initialPage = "character";
+  else if (hash === "combat" || hash === "pinned" || groups.some((group) => group.id === hash)) {
+    initialPage = "combat";
+    if (hash !== "combat") {
+      filter = hash;
+      query.value = "";
+      sessionView.set("filter", filter);
+      sessionView.set("query", "");
+    }
   }
-  showOptions();
+  navigate(initialPage);
+  if (hash === "sheet-layout") byId(hash).closest("dialog").showModal();
 })();

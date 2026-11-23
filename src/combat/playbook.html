@@ -1,7 +1,7 @@
-<section id="playbook" aria-labelledby="playbook-heading">
+<section id="playbook" data-view-scroll="tracked-abilities" aria-labelledby="playbook-heading">
   <div class="rail-heading"><h2 id="playbook-heading">Tracked abilities</h2><button type="button" id="add-ability">Add</button></div>
   <div id="ability-list" class="companion-grid"></div>
-  <details class="panel" id="known-infusion-panel" hidden>
+  <details class="panel" id="known-infusion-panel" data-view-disclosure="known-infusions" hidden>
     <summary id="known-infusion-heading">Artificer infusions</summary>
     <div id="known-infusion-list" class="infusion-list"></div>
   </details>
@@ -31,16 +31,37 @@
     <div class="companion-fields">
       <label>Name <input name="name" maxlength="160" required></label>
       <label>Track as <select name="kind"><option value="use">Use counter</option><option value="effect">Toggleable effect</option><option value="imbuement">Imbuement</option></select></label>
+      <label>Category <input name="category" maxlength="80" placeholder="Optional"></label>
+      <label>Source or reference <input name="reference" maxlength="160" placeholder="Optional"></label>
+      <label>Find a linked source <input id="ability-link-search" type="search" placeholder="Search spells, features, items, and effects"></label>
+      <label>Linked source <select name="link"></select></label>
+      <label class="companion-wide">Short summary <input name="summary" maxlength="180"></label>
+      <label class="companion-wide">Full description <textarea name="description" rows="4"></textarea></label>
       <label>Spend from <select name="pool"></select></label>
       <label>Cost <input name="cost" type="number" min="1" max="4294967295" value="1" required></label>
       <label>Resets or ends on <select name="reset"><option value="">Manual</option><option value="short">Short or long rest</option><option value="long">Long rest</option></select></label>
       <label>Bonus action while active <input name="followup" maxlength="160" placeholder="Optional action name"></label>
-      <label class="companion-wide">Details or imbued item <textarea name="notes" maxlength="4000" rows="4"></textarea></label>
+      <label class="companion-wide">Mechanical effects or notes <textarea name="notes" maxlength="4000" rows="3"></textarea></label>
     </div>
     <div class="focus-form companion-edit-actions">
       <button type="button" id="remove-ability" hidden>Remove</button>
       <button type="button" id="cancel-ability">Cancel</button>
       <button>Save ability</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="ability-reference" aria-labelledby="ability-reference-heading">
+  <div class="dialog-heading"><h2 id="ability-reference-heading"></h2><form method="dialog"><button>Close</button></form></div>
+  <div id="ability-reference-content"></div>
+</dialog>
+<dialog id="moxie-outcome" aria-labelledby="moxie-outcome-heading">
+  <form method="dialog">
+    <h2 id="moxie-outcome-heading"></h2>
+    <p>Record the trick and choose the target’s saving throw result.</p>
+    <div class="focus-form companion-edit-actions">
+      <button value="cancel" autofocus>Cancel</button>
+      <button value="used">Save succeeded · Record use</button>
+      <button value="failed" class="gold-button">Save failed · Regain 1 Moxie</button>
     </div>
   </form>
 </dialog>

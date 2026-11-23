@@ -2,7 +2,8 @@ use std::path::Path;
 
 use aurora_combat_tracker::{
     companion::CompanionTurn,
-    concentration::{ConcentrationCast, ConcentrationRules},
+    concentration::{ConcentrationCast, ConcentrationRules, ConcentrationSpell},
+    effects::{EffectDetails, EffectDuration},
     encounter::{HitPoints, InitiativeId},
     session::CharacterSession,
 };
@@ -121,4 +122,60 @@ fn damage_and_resource_changes_undo_without_affecting_the_import() {
     );
     session.reimport().unwrap();
     assert_eq!(session.progress().owner_hp(Some(27)).unwrap().current, 19);
+}
+
+#[test]
+fn ending_and_restarting_an_encounter_preserves_combat_state_and_can_be_undone() {
+    let mut session = session("companions.dnd5e", "companions.xml");
+    session.edit_combat(|progress, roster| {
+        roster.owner_initiative = Some(14);
+        roster.cards[0].remaining_rounds = Some(5);
+        progress.owner_hp = Some(HitPoints {
+            current: 8,
+            maximum: Some(16),
+        });
+        progress.spend("Spell slot:1", 2);
+        progress.effects.add(EffectDetails {
+            name: "Ongoing".into(),
+            notes: String::new(),
+            target: InitiativeId::Owner,
+            duration: EffectDuration::Rounds(4),
+        });
+    });
+    session
+        .start_concentration(ConcentrationCast {
+            spell: ConcentrationSpell::new(
+                "test".into(),
+                "Test focus".into(),
+                Some("1 minute".into()),
+            ),
+            scroll_key: None,
+        })
+        .unwrap();
+    session.next_turn();
+    session.next_turn();
+    let before = session.progress().clone();
+    let companions = session.companions.clone();
+    let concentration = session.concentration.clone();
+    assert_eq!(before.round, 2);
+    assert!(session.end_encounter());
+    assert!(!session.end_encounter());
+    assert_eq!(session.next_turn(), None);
+    let mut stopped = before.clone();
+    stopped.active = false;
+    assert_eq!(session.progress(), &stopped);
+    assert_eq!(session.companions, companions);
+    assert_eq!(session.concentration, concentration);
+    assert!(session.undo_combat());
+    assert_eq!(session.progress(), &before);
+    assert!(session.end_encounter());
+    assert!(session.start_encounter());
+    assert!(!session.start_encounter());
+    let mut restarted = before;
+    restarted.round = 1;
+    assert_eq!(session.progress(), &restarted);
+    assert_eq!(session.companions, companions);
+    assert_eq!(session.concentration, concentration);
+    assert!(session.undo_combat());
+    assert_eq!(session.progress(), &stopped);
 }
