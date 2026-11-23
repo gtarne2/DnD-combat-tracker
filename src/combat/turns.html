@@ -1,19 +1,25 @@
 <section id="encounter" aria-labelledby="encounter-heading">
-  <h2 id="encounter-heading">Encounter</h2>
-  <div class="focus-panel">
-    <p><strong id="round-number">Round 1</strong> <span id="current-turn">Ready to start</span></p>
-    <div class="focus-form">
+  <div class="initiative-heading"><h2 id="encounter-heading">Initiative</h2><strong id="round-number">Round 1</strong></div>
+  <p id="current-turn">Ready to start</p>
+  <div class="initiative-list"><ol id="turn-order"></ol></div>
+  <div class="initiative-footer">
+    <button type="button" class="quiet-button" data-dialog="encounter-settings" data-reveal="combatant-panel">Manage initiative</button>
+    <div class="turn-actions">
       <button type="button" id="next-turn">Start turns</button>
-      <button type="button" id="undo-turn" disabled>Undo combat update</button>
-      <span id="encounter-storage"></span>
+      <button type="button" id="undo-turn" aria-label="Undo combat update" title="Undo combat update" disabled>↶</button>
     </div>
+    <span id="encounter-storage"></span>
+  </div>
+</section>
+<dialog id="encounter-settings" aria-labelledby="encounter-settings-heading">
+  <div class="dialog-heading"><h2 id="encounter-settings-heading">Encounter controls</h2><form method="dialog"><button>Close</button></form></div>
+  <div class="encounter-settings-grid">
     <div>
       <h3>Initiative</h3>
       <form class="focus-form" id="encounter-owner">
         <label>Your initiative <input name="initiative" type="number" min="-2147483648" max="2147483647"></label>
         <button>Save initiative</button>
       </form>
-      <ol id="turn-order"></ol>
       <details class="panel" id="combatant-panel">
         <summary>Add or edit combatant</summary>
         <form class="panel-body focus-form" id="combatant-form">
@@ -34,9 +40,8 @@
         <button>Set HP</button>
       </form>
       <details class="panel" id="resource-panel">
-        <summary>Spell slots and feature uses</summary>
+        <summary>Manage spell slots and feature uses</summary>
         <div class="panel-body">
-          <ul id="encounter-resources"></ul>
           <form class="focus-form" id="encounter-resource-form">
             <label>Resource name <input name="name" maxlength="80" required></label>
             <label>Maximum uses <input name="capacity" type="number" min="1" max="4294967295" required></label>
@@ -46,4 +51,4 @@
       </details>
     </div>
   </div>
-</section>
+</dialog>

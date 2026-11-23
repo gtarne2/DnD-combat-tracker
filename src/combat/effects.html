@@ -1,13 +1,14 @@
 <section id="effects" aria-labelledby="effects-heading">
-  <h2 id="effects-heading">Ongoing effects</h2>
+  <div class="rail-heading"><h2 id="effects-heading">Active effects</h2><button type="button" id="add-effect">Add effect</button></div>
   <div class="focus-form effect-tools">
-    <button type="button" id="add-effect">Add effect</button>
+    <details class="effect-time-controls"><summary>Advance game time</summary>
     <form id="effect-clock" class="focus-form">
       <label>Elapsed game time <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
       <label for="effect-clock-unit">Game time unit</label>
       <select id="effect-clock-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select>
       <button>Advance game time</button>
     </form>
+    </details>
   </div>
   <p id="effect-feedback" role="status"></p>
   <div id="effect-list" class="companion-grid"></div>

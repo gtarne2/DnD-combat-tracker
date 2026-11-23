@@ -19,14 +19,52 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("sheet.css"));
     html.push_str("</style></head><body data-profile=\"");
     escape(&mut html, profile_key);
-    html.push_str("\"><header><div class=\"heading\"><h1>Combat sheet</h1>");
-    if let Some(name) = &sheet.character_name {
+    html.push_str("\"><header class=\"command-bar\"><div class=\"brand\"><span class=\"brand-mark\" aria-hidden=\"true\">A</span><div><strong>Aurora</strong><small>Combat Tracker</small></div></div>\
+        <nav class=\"command-nav\" aria-label=\"Tracker\"><a href=\"#combat\" aria-current=\"page\">Combat</a><button type=\"button\" data-dialog=\"character-dialog\">Character</button><a class=\"compact-nav\" href=\"#encounter\">Initiative</a><a href=\"#effects\">Effects</a><a href=\"#companions\">Companions</a></nav>\
+        <button type=\"button\" class=\"layout-trigger\" data-dialog=\"layout-dialog\">Layout</button></header><main class=\"dashboard\">");
+    render_encounter(&mut html, sheet);
+    html.push_str("<section class=\"overview\" aria-label=\"Character overview\"><div class=\"identity\"><span class=\"identity-mark\" aria-hidden=\"true\">");
+    let name = sheet.character_name.as_deref().unwrap_or("Character");
+    let initial = name
+        .chars()
+        .next()
+        .unwrap_or('C')
+        .to_uppercase()
+        .to_string();
+    escape(&mut html, &initial);
+    html.push_str("</span><div><h1>");
+    escape(&mut html, name);
+    html.push_str("</h1>");
+    let identity = ["Level", "Class", "Archetype"]
+        .into_iter()
+        .filter_map(|label| {
+            sheet
+                .profile
+                .fields
+                .iter()
+                .find(|field| field.label == label)
+                .map(|field| {
+                    if label == "Level" {
+                        format!("Lvl {}", field.value)
+                    } else {
+                        field.value.clone()
+                    }
+                })
+        })
+        .collect::<Vec<_>>()
+        .join(" · ");
+    if !identity.is_empty() {
         html.push_str("<p>");
-        escape(&mut html, name);
+        escape(&mut html, &identity);
         html.push_str("</p>");
     }
-    html.push_str("</div></header><nav aria-label=\"Combat options\"><div>");
-    html.push_str("<a href=\"#key-stats\">Stats</a><a href=\"#encounter\">Encounter</a><a href=\"#concentration\">Concentration</a><a href=\"#effects\">Effects</a><a href=\"#companions\">Companions</a><a href=\"#pinned\" id=\"pinned-link\" hidden>Pins</a><span id=\"group-navigation\">");
+    html.push_str("</div></div>");
+    render_stats(&mut html, &sheet.profile.stats);
+    html.push_str(include_str!("concentration.html"));
+    html.push_str("<section class=\"resource-strip\" aria-labelledby=\"resource-heading\"><h2 id=\"resource-heading\">Resources</h2><ul id=\"encounter-resources\"></ul><button type=\"button\" class=\"quiet-button\" data-dialog=\"encounter-settings\" data-reveal=\"resource-panel\">Manage</button></section></section>");
+    html.push_str("<section class=\"combat-workspace\" id=\"combat\" aria-labelledby=\"options-heading\"><div class=\"workspace-heading\"><h2 id=\"options-heading\">Combat options</h2>\
+        <label class=\"option-search\"><span class=\"visually-hidden\">Search combat options</span><input type=\"search\" id=\"option-search\" placeholder=\"Search options\"></label></div>\
+        <nav class=\"action-tabs\" aria-label=\"Combat options\"><span id=\"group-navigation\">");
     for group in &sheet.groups {
         if group.action != ActionGroup::Other || !group.options.is_empty() {
             write!(
@@ -39,15 +77,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
             .unwrap();
         }
     }
-    html.push_str("</span><a href=\"#sheet-layout\" data-open-panel>Layout</a><a href=\"#full-sheet\" data-open-panel>Full sheet</a></div></nav><main>");
-    render_stats(&mut html, &sheet.profile.stats);
-    render_encounter(&mut html, sheet);
-    html.push_str(include_str!("concentration.html"));
-    html.push_str(include_str!("effects.html"));
-    render_companions(&mut html, sheet);
-    html.push_str("<section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
-    render_layout(&mut html, sheet);
-    html.push_str("<p id=\"consumable-status\" class=\"visually-hidden\" role=\"status\"></p>");
+    html.push_str("</span><a href=\"#all-options\" data-filter=\"all\">All</a><a href=\"#pinned\" id=\"pinned-link\" data-filter=\"pinned\" hidden>Pinned</a></nav>\
+        <div class=\"combat-columns\"><div class=\"option-list\" id=\"all-options\">\
+        <section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\" class=\"visually-hidden\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
     html.push_str("<div id=\"action-groups\">");
     for group in &sheet.groups {
         if group.action == ActionGroup::Other && group.options.is_empty() {
@@ -67,13 +99,49 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
             html.push_str("<p class=\"empty\">Options with another casting time or no identified activation.</p>");
         }
         for option in &group.options {
-            start_card(&mut html, None, option.pin_key.as_deref());
-            write!(html, "<p class=\"kind\">{}</p><h3>", option.kind.label()).unwrap();
+            start_card(&mut html, Some("option-row"), option.pin_key.as_deref());
+            html.push_str("<h3 class=\"option-name\"><button type=\"button\" class=\"pick-option\" data-inspect aria-expanded=\"false\"><span class=\"option-title\">");
             escape(&mut html, &option.name);
-            html.push_str("</h3>");
+            html.push_str("</span><span class=\"option-meta\">");
+            let summary = option
+                .details
+                .iter()
+                .filter(|detail| {
+                    matches!(
+                        detail.label,
+                        "Attack roll" | "Damage" | "Save DC" | "Range" | "Uses" | "Cost"
+                    )
+                })
+                .take(3)
+                .map(|detail| match detail.label {
+                    "Save DC" => format!("DC {}", detail.value),
+                    _ => detail.value.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join(" · ");
+            escape(&mut html, &summary);
+            html.push_str("</span>");
+            if let Some(consumable) = &option.consumable {
+                html.push_str("<span class=\"row-quantity\" data-stack-count=\"");
+                escape(&mut html, &consumable.key);
+                html.push_str("\">");
+                if let Some(amount) = consumable.remaining {
+                    write!(html, "{amount} left").unwrap();
+                } else {
+                    html.push_str("Qty unknown");
+                }
+                html.push_str("</span>");
+            }
+            html.push_str("</button></h3>");
             if option.pin_key.is_some() {
                 pin_button(&mut html, &option.name);
             }
+            write!(
+                html,
+                "<div class=\"option-body\"><p class=\"kind\">{}</p>",
+                option.kind.label()
+            )
+            .unwrap();
             if !option.details.is_empty() {
                 html.push_str("<dl>");
                 for detail in &option.details {
@@ -112,13 +180,23 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
                 render_description(&mut html, &option.description);
                 html.push_str("</div></details>");
             }
-            html.push_str("</article>");
+            html.push_str("</div></article>");
         }
         html.push_str("</section>");
     }
-    html.push_str("</div><p id=\"no-groups\" class=\"empty\" hidden>All action sections are hidden. Use Layout to show them again.</p>");
+    html.push_str("</div><p id=\"no-groups\" class=\"empty\" hidden>All action sections are hidden. Use Layout to show them again.</p><p id=\"no-options\" class=\"empty\" hidden>No matching options.</p>\
+        </div><aside class=\"option-inspector\" id=\"option-inspector\" aria-label=\"Selected option\"><p class=\"empty\">Select an option to read its details.</p></aside></div></section>\
+        <aside class=\"combat-sidebar\" aria-label=\"Effects and companions\">");
+    html.push_str(include_str!("effects.html"));
+    render_companions(&mut html, sheet);
+    html.push_str(
+        "</aside><p id=\"consumable-status\" class=\"visually-hidden\" role=\"status\"></p>",
+    );
+    html.push_str("<dialog id=\"layout-dialog\" aria-labelledby=\"layout-dialog-title\"><div class=\"dialog-heading\"><h2 id=\"layout-dialog-title\">Layout</h2><form method=\"dialog\"><button>Close</button></form></div>");
+    render_layout(&mut html, sheet);
+    html.push_str("</dialog><dialog id=\"character-dialog\" aria-labelledby=\"character-dialog-title\"><div class=\"dialog-heading\"><h2 id=\"character-dialog-title\">Character</h2><form method=\"dialog\"><button>Close</button></form></div>");
     render_full_sheet(&mut html, &sheet.profile);
-    html.push_str("</main><script>");
+    html.push_str("</dialog></main><script>");
     html.push_str(include_str!("preferences.js"));
     html.push_str(include_str!("encounter.js"));
     html.push_str(include_str!("companions.js"));
@@ -126,6 +204,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("effects.js"));
     html.push_str(include_str!("consumables.js"));
     html.push_str(include_str!("concentration.js"));
+    html.push_str(include_str!("dashboard.js"));
     html.push_str("</script></body></html>");
     html
 }
@@ -242,12 +321,12 @@ fn render_consumable(html: &mut String, consumable: &ConsumableAmount, name: &st
 }
 
 fn render_stats(html: &mut String, stats: &KeyStats) {
-    html.push_str("<section id=\"key-stats\" aria-labelledby=\"stats-heading\"><h2 id=\"stats-heading\">Key stats</h2><div class=\"stat-grid\">");
+    html.push_str("<section id=\"key-stats\" aria-labelledby=\"stats-heading\"><h2 id=\"stats-heading\" class=\"visually-hidden\">Key stats</h2><div class=\"stat-grid\">");
     let hp = stats.max_hp.map(|value| format!("{value} max"));
     let armor = stats.armor_class.map(|value| value.to_string());
     for (key, label, value) in [
         ("hp", "HP", hp.as_deref()),
-        ("ac", "Armor Class", armor.as_deref()),
+        ("ac", "AC", armor.as_deref()),
         ("speed", "Speed", stats.speed.as_deref()),
     ] {
         start_card(html, Some("stat-card"), Some(&format!("stat:{key}")));
@@ -262,12 +341,17 @@ fn render_stats(html: &mut String, stats: &KeyStats) {
         html.push_str("</article>");
     }
     start_card(html, Some("stat-card saves-card"), Some("stat:saves"));
-    html.push_str("<h3>Saving throws</h3>");
+    html.push_str("<h3 class=\"visually-hidden\">Saving throws</h3>");
     pin_button(html, "Saving throws");
     html.push_str("<dl class=\"saves-list\">");
     for ((ability, key), value) in ABILITIES.into_iter().zip(SAVE_KEYS).zip(stats.saves) {
         let value = value.map(|value| format!("{value:+}"));
-        write!(html, "<div><dt>{ability}</dt><dd data-stat=\"{key}\">").unwrap();
+        write!(
+            html,
+            "<div><dt><abbr title=\"{ability}\">{}</abbr></dt><dd data-stat=\"{key}\">",
+            key.to_uppercase()
+        )
+        .unwrap();
         html.push_str(value.as_deref().unwrap_or("—"));
         html.push_str("</dd></div>");
     }
@@ -277,7 +361,7 @@ fn render_stats(html: &mut String, stats: &KeyStats) {
 const SAVE_KEYS: [&str; 6] = ["str", "dex", "con", "int", "wis", "cha"];
 
 fn render_layout(html: &mut String, sheet: &CombatSheet) {
-    html.push_str("<details id=\"sheet-layout\" class=\"panel\"><summary>Layout</summary><div class=\"panel-body\"><h2>Combat sections</h2><ul id=\"section-settings\">");
+    html.push_str("<details id=\"sheet-layout\" class=\"panel\" open><summary>Combat sections and stats</summary><div class=\"panel-body\"><ul id=\"section-settings\">");
     for group in &sheet.groups {
         if group.action == ActionGroup::Other && group.options.is_empty() {
             continue;
@@ -303,7 +387,7 @@ fn render_layout(html: &mut String, sheet: &CombatSheet) {
 }
 
 fn render_full_sheet(html: &mut String, profile: &CharacterProfile) {
-    html.push_str("<details id=\"full-sheet\" class=\"panel\"><summary>Full sheet</summary><div class=\"panel-body profile-fields\">");
+    html.push_str("<details id=\"full-sheet\" class=\"panel\" open><summary>Full sheet</summary><div class=\"panel-body profile-fields\">");
     for section in ProfileSection::ALL {
         let mut fields = profile
             .fields

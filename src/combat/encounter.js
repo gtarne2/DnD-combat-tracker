@@ -117,6 +117,7 @@ const previewEncounter = (() => {
       for (const reconcile of reconciliations) reconcile(previous);
       state = previous;
       save();
+      status.textContent = "Combat update undone.";
     });
   }
 

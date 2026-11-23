@@ -24,6 +24,10 @@ const consumableCards = (() => {
       stack.querySelector("[data-remaining]").textContent = amount ?? "Unavailable";
       stack.querySelector("[data-use]").disabled = amount == null || amount === 0;
     }
+    for (const count of document.querySelectorAll("[data-stack-count]")) {
+      const amount = remaining(previewEncounter.current(), count.dataset.stackCount);
+      count.textContent = amount == null ? "Qty unknown" : amount + " left";
+    }
   }
 
   document.addEventListener("click", (event) => {

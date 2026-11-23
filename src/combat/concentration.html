@@ -1,17 +1,18 @@
 <section id="concentration" aria-labelledby="concentration-heading">
-  <h2 id="concentration-heading">Concentration</h2>
   <div class="focus-panel">
-    <div>
+    <div class="focus-status">
+      <h2 id="concentration-heading">Concentration</h2>
       <p><strong id="active-concentration">None active</strong></p>
       <p id="concentration-duration" hidden></p>
-      <div id="concentration-actions" hidden>
+      <details id="concentration-actions" hidden>
+        <summary>Manage</summary>
         <form id="concentration-time" class="focus-form">
           <label>Elapsed <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
           <label>Unit <select name="unit"><option value="6">Rounds</option><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select></label>
           <button type="submit">Advance time</button>
         </form>
         <button id="end-concentration" type="button">End concentration</button>
-      </div>
+      </details>
     </div>
     <form id="concentration-damage" class="focus-form">
       <label>Damage taken <input name="damage" type="number" min="0" max="4294967295" required></label>

@@ -24,7 +24,9 @@ Select **Concentrate** on a concentration spell or use its scroll. In **Concentr
 
 In **Companions**, add an imported template or a custom companion. Edit the card to change HP, duration, command costs, and turn mode. Open **Companion initiative** to view separate entries and companions that act with their owner.
 
-In **Encounter**, enter your initiative and add other combatants. Start the turn order, then use **Next turn** to advance it. Set or adjust HP, and open **Spell slots and feature uses** to spend or restore resources. The damage form applies damage and handles concentration in one update. The preview saves progress locally, and **Undo combat update** reverses the latest change.
+Use **Manage initiative** to enter scores, add combatants, and set HP. The left rail shows the current turn and keeps **Next turn** and undo in reach. Use the **Resources** strip to spend or restore spell slots and feature uses. The damage form applies damage and handles concentration in one update. The preview saves progress locally.
+
+Choose an action tab or search across visible groups. Selecting a row opens its details beside the list on desktop and within the row on narrow screens. **Character** opens the full sheet and **Layout** opens display preferences.
 
 In **Effects**, add a custom effect such as **Berserk**, choose its target, and set when it ends. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
 

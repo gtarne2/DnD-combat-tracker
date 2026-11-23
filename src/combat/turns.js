@@ -95,20 +95,55 @@ const encounterTracker = (() => {
     hpForm.elements.current.value = hp?.current ?? "";
     hpForm.elements.max.value = hp?.max ?? "";
     order.replaceChildren();
+    if (!rows.length) {
+      const item = html("li", "Add an initiative score to start turns.");
+      item.className = "initiative-empty";
+      order.append(item);
+    }
     for (const row of rows) {
-      const item = html("li", `${row.score} · ${row.name}${row.hp == null ? "" : ` · ${row.hp} HP`}`);
+      const item = html("li");
+      const score = html("span", String(row.score));
+      score.className = "initiative-score";
+      const name = html("span", row.name);
+      name.className = "initiative-name";
+      item.append(score, name);
+      if (row.hp != null) {
+        const hp = html("small", `${row.hp} HP`);
+        hp.className = "initiative-hp";
+        item.append(hp);
+      }
       if (row.key === progress.current) item.setAttribute("aria-current", "true");
-      if (row.rank === 2) item.append(button("Edit", row.name, "edit", row.id), button("Remove", row.name, "remove", row.id));
+      if (row.rank === 2) {
+        const controls = html("span");
+        const edit = button("Edit", row.name, "edit", row.id);
+        const remove = button("Remove", row.name, "remove", row.id);
+        edit.textContent = "⋯";
+        remove.textContent = "×";
+        edit.title = edit.getAttribute("aria-label");
+        remove.title = remove.getAttribute("aria-label");
+        controls.className = "initiative-edit";
+        controls.append(edit, remove);
+        item.append(controls);
+      }
       order.append(item);
     }
     resources.replaceChildren();
     for (const resource of resourceList(progress)) {
       const used = progress.used[resource.key] || 0;
       const remaining = Math.max(0, resource.capacity - used);
-      const item = html("li", `${resource.name} · ${remaining} / ${resource.capacity}`);
-      item.append(button("Spend", resource.name, "spend", resource.key, remaining === 0),
-        button("Restore", resource.name, "restore", resource.key, used === 0),
-        button("Edit", resource.name, "capacity", resource.key));
+      const item = html("li");
+      const label = html("span", resource.name);
+      label.className = "resource-name";
+      const count = html("strong", `${remaining} / ${resource.capacity}`);
+      count.className = "resource-count";
+      const spend = button("Spend", resource.name, "spend", resource.key, remaining === 0);
+      const restore = button("Restore", resource.name, "restore", resource.key, used === 0);
+      const edit = button("Edit", resource.name, "capacity", resource.key);
+      for (const [control, symbol] of [[spend, "−"], [restore, "+"], [edit, "⋯"]]) {
+        control.title = control.getAttribute("aria-label");
+        control.textContent = symbol;
+      }
+      item.append(label, count, spend, restore, edit);
       resources.append(item);
     }
   }
@@ -210,6 +245,7 @@ const encounterTracker = (() => {
       const actor = get(previewEncounter.current()).actors.find((actor) => actor.id === id);
       if (!actor) return;
       editId = id;
+      if (!byId("encounter-settings").open) byId("encounter-settings").showModal();
       byId("combatant-panel").open = true;
       byId("cancel-combatant").hidden = false;
       for (const [key, value] of Object.entries(actor)) {
@@ -245,6 +281,8 @@ const encounterTracker = (() => {
     if (action === "capacity") {
       const resource = resourceList(get(previewEncounter.current())).find((resource) => resource.key === key);
       resourceKey = key;
+      if (!byId("encounter-settings").open) byId("encounter-settings").showModal();
+      byId("resource-panel").open = true;
       resourceForm.elements.name.value = resource.name;
       resourceForm.elements.capacity.value = resource.capacity;
       resourceForm.querySelector("button").textContent = "Save resource";

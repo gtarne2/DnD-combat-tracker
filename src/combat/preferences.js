@@ -71,6 +71,7 @@
       byId("section-settings").append(setting);
     }
     byId("no-groups").hidden = order.some((id) => !hidden.has(id));
+    document.dispatchEvent(new Event("combat-options-change"));
   }
 
   function renderPins() {
@@ -84,10 +85,16 @@
         button.textContent = verb;
       }
     }
-    const copies = pins.flatMap((key) => sources.get(key).map((card) => card.cloneNode(true)));
+    const copies = pins.flatMap((key) => sources.get(key).map((card) => {
+      const copy = card.cloneNode(true);
+      copy.classList.remove("selected-option", "search-hidden");
+      copy.querySelector("[data-inspect]")?.setAttribute("aria-expanded", "false");
+      return copy;
+    }));
     byId("pinned-cards").replaceChildren(...copies);
     byId("pinned").hidden = copies.length === 0;
     byId("pinned-link").hidden = copies.length === 0;
+    document.dispatchEvent(new Event("combat-options-change"));
   }
 
   function renderStats() {
