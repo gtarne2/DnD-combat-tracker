@@ -1,0 +1,65 @@
+<section id="playbook" aria-labelledby="playbook-heading">
+  <div class="rail-heading"><h2 id="playbook-heading">Tracked abilities</h2><button type="button" id="add-ability">Add</button></div>
+  <div id="ability-list" class="companion-grid"></div>
+  <details class="panel" id="known-infusion-panel" hidden>
+    <summary id="known-infusion-heading">Artificer infusions</summary>
+    <div id="known-infusion-list" class="infusion-list"></div>
+  </details>
+  <p id="playbook-status" role="status"></p>
+</section>
+<dialog id="rest-picker" aria-labelledby="rest-picker-heading">
+  <div class="dialog-heading"><h2 id="rest-picker-heading">Take a rest</h2><form method="dialog"><button>Close</button></form></div>
+  <div class="focus-form"><button type="button" data-rest="short">Short rest</button><button type="button" data-rest="long">Long rest</button></div>
+</dialog>
+<dialog id="protector-dialog" aria-labelledby="protector-heading">
+  <div class="dialog-heading"><h2 id="protector-heading">Activate Protector</h2><form method="dialog"><button>Cancel</button></form></div>
+  <form id="protector-form">
+    <p id="protector-description"></p>
+    <label>Rolled temporary HP <input name="amount" type="number" min="1" max="4294967295" required></label>
+    <fieldset id="protector-targets"><legend>Recipients in range</legend></fieldset>
+    <p>Recipients keep their higher temporary HP total.</p>
+    <p id="protector-feedback" role="status"></p>
+    <div class="focus-form companion-edit-actions">
+      <button name="mode" value="record" formnovalidate>Record activation only</button>
+      <button name="mode" value="apply">Activate and apply HP</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="ability-editor" aria-labelledby="ability-heading">
+  <form id="ability-form">
+    <h2 id="ability-heading">Track an ability</h2>
+    <div class="companion-fields">
+      <label>Name <input name="name" maxlength="160" required></label>
+      <label>Track as <select name="kind"><option value="use">Use counter</option><option value="effect">Toggleable effect</option><option value="imbuement">Imbuement</option></select></label>
+      <label>Spend from <select name="pool"></select></label>
+      <label>Cost <input name="cost" type="number" min="1" max="4294967295" value="1" required></label>
+      <label>Resets or ends on <select name="reset"><option value="">Manual</option><option value="short">Short or long rest</option><option value="long">Long rest</option></select></label>
+      <label>Bonus action while active <input name="followup" maxlength="160" placeholder="Optional action name"></label>
+      <label class="companion-wide">Details or imbued item <textarea name="notes" maxlength="4000" rows="4"></textarea></label>
+    </div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="remove-ability" hidden>Remove</button>
+      <button type="button" id="cancel-ability">Cancel</button>
+      <button>Save ability</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="rest-dialog" aria-labelledby="rest-heading">
+  <form id="rest-form">
+    <h2 id="rest-heading"></h2>
+    <p id="rest-summary"></p>
+    <p id="rest-hp"></p>
+    <label id="short-rest-healing">HP to recover (including Hit Dice) <input type="number" name="healing" min="0" max="4294967295" value="0" required></label>
+    <div id="long-rest-choices" hidden>
+      <details class="panel"><summary>Change prepared spells</summary><div id="rest-spells" class="rest-checklist"></div></details>
+      <details class="panel"><summary>Change active imbuements &amp; infusions</summary>
+        <div id="rest-imbuements" class="rest-checklist"></div>
+        <label class="rest-custom">Add a custom imbuement <input name="imbuement" maxlength="160" placeholder="Name or imbued item"></label>
+      </details>
+    </div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="cancel-rest">Cancel</button>
+      <button>Complete rest</button>
+    </div>
+  </form>
+</dialog>

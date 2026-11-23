@@ -5,7 +5,8 @@ const effectControls = (() => {
   const form = byId("effect-form");
   const clock = byId("effect-clock");
   const feedback = byId("effect-feedback");
-  const kinds = ["manual", "rounds", "seconds", "start", "end"];
+  const kinds = ["manual", "rounds", "seconds", "start", "end", "short", "long"];
+  const timed = (kind) => ["rounds", "seconds", "start", "end"].includes(kind);
   let editing = null;
   let activeBefore = new Set();
   let lastRender = "";
@@ -15,7 +16,7 @@ const effectControls = (() => {
   }
 
   function active(effect) {
-    return !effect.ended && (effect.kind === "manual" || effect.remaining > 0);
+    return !effect.ended && (!timed(effect.kind) || effect.remaining > 0);
   }
 
   function participants(state) {
@@ -79,10 +80,12 @@ const effectControls = (() => {
   }
 
   function deadline(effect, state, names, order) {
-    if (effect.ended) return "Ended manually";
+    if (effect.ended) return effect.endedByRest ? "Ended on a rest" : "Ended manually";
     if (!active(effect)) return "Expired";
     switch (effect.kind) {
       case "manual": return "Until ended manually";
+      case "short": return "Until the next short or long rest";
+      case "long": return "Until the next long rest";
       case "rounds": return `${effect.remaining} round${effect.remaining === 1 ? "" : "s"} remaining · start of round ${(state.progress?.round || 1) + effect.remaining}`;
       case "seconds": return `${displayTime(effect.remaining)} of game time remaining`;
       default: {
@@ -131,7 +134,7 @@ const effectControls = (() => {
     for (const effect of effects) {
       const card = node("article");
       card.append(node("h3", effect.name), node("p", names.get(effect.target) || "Unavailable participant"),
-        node("p", deadline(effect, state, names, order)));
+        node("strong", deadline(effect, state, names, order)));
       if (effect.notes) {
         const notes = node("p", effect.notes);
         notes.className = "effect-notes";
@@ -151,9 +154,9 @@ const effectControls = (() => {
 
   function formFields() {
     const kind = form.elements.kind.value;
-    byId("effect-amount").hidden = kind === "manual";
-    form.elements.remaining.required = kind !== "manual";
-    form.elements.remaining.disabled = kind === "manual";
+    byId("effect-amount").hidden = !timed(kind);
+    form.elements.remaining.required = timed(kind);
+    form.elements.remaining.disabled = !timed(kind);
     byId("effect-time-unit").hidden = kind !== "seconds";
     byId("effect-anchor").hidden = !["start", "end"].includes(kind);
   }
@@ -186,7 +189,7 @@ const effectControls = (() => {
     const data = new FormData(form);
     const name = data.get("name").trim();
     const kind = data.get("kind");
-    const remaining = kind === "manual" ? null : Number(data.get("remaining")) * (kind === "seconds" ? Number(data.get("unit")) : 1);
+    const remaining = timed(kind) ? Number(data.get("remaining")) * (kind === "seconds" ? Number(data.get("unit")) : 1) : null;
     if (!name || !kinds.includes(kind)) return;
     if (remaining !== null && (!Number.isInteger(remaining) || remaining < 1 || remaining > 0xffffffff)) {
       form.elements.remaining.setCustomValidity("Enter a shorter duration.");
@@ -195,7 +198,7 @@ const effectControls = (() => {
       return;
     }
     const effect = { name, notes: data.get("notes").trim(), target: data.get("target"),
-      anchor: ["start", "end"].includes(kind) ? data.get("anchor") : "", kind, remaining, ended: false };
+      anchor: ["start", "end"].includes(kind) ? data.get("anchor") : "", kind, remaining, ended: false, endedByRest: false };
     const id = editing;
     editor.close();
     encounterTracker.update((progress) => {

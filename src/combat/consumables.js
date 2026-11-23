@@ -1,5 +1,5 @@
 const consumableCards = (() => {
-  const status = document.getElementById("consumable-status");
+  const status = document.getElementById("encounter-status");
   const stacks = () => document.querySelectorAll("[data-consumable]");
   const initial = new Map([...stacks()].map((stack) => [
     stack.dataset.consumable,
@@ -36,7 +36,7 @@ const consumableCards = (() => {
     const key = button.closest("[data-consumable]").dataset.consumable;
     const name = button.dataset.use;
     const focus = button.closest("article").querySelector("[data-focus-spell]");
-    if (focus) {
+    if (focus && !focus.hidden) {
       concentrationControls.cast(focus, key);
       return;
     }
@@ -49,5 +49,5 @@ const consumableCards = (() => {
 
   document.addEventListener("preview-encounter-change", render);
   render();
-  return { spend };
+  return { remaining, spend };
 })();

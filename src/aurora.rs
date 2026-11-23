@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     error::Error,
     fmt, fs, io,
     path::{Path, PathBuf},
@@ -25,6 +25,7 @@ pub struct ImportedCharacter {
     pub spells: Vec<ImportedReference>,
     pub build_elements: Vec<ImportedReference>,
     pub companions: Vec<ImportedReference>,
+    pub infusions: Vec<(String, String)>,
     /// Definitions reachable from the save. A present key with no value marks missing content.
     pub definitions: BTreeMap<String, Option<ContentDefinition>>,
     pub companion_definitions: BTreeMap<String, Option<ContentDefinition>>,
@@ -64,7 +65,7 @@ pub struct ImportedAttack {
     pub description: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpellcastingStats {
     pub name: Option<String>,
     pub source_id: Option<String>,
@@ -79,6 +80,8 @@ pub struct ImportedReference {
     pub content_id: String,
     pub saved_name: Option<String>,
     pub saved_kind: Option<String>,
+    pub saved_spell_level: Option<u8>,
+    pub preparation: Option<bool>,
     pub spellcasting: Option<SpellcastingStats>,
     pub inventory: Option<InventoryEntry>,
     /// None when the supplied XML has no definition for this ID.
@@ -291,6 +294,17 @@ pub fn import_character_with_content(
         })
         .collect();
 
+    let infusion_ids: BTreeSet<_> = child(build, "elements")
+        .into_iter()
+        .flat_map(|elements| elements.descendants())
+        .filter(|node| node.has_tag_name("element"))
+        .filter(|node| {
+            node.attribute("name").is_some_and(|name| {
+                name == "Artificer Infusion" || name.starts_with("Artificer Infusion, ")
+            })
+        })
+        .filter_map(|node| node.attribute("registered"))
+        .collect();
     let roots = equipment
         .iter()
         .chain(&spells)
@@ -305,12 +319,37 @@ pub fn import_character_with_content(
                 .filter_map(|reference| reference.node.attribute("class"))
                 .filter(|id| !id.trim().is_empty()),
         )
+        .chain(infusion_ids.iter().copied())
         .map(str::to_owned)
         .chain(generated_scroll_spells.values().cloned())
         .collect();
     let definitions = index.resolve_graph(roots);
     let companion_definitions = index.resolve_companions();
     let profile = profile::read_profile(save.root_element(), build, &active, &definitions);
+    let infusions = infusion_ids
+        .iter()
+        .copied()
+        .filter(|id| {
+            !infusion_ids.iter().any(|choice| {
+                choice
+                    .strip_prefix(id)
+                    .is_some_and(|tail| tail.starts_with("_OPTION_"))
+            })
+        })
+        .map(|id| {
+            let name = definitions
+                .get(id)
+                .and_then(Option::as_ref)
+                .and_then(|definition| definition.name.clone())
+                .unwrap_or_else(|| {
+                    id.split_once("_INFUSION_")
+                        .or_else(|| id.split_once("_INFUSTION_"))
+                        .map_or(id, |(_, suffix)| suffix)
+                        .replace('_', " ")
+                });
+            (id.to_owned(), name)
+        })
+        .collect();
     let resolve = |references: Vec<SavedReference<'_, '_>>| {
         references
             .into_iter()
@@ -318,6 +357,19 @@ pub fn import_character_with_content(
                 content_id: reference.id.to_owned(),
                 saved_name: reference.node.attribute("name").map(str::to_owned),
                 saved_kind: reference.kind.map(str::to_owned),
+                preparation: reference.preparation(),
+                saved_spell_level: reference
+                    .node
+                    .attribute("level")
+                    .and_then(|level| level.parse::<u8>().ok())
+                    .filter(|level| *level <= 9)
+                    .or_else(|| {
+                        reference
+                            .node
+                            .parent_element()
+                            .is_some_and(|parent| parent.has_tag_name("cantrips"))
+                            .then_some(0)
+                    }),
                 spellcasting: reference.spellcasting(),
                 inventory: reference.node.has_tag_name("item").then(|| InventoryEntry {
                     identifier: nonempty(reference.node.attribute("identifier")).map(str::to_owned),
@@ -343,6 +395,7 @@ pub fn import_character_with_content(
         spells: resolve(spells),
         build_elements: resolve(build_elements),
         companions: resolve(companions),
+        infusions,
         definitions,
         companion_definitions,
         generated_scroll_spells,
@@ -380,6 +433,26 @@ impl<'a, 'input> SavedReference<'a, 'input> {
                     .and_then(|value| value.parse().ok()),
                 save_dc: casting.attribute("dc").and_then(|value| value.parse().ok()),
             })
+    }
+
+    fn preparation(self) -> Option<bool> {
+        let list = self.node.parent_element()?;
+        if !list.has_tag_name("spells") || self.node.attribute("always-prepared") == Some("true") {
+            return None;
+        }
+        match self.node.attribute("prepared") {
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            _ if self.node.attribute("known") != Some("true")
+                && children_named(list, "spell").any(|spell| {
+                    spell.attribute("prepared") == Some("true")
+                        && spell.attribute("always-prepared") != Some("true")
+                }) =>
+            {
+                Some(false)
+            }
+            _ => None,
+        }
     }
 }
 

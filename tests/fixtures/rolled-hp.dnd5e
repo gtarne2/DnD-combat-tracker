@@ -1,0 +1,28 @@
+<character>
+  <build>
+    <abilities><constitution>14</constitution></abilities>
+    <equipment>
+      <item id="ID_TEST_BOOTS"><equipped>true</equipped></item>
+      <item id="ID_TEST_PACK_BOOTS"><equipped>false</equipped></item>
+    </equipment>
+    <magic><spellcasting name="Tinkerer">
+      <cantrips><spell id="ID_TEST_UNRESOLVED_CANTRIP" name="Spark" /></cantrips>
+      <spells><spell id="ID_TEST_UNRESOLVED_SPELL" name="Flash" level="2" /></spells>
+    </spellcasting></magic>
+    <elements>
+      <element id="ID_LEVEL_1" type="Level" rndhp="2,3,7,1" />
+      <element id="ID_LEVEL_2" type="Level">
+        <element name="Artificer Infusion" registered="ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE" />
+        <element name="Artificer Infusion" registered="ID_TEST_ARTIFICER_INFUSION_REPLICATE_MAGIC_ITEM" />
+        <element name="Artificer Infusion, Replicate Magic Item" registered="ID_TEST_ARTIFICER_INFUSION_REPLICATE_MAGIC_ITEM_OPTION_CLOAK" />
+      </element>
+      <element id="ID_LEVEL_3" type="Level" />
+    </elements>
+    <sum>
+      <element id="ID_TEST_RACE_CLOCKWORK" type="Race" />
+      <element id="ID_TEST_CLASS_TINKERER" type="Class" />
+      <element id="ID_TEST_BOOTS" type="Magic Item" />
+      <element id="ID_TEST_PACK_BOOTS" type="Magic Item" />
+    </sum>
+  </build>
+</character>

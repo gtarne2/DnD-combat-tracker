@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},
 };
 
@@ -88,15 +88,12 @@ impl<'doc, 'xml> ContentIndex<'doc, 'xml> {
         let version = child(root, "info")
             .and_then(|info| child(info, "update"))
             .and_then(|update| update.attribute("version"));
-        let mut seen = HashSet::new();
         for node in root.children().filter(Node::is_element) {
             match node.tag_name().name() {
                 "element" => {
                     let id = content_id(node)
                         .ok_or_else(|| structure_error(path, "content <element> has no ID"))?;
-                    if !seen.insert(id) {
-                        return Err(structure_error(path, format!("duplicate content ID {id}")));
-                    }
+                    // Later definitions take precedence, including within one XML file.
                     self.elements.insert(
                         id,
                         DefinitionSource {

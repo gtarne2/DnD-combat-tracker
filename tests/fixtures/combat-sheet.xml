@@ -8,6 +8,8 @@
       <set name="isConcentration">true</set>
       <set name="duration">Concentration, up to 1 minute</set>
       <set name="range">60 feet</set>
+      <set name="hasVerbalComponent">true</set>
+      <set name="hasSomaticComponent">true</set>
       <set name="materialComponent">a copper reflector worth 5 gp</set>
     </setters>
   </element>
@@ -21,7 +23,7 @@
   </element>
   <element id="ID_TEST_SPELL_BEACON_RITUAL" name="Beacon Ritual" type="Spell" source="Synthetic Test Content">
     <description><p>After the ritual, you can use your reaction to move the beacon.</p></description>
-    <setters><set name="time">1 minute</set></setters>
+    <setters><set name="time">1 minute</set><set name="isRitual">true</set></setters>
   </element>
   <element id="ID_TEST_SPELL_SHIELD_FLASH" name="Shield Flash" type="Spell" source="Synthetic Test Content">
     <description><p>Make a ranged spell attack as you release the flash.</p></description>
@@ -94,5 +96,13 @@
   </element>
   <element id="ID_TEST_ARMOR_SHIELD" name="Signal Shield" type="Armor" source="Synthetic Test Content">
     <setters><set name="armor">Shield</set><set name="armorClass">+2</set></setters>
+  </element>
+  <element id="ID_TEST_BOOTS" name="Pace Boots" type="Magic Item">
+    <rules><stat name="speed:misc" value="5" /></rules>
+  </element>
+  <element id="ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE" name="Enhanced Defense" type="Class Feature" />
+  <element id="ID_TEST_ARTIFICER_INFUSION_REPLICATE_MAGIC_ITEM_OPTION_CLOAK" name="Cloak of Hiding" type="Class Feature" />
+  <element id="ID_TEST_PACK_BOOTS" name="Spare Boots" type="Magic Item">
+    <rules><stat name="speed:misc" value="10" /></rules>
   </element>
 </elements>

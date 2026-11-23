@@ -20,7 +20,9 @@ pub struct KeyStats {
     pub max_hp: Option<i32>,
     pub armor_class: Option<i32>,
     pub speed: Option<String>,
+    pub modifiers: [Option<i32>; 6],
     pub saves: [Option<i32>; 6],
+    pub checks: [Option<i32>; 6],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,9 +150,23 @@ pub(super) fn read_profile(
         .and_then(number)
         .or_else(|| (!levels.is_empty()).then_some(levels.len() as i32))
         .filter(|level| *level > 0);
+    let inventory: BTreeMap<_, _> = child(build, "equipment")
+        .into_iter()
+        .flat_map(|items| children_named(items, "item"))
+        .filter_map(|item| Some((item.attribute("id")?, is_equipped(item).is_some())))
+        .fold(BTreeMap::new(), |mut items, (id, equipped)| {
+            *items.entry(id).or_insert(false) |= equipped;
+            items
+        });
     let active = summary
         .iter()
         .map(|reference| reference.id)
+        .filter(|id| !inventory.contains_key(id))
+        .chain(
+            inventory
+                .iter()
+                .filter_map(|(&id, &equipped)| equipped.then_some(id)),
+        )
         .collect::<BTreeSet<_>>();
     // The summary lists actual active elements. Linked options can include unavailable grants.
     let modifiers: Vec<_> = active
@@ -197,7 +213,9 @@ pub(super) fn read_profile(
             max_hp,
             armor_class,
             speed,
+            modifiers: ability_modifiers,
             saves,
+            checks: ability_modifiers,
         },
         fields,
     }
@@ -288,12 +306,11 @@ fn max_hp(
         .iter()
         .filter(|reference| reference.kind == Some("Class"));
     let main = classes.next()?.id;
-    if classes.next().is_some()
-        || levels.is_empty()
-        || levels.len() > 1 && !active.contains("ID_INTERNAL_OPTION_ALLOW_AVERAGE_HP")
-    {
+    if classes.next().is_some() || levels.is_empty() {
         return None;
     }
+    let average = active.contains("ID_INTERNAL_OPTION_ALLOW_AVERAGE_HP");
+    let mut rolled = levels[0].attribute("rndhp").unwrap_or_default().split(',');
     let mut hp = 0;
     for (index, level) in levels.iter().enumerate() {
         let class = level
@@ -309,10 +326,25 @@ fn max_hp(
         if die < 2 {
             return None;
         }
-        let base = if index == 0 { die } else { die / 2 + 1 };
+        let roll = rolled.next();
+        let base = if index == 0 {
+            die
+        } else if average {
+            die / 2 + 1
+        } else {
+            roll?
+                .trim()
+                .parse::<i32>()
+                .ok()
+                .filter(|value| (1..=die).contains(value))?
+        };
         hp += (base + constitution).max(1);
     }
     Some(hp)
+}
+
+fn is_equipped<'a, 'input>(item: Node<'a, 'input>) -> Option<Node<'a, 'input>> {
+    child(item, "equipped").filter(|node| node.text().map(str::trim) == Some("true"))
 }
 
 fn armor_class(
@@ -326,9 +358,7 @@ fn armor_class(
         .into_iter()
         .flat_map(|items| children_named(items, "item"))
     {
-        let Some(equipped) =
-            child(item, "equipped").filter(|node| node.text().map(str::trim) == Some("true"))
-        else {
+        let Some(equipped) = is_equipped(item) else {
             continue;
         };
         let data = item
@@ -399,7 +429,8 @@ fn movement(modifiers: &[&ContentElement]) -> Option<String> {
             })
             .max()
     };
-    let walk = speeds("innate speed", None).map(|speed| speed + stat_bonus(modifiers, "speed"));
+    let walk = speeds("innate speed", None)
+        .map(|speed| speed + stat_bonus(modifiers, "speed") + stat_bonus(modifiers, "speed:misc"));
     let mut labels = Vec::new();
     if let Some(walk) = walk {
         labels.push(format!("{walk} ft. walk"));

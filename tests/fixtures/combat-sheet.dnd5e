@@ -3,6 +3,7 @@
   <display-properties>
     <race>Clockwork Kin</race>
     <class>Tinkerer</class>
+    <archetype>Beacon Keeper</archetype>
     <level>3</level>
     <background>Lamplighter</background>
   </display-properties>
@@ -44,9 +45,9 @@ They now chart the fog.</backstory>
       <spellcasting name="Tinkerer" attack="6" dc="15">
         <slots s1="3" s2="1" />
         <spells>
-          <spell id="ID_TEST_SPELL_FLARE" name="Flare" level="1" />
+          <spell id="ID_TEST_SPELL_FLARE" name="Flare" level="1" prepared="true" />
           <spell id="ID_TEST_SPELL_COUNTER_SPARK" name="Counter Spark" level="1" />
-          <spell id="ID_TEST_SPELL_BEACON_RITUAL" name="Beacon Ritual" level="1" />
+          <spell id="ID_TEST_SPELL_BEACON_RITUAL" name="Beacon Ritual" level="1" prepared="false" />
         </spells>
       </spellcasting>
       <spellcasting name="Ranger"><slots s1="3" s2="1" /></spellcasting>

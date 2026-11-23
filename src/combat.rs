@@ -69,6 +69,11 @@ impl OptionKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatOption {
     pub name: String,
+    pub spell_level: Option<u8>,
+    pub preparation: Option<bool>,
+    pub heat_metal: bool,
+    pub guidance: bool,
+    pub ritual: bool,
     pub pin_key: Option<String>,
     pub kind: OptionKind,
     pub details: Vec<CombatDetail>,
@@ -104,6 +109,8 @@ pub struct CombatSheet {
     pub companions: CompanionRoster,
     pub progress: EncounterProgress,
     pub resources: Vec<CombatResource>,
+    pub casting_rolls: Vec<SpellcastingStats>,
+    pub infusions: Vec<(String, String)>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -111,6 +118,7 @@ pub struct CombatResource {
     pub key: String,
     pub name: String,
     pub capacity: u32,
+    pub recovery: &'static str,
 }
 
 impl CombatSheet {
@@ -131,6 +139,8 @@ impl CombatSheet {
             companions,
             progress: EncounterProgress::default(),
             resources: Vec::new(),
+            casting_rolls: Vec::new(),
+            infusions: character.infusions.clone(),
             groups: ActionGroup::ALL.map(|action| CombatGroup {
                 action,
                 options: Vec::new(),
@@ -153,6 +163,11 @@ impl CombatSheet {
             sheet.push(ActionGroup::Action, option);
         }
         for spell in &character.spells {
+            if let Some(casting) = &spell.spellcasting
+                && !sheet.casting_rolls.contains(casting)
+            {
+                sheet.casting_rolls.push(casting.clone());
+            }
             sheet.add_definition(
                 character,
                 DefinitionOption {
@@ -161,6 +176,8 @@ impl CombatSheet {
                     definition: spell.definition.as_ref(),
                     linked_spell: None,
                     spellcasting: spell.spellcasting.as_ref(),
+                    saved_spell_level: spell.saved_spell_level,
+                    preparation: spell.preparation,
                     kind: OptionKind::Spell,
                     consumable: None,
                 },
@@ -201,6 +218,8 @@ impl CombatSheet {
                         .then(|| scroll_spell(character, &item.content_id, definition))
                         .flatten(),
                     spellcasting: None,
+                    saved_spell_level: None,
+                    preparation: None,
                     kind,
                     consumable,
                 },
@@ -222,6 +241,8 @@ impl CombatSheet {
                     definition: weapon.definition.as_ref(),
                     linked_spell: None,
                     spellcasting: None,
+                    saved_spell_level: None,
+                    preparation: None,
                     kind: OptionKind::Attack,
                     consumable: None,
                 },
@@ -280,6 +301,8 @@ impl CombatSheet {
                     definition,
                     linked_spell: None,
                     spellcasting: None,
+                    saved_spell_level: None,
+                    preparation: None,
                     kind: OptionKind::Feature,
                     consumable: None,
                 },
@@ -294,6 +317,8 @@ impl CombatSheet {
             definition,
             linked_spell,
             spellcasting,
+            saved_spell_level,
+            preparation,
             kind,
             consumable,
         } = source;
@@ -301,6 +326,7 @@ impl CombatSheet {
             .or_else(|| definition.and_then(|value| value.name.as_deref()))
             .unwrap_or(id);
         let mut option = CombatOption::new(kind, name);
+        option.preparation = preparation;
         option.consumable = consumable;
         option.pin_key = Some(
             match spellcasting.and_then(|casting| casting.source_id.as_deref()) {
@@ -310,8 +336,44 @@ impl CombatSheet {
         );
         let mechanics = linked_spell.or(definition);
         let time = setter(mechanics, "time");
+        option.detail("Casting time", time.as_deref());
+        option.detail("Range", setter(mechanics, "range"));
         if matches!(kind, OptionKind::Spell | OptionKind::Scroll) {
+            option.heat_metal = mechanics
+                .and_then(|value| attr(&value.element, "id"))
+                .unwrap_or(id)
+                .ends_with("_SPELL_HEAT_METAL");
+            option.guidance = mechanics
+                .and_then(|value| attr(&value.element, "id"))
+                .unwrap_or(id)
+                .ends_with("_SPELL_GUIDANCE");
+            option.spell_level = setter(mechanics, "level")
+                .and_then(|level| level.parse::<u8>().ok())
+                .filter(|level| *level <= 9)
+                .or(saved_spell_level);
+            let flag = |key| {
+                setter(mechanics, key).is_some_and(|value| value.eq_ignore_ascii_case("true"))
+            };
+            option.ritual = flag("isRitual")
+                || time
+                    .as_deref()
+                    .is_some_and(|value| value.to_ascii_lowercase().contains("(ritual)"));
             let duration = setter(mechanics, "duration");
+            option.detail("Duration", duration.as_deref());
+            if kind == OptionKind::Spell {
+                let material = setter(mechanics, "materialComponent");
+                let components = [
+                    ("V", flag("hasVerbalComponent")),
+                    ("S", flag("hasSomaticComponent")),
+                    ("M", flag("hasMaterialComponent") || material.is_some()),
+                ]
+                .into_iter()
+                .filter_map(|(label, present)| present.then_some(label))
+                .collect::<Vec<_>>()
+                .join(", ");
+                option.detail("Components", Some(components));
+                option.detail("Material", material);
+            }
             let concentration = setter(mechanics, "isConcentration").map_or_else(
                 || {
                     duration.as_deref().is_some_and(|value| {
@@ -334,8 +396,6 @@ impl CombatSheet {
                 ));
             }
         }
-        option.detail("Casting time", time.as_deref());
-        option.detail("Range", setter(mechanics, "range"));
         let damage = setter(mechanics, "damage");
         option.detail("Damage", damage.as_deref());
 
@@ -383,8 +443,8 @@ impl CombatSheet {
 
         match kind {
             OptionKind::Spell => {
-                if let Some(level) = setter(definition, "level") {
-                    if level == "0" {
+                if let Some(level) = option.spell_level {
+                    if level == 0 {
                         option.detail("Spell slot", Some("Cantrip"));
                     } else {
                         option.detail(
@@ -393,7 +453,6 @@ impl CombatSheet {
                         );
                     }
                 }
-                option.detail("Material", setter(definition, "materialComponent"));
                 option.detail(
                     "Spellcasting",
                     spellcasting.and_then(|stats| stats.name.as_deref()),
@@ -439,6 +498,11 @@ fn resources(character: &ImportedCharacter, groups: &[CombatGroup]) -> Vec<Comba
                 key: format!("{pool}:{level}"),
                 name: format!("Level {level} {pool}"),
                 capacity: capacity.into(),
+                recovery: if pool == "Spell slot" {
+                    "long"
+                } else {
+                    "short"
+                },
             });
         }
     }
@@ -454,7 +518,7 @@ fn resources(character: &ImportedCharacter, groups: &[CombatGroup]) -> Vec<Comba
             .iter()
             .filter(|detail| detail.label == "Uses")
         {
-            let Some((amount, _)) = detail.value.split_once('/') else {
+            let Some((amount, period)) = detail.value.split_once('/') else {
                 continue;
             };
             let Ok(capacity) = amount.trim().parse::<u32>() else {
@@ -463,22 +527,33 @@ fn resources(character: &ImportedCharacter, groups: &[CombatGroup]) -> Vec<Comba
             if capacity == 0 {
                 continue;
             }
+            let period = period.to_ascii_lowercase();
+            let recovery = if period.contains("short rest") {
+                "short"
+            } else if period.contains("long rest") {
+                "long"
+            } else {
+                ""
+            };
             features
                 .entry(key)
-                .and_modify(|entry: &mut Option<(&str, u32)>| {
-                    if entry.is_some_and(|(_, previous)| previous != capacity) {
+                .and_modify(|entry: &mut Option<(&str, u32, &str)>| {
+                    if entry
+                        .is_some_and(|(_, amount, reset)| amount != capacity || reset != recovery)
+                    {
                         *entry = None;
                     }
                 })
-                .or_insert(Some((&option.name, capacity)));
+                .or_insert(Some((&option.name, capacity, recovery)));
         }
     }
     result.extend(features.into_iter().filter_map(|(key, entry)| {
-        let (name, capacity) = entry?;
+        let (name, capacity, recovery) = entry?;
         Some(CombatResource {
             key: key.clone(),
             name: name.to_owned(),
             capacity,
+            recovery,
         })
     }));
     result
@@ -490,6 +565,8 @@ struct DefinitionOption<'a> {
     definition: Option<&'a ContentDefinition>,
     linked_spell: Option<&'a ContentDefinition>,
     spellcasting: Option<&'a SpellcastingStats>,
+    saved_spell_level: Option<u8>,
+    preparation: Option<bool>,
     kind: OptionKind,
     consumable: Option<ConsumableAmount>,
 }
@@ -498,6 +575,11 @@ impl CombatOption {
     fn new(kind: OptionKind, name: &str) -> Self {
         Self {
             name: name.to_owned(),
+            spell_level: None,
+            preparation: None,
+            heat_metal: false,
+            guidance: false,
+            ritual: false,
             pin_key: None,
             kind,
             details: Vec::new(),

@@ -1,21 +1,16 @@
-<section id="companions" aria-labelledby="companions-heading">
-  <h2 id="companions-heading">Companions</h2>
+<div id="companion-roster-home"><section id="companions" aria-label="Companion roster">
+  <h2>Companions</h2>
   <form id="add-companion" class="focus-form">
     <div><label for="companion-template">Template</label>
-      <select id="companion-template" name="template"><option value="">Custom companion</option></select></div>
+      <select id="companion-template" name="template" required><option value="" disabled selected>Choose template…</option><option value="custom">Custom companion</option></select></div>
     <button>Add companion</button>
   </form>
-  <div id="companion-cards" class="companion-grid"></div>
-  <details id="companion-turns" class="panel">
-    <summary>Companion initiative</summary>
-    <div class="panel-body">
-      <form id="companion-owner" class="focus-form">
-        <label>Owner initiative <input name="initiative" type="number" min="-2147483648" max="2147483647"></label>
-        <button>Set initiative</button>
-      </form>
-      <ol id="companion-initiative"></ol>
-    </div>
-  </details>
+  <div id="companion-cards"></div>
+  <div id="companion-detail-home"><section id="companion-detail" class="companion-grid" aria-label="Selected companion" hidden></section></div>
+</section>
+</div>
+<section class="sheet-page" id="companion-roster-dialog" hidden><h1>Companions</h1>
+  <div class="companion-roster-layout"><div id="companion-roster-body"></div><div id="companion-roster-detail"><p id="companion-roster-hint">Choose a companion to see its details.</p></div></div>
 </section>
 <dialog id="companion-editor" aria-labelledby="companion-editor-title">
   <form id="edit-companion">
@@ -26,6 +21,7 @@
       <datalist id="companion-kinds"><option>Pet</option><option>Familiar</option><option>Summon</option><option>Construct</option><option>Other</option></datalist>
       <label>Current HP <input name="currentHp" type="number" min="0" max="4294967295"></label>
       <label>Maximum HP <input name="maxHp" type="number" min="0" max="4294967295"></label>
+      <label>Temporary HP <input name="temporary" type="number" min="0" max="4294967295"></label>
       <label>Armor Class <input name="armor" maxlength="120"></label>
       <label>Speed <input name="speed" maxlength="120"></label>
       <label>Duration <input name="duration" maxlength="160"></label>

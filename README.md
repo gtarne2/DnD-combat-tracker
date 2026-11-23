@@ -6,7 +6,21 @@ A personal Windows companion app for characters built in Aurora. It brings attac
 - [Architecture](docs/architecture.md)
 - [Windows development and workflow](docs/development.md)
 
-## Preview the combat sheet
+## Open the tracker on Windows
+
+Extract the Windows package and double-click **Aurora Combat Tracker.exe**.
+If you are running from source, first run `cargo build --release --bin combat-sheet`
+and `.\launcher\build.cmd`, then open the launcher in `target\release`.
+
+1. Click **Browse** and select your Aurora `.dnd5e` save.
+2. Click **Add folder** to scan a parent folder and all its subfolders for XML each time you open the sheet. You can also use **Add files** for individual XML files or open the sheet with the save alone. Files inside a folder load in path order. To give an override priority, add it separately and move it below the folder.
+3. Click **Open Combat Sheet** to open it in your default browser.
+
+The launcher remembers your last successful file selections. After editing the
+character in Aurora, click **Open Combat Sheet** again. The launcher refreshes
+the same local sheet so that the same browser profile can retain your progress.
+
+## Generate a sheet from the command line
 
 From the repository root, generate a local HTML sheet and open it in a browser.
 
@@ -18,15 +32,17 @@ Use your own save and content XML paths to preview your character. Supply multip
 
 Use **Layout** to reorder or hide combat sections and override missing or conditional stats. Pin a stat or combat option to keep a copy above the action groups. **Full sheet** opens your character’s background, personality, and lore. The browser saves preferences for each character in that preview.
 
-Select **Use** on a scroll, potion, or other consumable to record one unit spent. The sheet immediately updates the quantity on the action card and its pinned copies.
+Select **Use scroll** or **Use item** to record one unit spent. The sheet immediately updates the quantity on the action row and its favorites copies.
 
-Select **Concentrate** on a concentration spell or use its scroll. In **Concentration**, advance in-game time or record damage after reductions. Record the result of each prompted Constitution save. Choose 2014 or 2024 rules for the DC calculation.
+Select **Cast** on a concentration spell or use its scroll. The header shows the active spell and remaining duration. Use **Manage** to advance in-game time, or **Damage** to enter damage after reductions and choose the rules for the save DC. Record the result of each prompted Constitution save.
 
-In **Companions**, add an imported template or a custom companion. Edit the card to change HP, duration, command costs, and turn mode. Open **Companion initiative** to view separate entries and companions that act with their owner.
+In the **Companions** rail or header roster, add an imported template or a custom companion. The roster shows HP and AC. Select a companion to see its details and editing controls.
 
-Use **Manage initiative** to enter scores, add combatants, and set HP. The left rail shows the current turn and keeps **Next turn** and undo in reach. Use the **Resources** strip to spend or restore spell slots and feature uses. The damage form applies damage and handles concentration in one update. The preview saves progress locally.
+Use **Next Turn** to advance timers. Without other initiative entries, each click advances one round. Optional initiative settings are in **Layout**. The HP card holds **Set HP**, **Damage**, and **Rest**. Damage uses temporary HP first. Long rests heal to known maximum HP and clear temporary HP. For a short rest, enter the healing you rolled. Cast directly from a spell row and select a spell slot when needed. The preview saves progress locally.
 
-Choose an action tab or search across visible groups. Selecting a row opens its details beside the list on desktop and within the row on narrow screens. **Character** opens the full sheet and **Layout** opens display preferences.
+Choose an action tab or search across visible groups. Selecting a row opens its details beside the list on desktop and within the row on narrow screens. Drag the desktop divider to resize the panes, or use **Hide details** to widen the action list. Select an ability tile to inspect its check and saving throw. **Attack** records your latest weapon attack for the encounter. **Character** opens the full sheet and **Layout** opens display preferences.
+
+Use **Traits** to find features and **Track uses or effect** to set up a counter or toggle. Create a shared pool such as Ki in **Manage resources**, then choose it and set the cost on each ability. **Tracked abilities** also holds custom imbuements and known Artificer infusions. During a long rest, you can review prepared spells and switch which imbuements and infusions are active. **Bonus Action** lists supported ongoing actions, such as Heat Metal and active Eldritch Cannons.
 
 In **Effects**, add a custom effect such as **Berserk**, choose its target, and set when it ends. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
 

@@ -1,16 +1,16 @@
-(() => {
+const companionControls = (() => {
   const byId = (id) => document.getElementById(id);
   const add = byId("add-companion");
-  const owner = byId("companion-owner");
   const editor = byId("companion-editor");
   const form = byId("edit-companion");
   const cards = byId("companion-cards");
-  const initiative = byId("companion-initiative");
+  const detail = byId("companion-detail");
   const textFields = ["name", "kind", "armor", "speed", "stats", "attacks", "abilities", "command", "duration"];
-  const numberFields = ["currentHp", "maxHp", "rounds", "initiative"];
+  const numberFields = ["currentHp", "maxHp", "temporary", "rounds", "initiative"];
   const number = (value) => value === "" || value == null ? null : Number(value);
   const blank = () => ({ cards: [], seen: [], sequence: 0, owner: null });
   let edit = null;
+  let selectedId = null;
   let lastRender;
 
   function fromData(node) {
@@ -30,6 +30,20 @@
     add.elements.template.add(option);
   }
 
+  const cannonControls = byId("cannon-controls");
+  const variants = [...templates].filter(([id, card]) => id.includes("ELDRITCH_CANNON") || /^Eldritch Cannon\b/i.test(card.name));
+  if (variants.length) {
+    cannonControls.hidden = false;
+    cannonControls.append(node("strong", "Create cannon"));
+    for (const [id, template] of variants) {
+      const create = node("button", template.name.replace(/^Eldritch Cannon\s*[-—:]?\s*/i, ""));
+      create.onclick = () => update(roster => {
+        roster.cards.push({...template, templateId: id, rounds: template.rounds ?? parseRounds(template.duration), id: ++roster.sequence});
+        return true;
+      });
+      cannonControls.append(create);
+    }
+  }
   function node(tag, text) {
     const result = document.createElement(tag);
     if (text !== undefined) result.textContent = text;
@@ -46,24 +60,51 @@
 
   function render() {
     const roster = previewEncounter.current().companions || blank();
-    const signature = JSON.stringify(roster);
+    if (!roster.cards.some((card) => card.id === selectedId)) selectedId = null;
+    const effects = previewEncounter.current().progress?.effects || [];
+    const signature = JSON.stringify([roster.cards, selectedId, effects]);
     if (signature === lastRender) return;
     lastRender = signature;
+    const previousDetails = detail.querySelector(`[data-companion-id="${selectedId}"]`);
+    const expanded = new Set([...previousDetails?.querySelectorAll("details[open] > summary") || []]
+      .map((heading) => heading.textContent));
+    document.body.classList.toggle("has-companions", roster.cards.length > 0);
     cards.replaceChildren();
-    if (!roster.cards.length) cards.append(node("p", "No companions in this encounter."));
+    detail.replaceChildren();
+    detail.hidden = selectedId === null;
+    if (!roster.cards.length) cards.append(node("p", "No companions yet."));
     for (const card of roster.cards) {
+      const hp = card.currentHp != null ? `${card.currentHp}${card.maxHp == null ? "" : ` / ${card.maxHp}`}`
+        : card.maxHp == null ? "" : `${card.maxHp} max`;
+      const pick = node("button");
+      pick.type = "button";
+      pick.dataset.pickCompanion = card.id;
+      pick.setAttribute("aria-pressed", String(card.id === selectedId));
+      const summary = [hp ? `HP ${hp}` : "HP unavailable", card.temporary > 0 ? `+${card.temporary} temp` : "",
+        card.armor ? `AC ${card.armor}` : "",
+        card.rounds === 0 ? "Expired" : ""].filter(Boolean).join(" · ");
+      pick.append(node("strong", card.name), node("small", summary));
+      if (card.maxHp > 0 && card.currentHp != null) {
+        const health = node("meter");
+        health.max = card.maxHp;
+        health.value = card.currentHp;
+        health.setAttribute("aria-label", `${card.name} hit points`);
+        pick.append(health);
+      }
+      cards.append(pick);
+      if (card.id !== selectedId) continue;
+      const activeEffects = effects.filter(effect => effect.target === "companion:" + card.id && !effect.ended &&
+        (!["start","end","seconds","rounds"].includes(effect.kind) || effect.remaining > 0));
       const article = node("article");
       article.dataset.companionId = card.id;
       article.append(node("h3", card.name));
       const details = node("dl");
-      const hp = card.currentHp != null ? `${card.currentHp}${card.maxHp == null ? "" : ` / ${card.maxHp}`}`
-        : card.maxHp == null ? "" : `${card.maxHp} max`;
       const duration = card.rounds == null ? card.duration : card.rounds === 0 ? "Expired"
         : `${card.rounds} round${card.rounds === 1 ? "" : "s"} remaining${card.duration ? ` · ${card.duration}` : ""}`;
       for (const [label, value] of [
-        ["Kind", card.kind], ["HP", hp], ["AC", card.armor], ["Speed", card.speed],
+        ["Kind", card.kind], ["HP", hp], ["Temporary HP", String(card.temporary || 0)], ["AC", card.armor], ["Speed", card.speed],
         ["Duration", duration], ["Turn", card.turn === "separate" ? `Initiative ${card.initiative}` : "With owner"],
-        ["Command", card.command],
+        ["Effects", activeEffects.map(effect => effect.name).join(", ") || "None active"], ["Command", card.command],
       ]) {
         if (!value) continue;
         const row = node("div");
@@ -71,9 +112,33 @@
         details.append(row);
       }
       article.append(details);
+      const damage = node("form");
+      damage.className = "companion-damage";
+      const label = node("label", "Damage amount");
+      const amount = node("input");
+      Object.assign(amount, {type: "number", min: "1", max: "4294967295", required: true});
+      label.append(amount);
+      const apply = node("button", "Apply damage");
+      apply.disabled = card.currentHp == null;
+      damage.append(label, apply);
+      if (apply.disabled) damage.append(node("span", "Set current HP in Edit to record damage."));
+      damage.onsubmit = event => {
+        event.preventDefault();
+        const loss = amount.valueAsNumber;
+        update(roster => {
+          const target = roster.cards.find(entry => entry.id === card.id);
+          if (target?.currentHp == null || !(target.currentHp || target.temporary)) return false;
+          const absorbed = Math.min(target.temporary || 0, loss);
+          target.temporary = (target.temporary || 0) - absorbed;
+          target.currentHp = Math.max(0, target.currentHp - (loss - absorbed));
+          return true;
+        });
+      };
+      article.append(damage);
       for (const [label, value] of [["Other stats", card.stats], ["Attacks", card.attacks], ["Abilities", card.abilities]]) {
         if (!value) continue;
         const section = node("details");
+        section.open = expanded.has(label);
         const body = node("p", value);
         body.className = "companion-text";
         section.append(node("summary", label), body);
@@ -85,18 +150,22 @@
       if (card.rounds > 0) controls.append(button("Advance 1 round", "advance", card.name));
       controls.append(button("Remove", "remove", card.name));
       article.append(controls);
-      cards.append(article);
+      detail.append(article);
     }
-    owner.elements.initiative.value = roster.owner ?? "";
-    initiative.replaceChildren();
-    const shared = roster.cards.filter((card) => card.turn === "owner" && card.rounds !== 0).map((card) => card.name);
-    const rows = [{ score: roster.owner, label: shared.length ? `Owner with ${shared.join(", ")}` : "Owner" }];
-    for (const card of roster.cards) {
-      if (card.turn === "separate" && card.rounds !== 0) rows.push({ score: card.initiative, label: card.name });
-    }
-    rows.sort((left, right) => (right.score ?? -Infinity) - (left.score ?? -Infinity));
-    for (const row of rows) initiative.append(node("li", `${row.score ?? "—"} · ${row.label}`));
   }
+
+  function select(id) {
+    selectedId = id;
+    render();
+  }
+
+  cards.addEventListener("click", (event) => {
+    const pick = event.target.closest("[data-pick-companion]");
+    if (!pick) return;
+    select(Number(pick.dataset.pickCompanion));
+    cards.querySelector(`[data-pick-companion="${selectedId}"]`).focus();
+    document.dispatchEvent(new Event("companion-inspected"));
+  });
 
   function update(operation) {
     previewEncounter.transact((state) => operation(state.companions ||= blank()));
@@ -126,7 +195,8 @@
 
   add.addEventListener("submit", (event) => {
     event.preventDefault();
-    const templateId = add.elements.template.value;
+    const choice = add.elements.template.value;
+    const templateId = choice === "custom" ? null : choice;
     openEditor({ ...templates.get(templateId), templateId });
   });
   form.elements.turn.addEventListener("change", turnFields);
@@ -158,7 +228,7 @@
     });
   });
 
-  cards.addEventListener("click", (event) => {
+  detail.addEventListener("click", (event) => {
     const control = event.target.closest("[data-companion-action]");
     if (!control) return;
     const id = Number(control.closest("[data-companion-id]").dataset.companionId);
@@ -167,7 +237,7 @@
     const action = control.dataset.companionAction;
     if (action === "edit") openEditor(card, id);
     else if (action === "duplicate") openEditor({
-      ...card, currentHp: card.maxHp, rounds: templates.get(card.templateId)?.rounds ?? card.rounds,
+        ...card, currentHp: card.maxHp, temporary: 0, rounds: templates.get(card.templateId)?.rounds ?? card.rounds,
     });
     else update((roster) => {
       const index = roster.cards.findIndex((entry) => entry.id === id);
@@ -179,14 +249,6 @@
     });
   });
 
-  owner.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const score = number(new FormData(owner).get("initiative"));
-    update((roster) => {
-      roster.owner = score;
-      return true;
-    });
-  });
   document.addEventListener("preview-encounter-change", render);
   render();
   function syncSeeds(state) {
@@ -205,4 +267,5 @@
     previewEncounter.reconcile(syncSeeds);
     previewEncounter.transact(syncSeeds, { undo: false });
   }
+  return { select, selected: () => selectedId, detail };
 })();

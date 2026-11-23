@@ -2,7 +2,7 @@
   <div class="focus-panel">
     <div class="focus-status">
       <h2 id="concentration-heading">Concentration</h2>
-      <p><strong id="active-concentration">None active</strong></p>
+      <p class="focus-spell"><strong id="active-concentration">None active</strong></p>
       <p id="concentration-duration" hidden></p>
       <details id="concentration-actions" hidden>
         <summary>Manage</summary>
@@ -14,20 +14,35 @@
         <button id="end-concentration" type="button">End concentration</button>
       </details>
     </div>
-    <form id="concentration-damage" class="focus-form">
-      <label>Damage taken <input name="damage" type="number" min="0" max="4294967295" required></label>
-      <label>Rules <select id="concentration-rules"><option value="2014">2014</option><option value="2024">2024</option></select></label>
-      <button type="submit">Record damage</button>
-    </form>
     <div id="concentration-save" class="focus-save" hidden>
       <p><strong id="concentration-save-prompt"></strong></p>
       <button type="button" data-save-result="success">Save succeeded</button>
       <button type="button" data-save-result="failure">Save failed</button>
     </div>
     <p id="concentration-last" class="focus-feedback" hidden></p>
-    <p id="encounter-status" class="focus-feedback" role="status"></p>
   </div>
 </section>
+<dialog id="damage-dialog" aria-labelledby="damage-heading">
+  <div class="dialog-heading"><h2 id="damage-heading">Record damage</h2><form method="dialog"><button>Cancel</button></form></div>
+  <p id="damage-hp"></p>
+  <form id="concentration-damage" class="focus-form">
+    <label>Damage after reductions <input name="damage" type="number" min="1" max="4294967295" required autofocus></label>
+    <label>Concentration rules <select id="concentration-rules"><option value="2014">2014</option><option value="2024">2024</option></select></label>
+    <button type="submit">Apply damage</button>
+  </form>
+</dialog>
+<dialog id="cast-dialog" aria-labelledby="cast-heading">
+  <form id="cast-form">
+    <h2 id="cast-heading"></h2>
+    <p id="cast-warning" hidden></p>
+    <p id="cast-slot-notice" hidden>No eligible spell slots remain. Choose Cast without a slot for a ritual or other free casting.</p>
+    <label id="cast-slot-field">Spell slot <select name="slot" required></select></label>
+    <div class="focus-form companion-edit-actions">
+      <button id="cancel-cast" type="button">Cancel</button>
+      <button>Confirm cast</button>
+    </div>
+  </form>
+</dialog>
 <dialog id="replace-concentration" aria-labelledby="replace-heading" aria-describedby="replace-message">
   <form method="dialog">
     <h2 id="replace-heading">Replace concentration?</h2>

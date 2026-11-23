@@ -49,10 +49,16 @@ fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
 
     let flare = option(&sheet, ActionGroup::Action, "Flare");
     assert_eq!(flare.kind, OptionKind::Spell);
+    assert_eq!(flare.preparation, Some(true));
     assert_eq!(detail(flare, "Range"), Some("60 feet"));
     assert_eq!(detail(flare, "Save DC"), Some("15"));
     assert_eq!(detail(flare, "Attack roll"), None);
     assert_eq!(detail(flare, "Dice in description"), Some("2d6 · 1d6"));
+    assert_eq!(detail(flare, "Components"), Some("V, S, M"));
+    assert_eq!(
+        detail(flare, "Duration"),
+        Some("Concentration, up to 1 minute")
+    );
     assert_eq!(
         detail(flare, "Material"),
         Some("a copper reflector worth 5 gp")
@@ -101,7 +107,11 @@ fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
     assert_eq!(detail(scroll, "Save DC"), Some("13"));
     assert_eq!(detail(scroll, "Material"), None);
 
-    option(&sheet, ActionGroup::Other, "Beacon Ritual");
+    assert_eq!(
+        option(&sheet, ActionGroup::Other, "Beacon Ritual").preparation,
+        Some(false)
+    );
+    assert!(option(&sheet, ActionGroup::Other, "Beacon Ritual").ritual);
     let ambiguous = option(&sheet, ActionGroup::Other, "Scroll of Twin Signal");
     assert_eq!(
         detail(ambiguous, "Aurora content"),
@@ -134,6 +144,10 @@ fn renders_all_groups_and_full_linked_descriptions_as_inline_disclosures() {
         assert!(html.contains(&format!("<section id=\"{group}\"")));
     }
     assert!(html.contains("Rowan &amp; Co."));
+    assert!(html.contains("Lvl 3 · Tinkerer · Beacon Keeper"));
+    assert!(html.contains("id=\"inspector-divider\" role=\"separator\""));
+    assert!(html.contains("data-record-attack=\"Signal Bow\""));
+    assert!(html.contains("data-ritual-cast"));
     assert!(html.contains("<details><summary>Full description</summary>"));
     assert!(html.contains("<strong>At higher levels.</strong>"));
     assert!(html.contains("<ul><li>Blue points north.</li><li>Amber signals a retreat.</li></ul>"));
@@ -149,6 +163,8 @@ fn shows_character_stats_and_preserves_lore_in_the_full_sheet() {
     assert_eq!(stats.max_hp, Some(27));
     assert_eq!(stats.armor_class, Some(18));
     assert_eq!(stats.speed.as_deref(), Some("40 ft. walk · 40 ft. swim"));
+    assert_eq!(stats.modifiers[2], Some(3));
+    assert_eq!(stats.checks[2], Some(3));
     assert_eq!(
         stats.saves,
         [Some(0), Some(3), Some(6), Some(1), Some(0), Some(-1)]
@@ -160,11 +176,41 @@ fn shows_character_stats_and_preserves_lore_in_the_full_sheet() {
     assert!(html.contains("data-stat=\"hp\">27 max"));
     assert!(html.contains("data-stat=\"ac\">18"));
     assert!(html.contains("data-stat=\"con\">+6"));
+    assert_eq!(html.matches("class=\"ability-tile\"").count(), 6);
+    assert!(html.contains("data-ability=\"Constitution\" data-check=\"+3\""));
     let full = html.split_once("id=\"full-sheet\"").unwrap().1;
     assert!(full.contains("Rowan &amp; Mira kept the coast lit.\nThey now chart the fog."));
     assert!(full.contains("I always leave a light in the window."));
     assert!(full.contains("Lamplighters offer a dry bunk."));
     assert!(full.contains("Lamplighter"));
+}
+
+#[test]
+fn shows_saved_hp_rolls_equipped_speed_and_unresolved_spell_levels() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &fixtures.join("rolled-hp.dnd5e"),
+        &fixtures.join("combat-sheet.xml"),
+    )
+    .unwrap();
+    let sheet = CombatSheet::from_character(&character);
+    assert_eq!(sheet.profile.stats.max_hp, Some(27)); // 8 + 3 + 7 + (3 × 3 CON)
+    assert_eq!(
+        sheet.profile.stats.speed.as_deref(),
+        Some("45 ft. walk · 45 ft. swim")
+    );
+    let html = render_html(&sheet);
+    assert!(html.contains(
+        "Spark</span><span class=\"option-badges\"><span class=\"spell-level\">Cantrip</span>"
+    ));
+    assert!(html.contains(
+        "Flash</span><span class=\"option-badges\"><span class=\"spell-level\">Level 2</span>"
+    ));
+    assert_eq!(sheet.infusions.len(), 2);
+    assert!(html.contains(
+        "data-infusion=\"ID_TEST_ARTIFICER_INFUSION_ENHANCED_DEFENSE\">Enhanced Defense"
+    ));
+    assert!(html.contains("data-infusion=\"ID_TEST_ARTIFICER_INFUSION_REPLICATE_MAGIC_ITEM_OPTION_CLOAK\">Cloak of Hiding"));
 }
 
 #[test]
@@ -248,7 +294,7 @@ fn exposes_concentration_from_a_spell_and_a_generated_scroll() {
     );
 
     let html = render_html(&sheet);
-    assert!(html.contains("aria-label=\"Concentrate on Flare\""));
+    assert!(html.contains("data-cast-spell aria-label=\"Cast Flare\""));
     assert!(html.contains("data-focus-spell=\"Shield Flash\""));
     assert!(html.contains("id=\"replace-concentration\""));
 }

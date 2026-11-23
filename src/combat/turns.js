@@ -2,7 +2,7 @@ const encounterTracker = (() => {
   const byId = (id) => document.getElementById(id);
   const baseline = byId("encounter-baseline");
   const importedResources = [...baseline.querySelectorAll("[data-resource]")].map((entry) => ({
-    key: entry.dataset.resource, name: entry.textContent, capacity: Number(entry.dataset.capacity),
+    key: entry.dataset.resource, name: entry.textContent, capacity: Number(entry.dataset.capacity), recovery: entry.dataset.recovery,
   }));
   const keyHp = () => document.querySelector("#key-stats [data-stat=hp]").textContent;
   let hpBaseline = keyHp();
@@ -12,10 +12,10 @@ const encounterTracker = (() => {
   const hpForm = byId("encounter-hp-form");
   const actorForm = byId("combatant-form");
   const resourceForm = byId("encounter-resource-form");
+  const resourceChoice = byId("resource-choice");
   const order = byId("turn-order");
   const resources = byId("encounter-resources");
   let editId = null;
-  let resourceKey = null;
   let lastRender = "";
 
   function html(tag, text) {
@@ -39,10 +39,8 @@ const encounterTracker = (() => {
     const result = [];
     const shared = companions.cards.filter((card) => card.turn === "owner" && card.rounds !== 0)
       .map((card) => card.name);
-    if (companions.owner != null) {
-      result.push({key: "owner", name: baseline.dataset.owner + (shared.length ? ` with ${shared.join(", ")}` : ""),
-        score: companions.owner, rank: 0, id: 0});
-    }
+    result.push({key: "owner", name: baseline.dataset.owner + (shared.length ? ` with ${shared.join(", ")}` : ""),
+      score: companions.owner, rank: 0, id: 0});
     for (const card of companions.cards) {
       if (card.turn === "separate" && card.initiative != null && card.rounds !== 0) {
         result.push({key: `companion:${card.id}`, name: card.name, score: card.initiative, rank: 1, id: card.id});
@@ -51,12 +49,12 @@ const encounterTracker = (() => {
     for (const actor of get(state).actors) {
       result.push({key: `actor:${actor.id}`, name: actor.name, score: actor.score, rank: 2, id: actor.id, hp: actor.hp});
     }
-    return result.sort((a, b) => b.score - a.score || a.rank - b.rank || a.id - b.id);
+    return result.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity) || a.rank - b.rank || a.id - b.id);
   }
 
   function resourceList(progress) {
     const all = new Map(importedResources.map((resource) => [resource.key, resource]));
-    for (const resource of progress.resources) all.set(resource.key, resource);
+    for (const resource of progress.resources) all.set(resource.key, {...all.get(resource.key), ...resource});
     return [...all.values()];
   }
 
@@ -69,8 +67,13 @@ const encounterTracker = (() => {
     return hp == null ? "Unavailable" : hp.max == null ? String(hp.current) : `${hp.current} / ${hp.max}`;
   }
   function paintKeyHp(progress) {
-    const text = progress.hp ? displayHp(progress.hp) : hpBaseline;
+    const hp = progress.hp || initialHp();
+    const text = hp ? displayHp(hp) : hpBaseline;
     for (const node of document.querySelectorAll("[data-stat=hp]")) node.textContent = text;
+    for (const node of document.querySelectorAll("[data-temp-hp]")) {
+      node.hidden = false;
+      node.textContent = hp?.temporary > 0 ? `+${hp.temporary} temp HP` : "0 temp HP";
+    }
   }
 
   function render() {
@@ -81,28 +84,27 @@ const encounterTracker = (() => {
     paintKeyHp(progress);
     if (signature === lastRender) return;
     lastRender = signature;
-    const active = rows.find((row) => row.key === progress.current);
+    const active = rows.find((row) => row.key === progress.current) || rows[0];
     byId("round-number").textContent = `Round ${progress.round}`;
-    byId("current-turn").textContent = active ? `Turn: ${active.name}` : "Ready to start";
-    const next = byId("next-turn");
-    next.textContent = active ? "Next turn" : "Start turns";
-    next.disabled = rows.length === 0;
+    byId("current-turn").textContent = rows.length > 1 ? `Turn: ${active.name}` : "1 turn per round";
+    const lastAttack = byId("last-attack");
+    lastAttack.hidden = !progress.lastAttack;
+    lastAttack.textContent = progress.lastAttack
+      ? "Last attack · " + progress.lastAttack.name + " · Round " + progress.lastAttack.round : "";
     byId("undo-turn").disabled = !previewEncounter.canUndo();
     byId("encounter-storage").textContent = previewEncounter.isPersisted() ? "Saved locally" : "This tab only";
     owner.elements.initiative.value = state.companions?.owner ?? "";
     const hp = progress.hp || initialHp();
     byId("encounter-hp").textContent = displayHp(hp);
+    const temporary = hp?.temporary ? ` · ${hp.temporary} temporary HP` : "";
+    byId("damage-hp").textContent = hp ? `Current HP: ${displayHp(hp)}${temporary}` : "Set HP on the combat sheet to apply damage to it.";
     hpForm.elements.current.value = hp?.current ?? "";
     hpForm.elements.max.value = hp?.max ?? "";
+    hpForm.elements.temporary.value = hp?.temporary ?? 0;
     order.replaceChildren();
-    if (!rows.length) {
-      const item = html("li", "Add an initiative score to start turns.");
-      item.className = "initiative-empty";
-      order.append(item);
-    }
     for (const row of rows) {
       const item = html("li");
-      const score = html("span", String(row.score));
+      const score = html("span", row.score ?? "—");
       score.className = "initiative-score";
       const name = html("span", row.name);
       name.className = "initiative-name";
@@ -112,7 +114,7 @@ const encounterTracker = (() => {
         hp.className = "initiative-hp";
         item.append(hp);
       }
-      if (row.key === progress.current) item.setAttribute("aria-current", "true");
+      if (row.key === active.key) item.setAttribute("aria-current", "true");
       if (row.rank === 2) {
         const controls = html("span");
         const edit = button("Edit", row.name, "edit", row.id);
@@ -132,18 +134,38 @@ const encounterTracker = (() => {
       const used = progress.used[resource.key] || 0;
       const remaining = Math.max(0, resource.capacity - used);
       const item = html("li");
-      const label = html("span", resource.name);
+      const spellSlot = /^(Spell slot|Pact Magic slot):/.test(resource.key);
+      item.classList.toggle("spell-slot-pool", spellSlot);
+      const label = html(resource.key.startsWith("Feature:") ? "button" : "span", resource.name);
+      if (label.tagName === "BUTTON") {
+        label.type = "button";
+        label.dataset.resourceDetail = resource.key;
+        label.title = `Read ${resource.name}`;
+      }
       label.className = "resource-name";
       const count = html("strong", `${remaining} / ${resource.capacity}`);
       count.className = "resource-count";
       const spend = button("Spend", resource.name, "spend", resource.key, remaining === 0);
       const restore = button("Restore", resource.name, "restore", resource.key, used === 0);
-      const edit = button("Edit", resource.name, "capacity", resource.key);
-      for (const [control, symbol] of [[spend, "−"], [restore, "+"], [edit, "⋯"]]) {
+      for (const [control, symbol] of [[spend, "−"], [restore, "+"]]) {
         control.title = control.getAttribute("aria-label");
         control.textContent = symbol;
       }
-      item.append(label, count, spend, restore, edit);
+      const group = html("div");
+      group.className = "resource-label";
+      group.append(label, count);
+      if (spellSlot && resource.capacity <= 12) {
+        const pips = html("span");
+        pips.className = "slot-pips";
+        pips.setAttribute("aria-hidden", "true");
+        for (let i = 0; i < resource.capacity; i++) {
+          const pip = html("i");
+          pip.classList.toggle("available", i < remaining);
+          pips.append(pip);
+        }
+        group.append(pips);
+      }
+      item.append(group, spend, restore);
       resources.append(item);
     }
   }
@@ -163,10 +185,10 @@ const encounterTracker = (() => {
   byId("next-turn").addEventListener("click", () => {
     update((progress, state) => {
       const rows = turns(state);
-      if (!rows.length) return false;
-      const index = rows.findIndex((row) => row.key === progress.current);
+      const index = Math.max(0, rows.findIndex((row) => row.key === progress.current));
       const wrap = index === rows.length - 1;
-      if (index >= 0) effectControls.boundary(state, "end", rows[index].key);
+      progress.turnSequence = (progress.turnSequence || 0) + 1;
+      effectControls.boundary(state, "end", rows[index].key);
       progress.current = rows[wrap ? 0 : index + 1].key;
       if (wrap) {
         progress.round += 1;
@@ -195,7 +217,8 @@ const encounterTracker = (() => {
   });
   hpForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const hp = {current: number(hpForm.elements.current.value), max: number(hpForm.elements.max.value)};
+    const hp = {current: number(hpForm.elements.current.value), max: number(hpForm.elements.max.value),
+      temporary: Number(hpForm.elements.temporary.value)};
     if (hp.max !== null && hp.current > hp.max) {
       hpForm.elements.current.setCustomValidity("Current HP cannot exceed maximum HP.");
       hpForm.reportValidity();
@@ -207,6 +230,7 @@ const encounterTracker = (() => {
       if (hp.current === 0) { state.focus.active = null; state.focus.pending = []; }
       return true;
     });
+    byId("hp-settings").close();
   });
 
   function resetActor() {
@@ -256,45 +280,45 @@ const encounterTracker = (() => {
     }
   });
 
+  function chooseResource() {
+    const resource = resourceList(get(previewEncounter.current())).find((entry) => entry.key === resourceChoice.value);
+    resourceForm.elements.name.value = resource?.name ?? "";
+    resourceForm.elements.capacity.value = resource?.capacity ?? "";
+    resourceForm.elements.recovery.value = resource?.recovery ?? "";
+    resourceForm.querySelector("button").textContent = resource ? "Save resource" : "Add resource";
+  }
+  document.querySelector('[data-dialog="resource-settings"]').addEventListener("click", () => {
+    const choices = resourceList(get(previewEncounter.current())).map((entry) => new Option(entry.name, entry.key));
+    resourceChoice.replaceChildren(new Option("New resource", ""), ...choices);
+    chooseResource();
+  });
+  resourceChoice.addEventListener("change", chooseResource);
   resourceForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(resourceForm);
     const name = data.get("name").trim();
     if (!name) return;
     const capacity = number(data.get("capacity"));
-    const previous = resourceKey;
-    resourceKey = null;
-    resourceForm.reset();
-    resourceForm.querySelector("button").textContent = "Add resource";
+    const recovery = data.get("recovery");
+    const previous = resourceChoice.value;
     update((progress) => {
       const key = previous || `manual:${++progress.sequence}`;
       const resource = progress.resources.find((resource) => resource.key === key);
-      if (resource) Object.assign(resource, {name, capacity});
-      else progress.resources.push({key, name, capacity});
+      if (resource) Object.assign(resource, {name, capacity, recovery});
+      else progress.resources.push({key, name, capacity, recovery});
       return true;
     });
+    byId("resource-settings").close();
   });
   resources.addEventListener("click", (event) => {
     const control = event.target.closest("[data-action]");
     if (!control) return;
     const {action, key} = control.dataset;
-    if (action === "capacity") {
-      const resource = resourceList(get(previewEncounter.current())).find((resource) => resource.key === key);
-      resourceKey = key;
-      if (!byId("encounter-settings").open) byId("encounter-settings").showModal();
-      byId("resource-panel").open = true;
-      resourceForm.elements.name.value = resource.name;
-      resourceForm.elements.capacity.value = resource.capacity;
-      resourceForm.querySelector("button").textContent = "Save resource";
-      resourceForm.elements.capacity.focus();
-      return;
-    }
-    update((progress) => {
-      const resource = resourceList(progress).find((resource) => resource.key === key);
-      if (!resource) return false;
+    update((progress, state) => {
+      if (action === "spend") return spendResource(state, key);
+      if (!resourceList(progress).some((resource) => resource.key === key)) return false;
       const used = progress.used[key] || 0;
-      if (action === "spend" && used < resource.capacity) progress.used[key] = used + 1;
-      else if (action === "restore" && used > 0) {
+      if (action === "restore" && used > 0) {
         if (used === 1) delete progress.used[key];
         else progress.used[key] = used - 1;
       } else return false;
@@ -304,14 +328,40 @@ const encounterTracker = (() => {
 
   function damageOwner(state, amount) {
     const existing = state.progress?.hp || initialHp();
-    if (amount === 0 || !existing) return {changed: false, dropped: false};
+    if (amount === 0 || !existing) return {changed: false, dropped: false, current: existing?.current};
     const progress = state.progress ||= blank();
-    progress.hp = {...existing, current: Math.max(0, existing.current - amount)};
-    return {changed: existing.current !== progress.hp.current, dropped: progress.hp.current === 0};
+    const absorbed = Math.min(existing.temporary || 0, amount);
+    progress.hp = {...existing, current: Math.max(0, existing.current - (amount - absorbed)),
+      temporary: (existing.temporary || 0) - absorbed};
+    return {changed: absorbed > 0 || existing.current !== progress.hp.current,
+      dropped: progress.hp.current === 0, current: progress.hp.current, absorbed, temporary: progress.hp.temporary};
   }
 
+  function healOwner(progress, kind, amount) {
+    const hp = progress.hp || initialHp();
+    if (!hp) return;
+    const current = kind === "long" ? hp.max ?? hp.current : Math.min(hp.max ?? 0xffffffff, hp.current + amount);
+    const temporary = kind === "long" ? 0 : hp.temporary || 0;
+    if (current !== hp.current || temporary !== (hp.temporary || 0)) progress.hp = {...hp, current, temporary};
+  }
   document.addEventListener("preview-stat-overrides", () => { hpBaseline = keyHp(); render(); });
   document.addEventListener("preview-encounter-change", render);
   render();
-  return {damageOwner, update, ownerName: baseline.dataset.owner, turns};
+  function spendResource(state, key, cost = 1) {
+    const progress = state.progress ||= blank();
+    const pool = resourceList(progress).find((resource) => resource.key === key);
+    const used = progress.used[key] || 0;
+    if (!pool || used + cost > pool.capacity) return false;
+    progress.used[key] = used + cost;
+    return true;
+  }
+  function recordAttack(name) {
+    update((progress) => {
+      progress.lastAttack = {name, round: progress.round, sequence: ++progress.sequence};
+      byId("encounter-status").textContent = "Recorded attack with " + name + ".";
+      return true;
+    });
+  }
+  return {damageOwner, healOwner, spendResource, recordAttack, hp: (state) => state.progress?.hp || initialHp(),
+    update, ownerName: baseline.dataset.owner, turns, resources: (state) => resourceList(get(state))};
 })();

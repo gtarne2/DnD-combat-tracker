@@ -1,4 +1,4 @@
-(() => {
+const layoutPreferences = (() => {
   const byId = (id) => document.getElementById(id);
   const collect = (selector, key) =>
     new Map([...document.querySelectorAll(selector)].map((node) => [key(node), node]));
@@ -28,6 +28,8 @@
   }
 
   const stored = readPreferences();
+  let inspectorSplit = typeof stored.inspectorSplit === "number"
+    && stored.inspectorSplit > 0 && stored.inspectorSplit < 100 ? stored.inspectorSplit : 57;
   const keysIn = (values, allowed) =>
     Array.isArray(values) ? [...new Set(values.filter((key) => allowed.has(key)))] : [];
   const storedOrder = keysIn(stored.order, groups);
@@ -43,7 +45,7 @@
     if (storageKey) {
       try {
         localStorage.setItem(storageKey, JSON.stringify({
-          order, hidden: [...hidden], pins, overrides: Object.fromEntries(overrides),
+          order, hidden: [...hidden], pins, overrides: Object.fromEntries(overrides), inspectorSplit,
         }));
         status.textContent = message;
         return;
@@ -92,8 +94,8 @@
       return copy;
     }));
     byId("pinned-cards").replaceChildren(...copies);
-    byId("pinned").hidden = copies.length === 0;
-    byId("pinned-link").hidden = copies.length === 0;
+    byId("pinned").hidden = false;
+    if (!copies.length) byId("pinned-cards").textContent = "Star an option or stat to see it here.";
     document.dispatchEvent(new Event("combat-options-change"));
   }
 
@@ -170,4 +172,8 @@
   renderStats();
   renderPins();
   openPanel(location.hash);
+  return { inspectorSplit, setInspectorSplit(value) {
+    inspectorSplit = value;
+    savePreferences("Details width saved.");
+  } };
 })();

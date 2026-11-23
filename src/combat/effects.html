@@ -1,5 +1,6 @@
 <section id="effects" aria-labelledby="effects-heading">
   <div class="rail-heading"><h2 id="effects-heading">Active effects</h2><button type="button" id="add-effect">Add effect</button></div>
+  <p id="effect-concentration" hidden></p>
   <div class="focus-form effect-tools">
     <details class="effect-time-controls"><summary>Advance game time</summary>
     <form id="effect-clock" class="focus-form">
@@ -24,7 +25,7 @@
       <label>Effect name <input name="name" maxlength="120" placeholder="Berserk" required></label>
       <div><label for="effect-target">Applies to</label><select id="effect-target" name="target"></select></div>
       <div><label for="effect-kind">Ends after</label>
-        <select id="effect-kind" name="kind"><option value="manual">Manually ended</option><option value="rounds">Combat rounds</option><option value="seconds">In-game time</option><option value="start">Start of turn</option><option value="end">End of turn</option></select>
+        <select id="effect-kind" name="kind"><option value="manual">Manually ended</option><option value="rounds">Combat rounds</option><option value="seconds">In-game time</option><option value="start">Start of turn</option><option value="end">End of turn</option><option value="short">Short or long rest</option><option value="long">Long rest</option></select>
       </div>
       <label id="effect-amount">Remaining <input name="remaining" type="number" min="1" max="4294967295" value="1"></label>
       <div id="effect-time-unit"><label for="effect-duration-unit">Duration unit</label>
