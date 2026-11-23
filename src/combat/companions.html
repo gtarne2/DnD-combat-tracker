@@ -1,16 +1,18 @@
-<div id="companion-roster-home"><section id="companions" aria-label="Companion roster">
-  <h2>Companions</h2>
+<aside id="companion-roster-home" aria-label="Companion sidebar"><section id="companions" aria-label="Companion roster">
+  <div class="rail-heading"><h2>Companions</h2><button type="button" id="toggle-companions" aria-controls="companion-roster-content" aria-expanded="true">Hide</button></div>
+  <div id="companion-roster-content">
   <form id="add-companion" class="focus-form">
     <div><label for="companion-template">Template</label>
       <select id="companion-template" name="template" required><option value="" disabled selected>Choose template…</option><option value="custom">Custom companion</option></select></div>
-    <button>Add companion</button>
+    <button aria-label="Add companion">Add</button>
   </form>
+  <p id="no-companions">No companions yet.</p>
   <div id="companion-cards"></div>
-  <div id="companion-detail-home"><section id="companion-detail" class="companion-grid" aria-label="Selected companion" hidden></section></div>
-</section>
 </div>
+</section>
+</aside>
 <section class="sheet-page" id="companion-roster-dialog" hidden><h1>Companions</h1>
-  <div class="companion-roster-layout"><div id="companion-roster-body"></div><div id="companion-roster-detail"><p id="companion-roster-hint">Choose a companion to see its details.</p></div></div>
+  <div id="companion-roster-body"></div>
 </section>
 <dialog id="companion-editor" aria-labelledby="companion-editor-title">
   <form id="edit-companion">
@@ -37,6 +39,21 @@
     <div class="focus-form companion-edit-actions">
       <button type="button" id="companion-cancel">Cancel</button>
       <button type="submit">Save companion</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="companion-resource-editor" aria-labelledby="companion-resource-heading">
+  <form id="companion-resource-form">
+    <h2 id="companion-resource-heading">Companion resource</h2>
+    <div class="companion-fields">
+      <label class="companion-wide">Resource name <input name="name" maxlength="80" required></label>
+      <label>Remaining uses <input name="remaining" type="number" min="0" max="4294967295" required></label>
+      <label>Maximum uses <input name="capacity" type="number" min="1" max="4294967295" required></label>
+    </div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="companion-resource-remove" hidden>Remove resource</button>
+      <button type="button" id="companion-resource-cancel">Cancel</button>
+      <button type="submit">Save resource</button>
     </div>
   </form>
 </dialog>

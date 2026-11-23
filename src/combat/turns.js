@@ -39,8 +39,7 @@ const encounterTracker = (() => {
     const result = [];
     const shared = companions.cards.filter((card) => card.turn === "owner" && card.rounds !== 0)
       .map((card) => card.name);
-    result.push({key: "owner", name: baseline.dataset.owner + (shared.length ? ` with ${shared.join(", ")}` : ""),
-      score: companions.owner, rank: 0, id: 0});
+    result.push({key: "owner", name: baseline.dataset.owner, shared, score: companions.owner, rank: 0, id: 0});
     for (const card of companions.cards) {
       if (card.turn === "separate" && card.initiative != null && card.rounds !== 0) {
         result.push({key: `companion:${card.id}`, name: card.name, score: card.initiative, rank: 1, id: card.id});
@@ -80,18 +79,24 @@ const encounterTracker = (() => {
     const state = previewEncounter.current();
     const progress = get(state);
     const rows = turns(state);
-    const signature = JSON.stringify([progress, rows, hpBaseline, previewEncounter.canUndo(), previewEncounter.isPersisted()]);
+    const undoLabel = previewEncounter.undoLabel();
+    const signature = JSON.stringify([progress, rows, hpBaseline, undoLabel, previewEncounter.canUndo(), previewEncounter.isPersisted()]);
     paintKeyHp(progress);
     if (signature === lastRender) return;
     lastRender = signature;
     const active = rows.find((row) => row.key === progress.current) || rows[0];
     byId("round-number").textContent = `Round ${progress.round}`;
-    byId("current-turn").textContent = rows.length > 1 ? `Turn: ${active.name}` : "1 turn per round";
+    byId("current-turn").textContent = rows.length > 1 ? "Turn: " + active.name : "Solo turn";
     const lastAttack = byId("last-attack");
     lastAttack.hidden = !progress.lastAttack;
     lastAttack.textContent = progress.lastAttack
       ? "Last attack · " + progress.lastAttack.name + " · Round " + progress.lastAttack.round : "";
-    byId("undo-turn").disabled = !previewEncounter.canUndo();
+    const undo = byId("undo-turn");
+    undo.disabled = !previewEncounter.canUndo();
+    undo.title = undoLabel ? "Undo " + undoLabel : "Undo combat update";
+    undo.setAttribute("aria-label", undo.title);
+    byId("undo-label").hidden = !undoLabel;
+    byId("undo-label").textContent = undoLabel ? "Last change · " + undoLabel : "";
     byId("encounter-storage").textContent = previewEncounter.isPersisted() ? "Saved locally" : "This tab only";
     owner.elements.initiative.value = state.companions?.owner ?? "";
     const hp = progress.hp || initialHp();
@@ -109,8 +114,11 @@ const encounterTracker = (() => {
       const name = html("span", row.name);
       name.className = "initiative-name";
       item.append(score, name);
-      if (row.hp != null) {
-        const hp = html("small", `${row.hp} HP`);
+      if (row.hp != null || row.shared?.length) {
+        const hp = html("small", row.shared?.length
+          ? "With " + row.shared.length + (row.shared.length === 1 ? " companion" : " companions")
+          : row.hp + " HP");
+        if (row.shared?.length) hp.title = row.shared.join(", ");
         hp.className = "initiative-hp";
         item.append(hp);
       }
@@ -170,8 +178,8 @@ const encounterTracker = (() => {
     }
   }
 
-  function update(operation) {
-    previewEncounter.transact((state) => operation(state.progress ||= blank(), state));
+  function update(operation, label) {
+    previewEncounter.transact((state) => operation(state.progress ||= blank(), state), {label});
   }
 
   function reconcileCurrent(state) {
@@ -200,7 +208,7 @@ const encounterTracker = (() => {
       }
       reconcileCurrent(state);
       if (progress.current) effectControls.boundary(state, "start", progress.current);
-      return true;
+      return wrap ? "advancing to round " + progress.round : "advancing the turn";
     });
   });
   byId("undo-turn").addEventListener("click", previewEncounter.undo);
@@ -228,7 +236,7 @@ const encounterTracker = (() => {
     update((progress, state) => {
       progress.hp = hp;
       if (hp.current === 0) { state.focus.active = null; state.focus.pending = []; }
-      return true;
+      return "setting hit points";
     });
     byId("hp-settings").close();
   });
@@ -315,14 +323,15 @@ const encounterTracker = (() => {
     if (!control) return;
     const {action, key} = control.dataset;
     update((progress, state) => {
-      if (action === "spend") return spendResource(state, key);
-      if (!resourceList(progress).some((resource) => resource.key === key)) return false;
+      const pool = resourceList(progress).find((resource) => resource.key === key);
+      if (!pool) return false;
+      if (action === "spend") return spendResource(state, key) && "spending " + pool.name;
       const used = progress.used[key] || 0;
       if (action === "restore" && used > 0) {
         if (used === 1) delete progress.used[key];
         else progress.used[key] = used - 1;
       } else return false;
-      return true;
+      return "restoring " + pool.name;
     });
   });
 
@@ -359,7 +368,7 @@ const encounterTracker = (() => {
     update((progress) => {
       progress.lastAttack = {name, round: progress.round, sequence: ++progress.sequence};
       byId("encounter-status").textContent = "Recorded attack with " + name + ".";
-      return true;
+      return "attacking with " + name;
     });
   }
   return {damageOwner, healOwner, spendResource, recordAttack, hp: (state) => state.progress?.hp || initialHp(),

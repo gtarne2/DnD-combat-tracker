@@ -1,6 +1,6 @@
 <section id="effects" aria-labelledby="effects-heading">
   <div class="rail-heading"><h2 id="effects-heading">Active effects</h2><button type="button" id="add-effect">Add effect</button></div>
-  <p id="effect-concentration" hidden></p>
+  <article id="effect-concentration" hidden><span class="status-chip" data-status-kind="concentration">Concentration</span><h3 id="effect-concentration-name"></h3><p id="effect-concentration-duration"></p><button type="button" id="effect-end-concentration">End concentration</button></article>
   <div class="focus-form effect-tools">
     <details class="effect-time-controls"><summary>Advance game time</summary>
     <form id="effect-clock" class="focus-form">
@@ -23,6 +23,7 @@
     <h2 id="effect-heading">Ongoing effect</h2>
     <div class="companion-fields">
       <label>Effect name <input name="name" maxlength="120" placeholder="Berserk" required></label>
+      <label>Type <select name="category"><option value="effect">Effect</option><option value="condition">Condition</option></select></label>
       <div><label for="effect-target">Applies to</label><select id="effect-target" name="target"></select></div>
       <div><label for="effect-kind">Ends after</label>
         <select id="effect-kind" name="kind"><option value="manual">Manually ended</option><option value="rounds">Combat rounds</option><option value="seconds">In-game time</option><option value="start">Start of turn</option><option value="end">End of turn</option><option value="short">Short or long rest</option><option value="long">Long rest</option></select>
@@ -32,7 +33,7 @@
         <select id="effect-duration-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select>
       </div>
       <div id="effect-anchor"><label for="effect-turn">Whose turn</label><select id="effect-turn" name="anchor"></select></div>
-      <label class="companion-wide">Notes <textarea name="notes" rows="3" maxlength="2000"></textarea></label>
+      <label class="companion-wide">Condition, modifier, or notes <textarea name="notes" rows="3" maxlength="2000"></textarea></label>
     </div>
     <div class="focus-form companion-edit-actions">
       <button type="button" id="effect-cancel">Cancel</button>

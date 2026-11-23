@@ -50,7 +50,11 @@ fn imports_cannon_variants_and_creature_abilities_as_reusable_templates() {
     assert!(selected.details.command.contains("command an attack"));
     assert!(selected.details.attacks.contains("Nip:"));
     assert!(selected.details.abilities.contains("Warm Glow:"));
-    assert!(render_html(&sheet).contains("data-companion-template=\"ID_TEST_WARDEN_HOUND\""));
+    let html = render_html(&sheet);
+    assert!(html.contains("data-companion-template=\"ID_TEST_WARDEN_HOUND\""));
+    assert!(html.contains("aria-controls=\"companion-roster-content\""));
+    assert!(html.contains("id=\"companion-resource-form\""));
+    assert!(html.contains("id=\"quick-actions\""));
 }
 
 #[test]

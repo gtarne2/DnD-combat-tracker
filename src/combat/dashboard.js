@@ -19,7 +19,6 @@
   let split = layoutPreferences.inspectorSplit;
   let collapsed = false;
   const remembered = new Map();
-  let inspectingCompanion = false;
 
   const categories = [
     ["Attack", "Attacks"], ["Spell", "Spells"], ["Feature", "Features"],
@@ -119,6 +118,8 @@
     } else if (stack) {
       const remaining = consumableCards.remaining(state, stack.dataset.consumable);
       unavailable = remaining == null || remaining === 0;
+      stack.querySelector("[data-use]").disabled = unavailable;
+      stack.querySelector("[data-remaining]").textContent = remaining ?? "Unavailable";
       if (unavailable) reason = remaining === 0 ? "None remaining." : "Quantity unavailable in the Aurora save.";
     } else if (feature) {
       const use = playbook.featureUse(card.dataset.pin, state);
@@ -141,6 +142,9 @@
     if (reason) tools.title = reason;
     else tools.removeAttribute("title");
   }
+
+  const quick = setupQuickActions(groups, updateAction);
+  companionControls.start();
 
   function select(card) {
     if (selected) {
@@ -172,6 +176,8 @@
     if (description) description.open = true;
     const header = document.createElement("header");
     header.append(kind, heading, badges, tools);
+    const quickPin = quick.pinButton(card);
+    if (quickPin) tools.append(quickPin);
     article.append(header, body);
     inspector.append(article);
     updateAction(article, previewEncounter.current());
@@ -229,7 +235,7 @@
       || shown === "pinned" || active.some((section) => section.querySelector(":scope > .empty"))));
     showFollowups();
     byId("no-groups").classList.toggle("view-hidden", shown === "pinned");
-    if (!inspectingCompanion && !candidates.includes(selected)) {
+    if (!candidates.includes(selected)) {
       const previous = remembered.get(shown);
       const preferred = previous && candidates.find(card => card.dataset.pin === previous);
       select(wide.matches ? preferred || candidates[0] : null);
@@ -238,54 +244,34 @@
     for (const card of candidates) updateAction(card, state);
     const detail = inspector.querySelector("article");
     if (detail) updateAction(detail, state);
+    quick.render();
   }
 
   function showFollowups() {
     const visible = ["bonus-action", "all"].includes(workspace.dataset.view);
-    byId("bonus-followups").hidden = !visible || !byId("bonus-followup-list").children.length;
+    const hasFollowups = Boolean(byId("bonus-followup-list").children.length);
+    byId("bonus-followups").hidden = !visible || !hasFollowups;
+    byId("bonus-action").querySelector(":scope > .empty")?.toggleAttribute("hidden", hasFollowups);
   }
   document.addEventListener("followups-changed", showFollowups);
   showUnprepared.addEventListener("change", showOptions);
 
-  let page = "combat";
-  function placeCompanion() {
-    const hasDetail = companionControls.selected() !== null;
-    byId("companion-roster-hint").hidden = hasDetail;
-    byId(page === "companions" ? "companion-roster-detail" : "combat-companion-detail").append(companionControls.detail);
-    byId("companion-workspace").hidden = page !== "combat" || !hasDetail;
-    workspace.hidden = page !== "combat" || hasDetail;
-  }
-  function leaveCompanion() {
-    inspectingCompanion = false;
-    companionControls.select(null);
-    placeCompanion();
-  }
   function navigate(next, control) {
-    page = next;
+    workspace.hidden = next !== "combat";
     document.body.classList.toggle("reading-page", next !== "combat");
     byId("character-dialog").hidden = next !== "character";
     rosterDialog.hidden = next !== "companions";
     byId("reference-dialog").hidden = next !== "reference";
-    byId(next === "companions" ? "companion-roster-body" : "companion-roster-home").append(byId("companions"));
+    companionControls.place(next === "companions");
     document.querySelectorAll(".command-nav [aria-current]").forEach(link => link.removeAttribute("aria-current"));
     control.setAttribute("aria-current", "page");
-    placeCompanion();
     window.scrollTo(0, 0);
   }
-  document.addEventListener("companion-inspected", () => {
-    inspectingCompanion = true;
-    placeCompanion();
-  });
-  document.addEventListener("preview-encounter-change", () => {
-    if (inspectingCompanion && companionControls.selected() === null) leaveCompanion();
-    showOptions();
-  });
+  document.addEventListener("preview-encounter-change", showOptions);
   byId("companions-nav").onclick = event => navigate("companions", event.currentTarget);
   byId("character-nav").onclick = event => navigate("character", event.currentTarget);
-  byId("back-to-actions").onclick = () => { leaveCompanion(); showOptions(); };
   byId("combat-nav").onclick = event => {
     event.preventDefault();
-    leaveCompanion();
     navigate("combat", event.currentTarget);
     showOptions();
   };
@@ -309,7 +295,6 @@
     const tab = event.target.closest("[data-nav], [data-filter]");
     if (tab) {
       event.preventDefault();
-      leaveCompanion();
       filter = tab.dataset.nav || tab.dataset.filter;
       query.value = "";
       showOptions();
@@ -320,7 +305,6 @@
     const card = event.target.closest(".option-row");
     if (!card || (!button && event.target.closest("button, .option-body"))) return;
     if (!button) card.querySelector("[data-inspect]").focus();
-    leaveCompanion();
     remembered.set(workspace.dataset.view, card.dataset.pin);
     if (wide.matches && collapsed) setCollapsed(false);
     if (card !== selected) select(card);
@@ -352,7 +336,6 @@
       const card = groups.flatMap((group) => [...group.querySelectorAll("[data-pin]")])
         .find((card) => card.dataset.pin === resource.dataset.resourceDetail);
       if (!card) return;
-      leaveCompanion();
       filter = "traits";
       query.value = "";
       showOptions();
@@ -407,11 +390,10 @@
       navigate("reference", control);
     });
   }
-  query.addEventListener("input", () => { leaveCompanion(); showOptions(); });
+  query.addEventListener("input", showOptions);
   wide.addEventListener("change", () => {
     updateInspectorVisibility();
-    if (inspectingCompanion) placeCompanion();
-    else showOptions();
+    showOptions();
   });
   document.addEventListener("combat-options-change", showOptions);
   document.documentElement.classList.add("dashboard-ready");

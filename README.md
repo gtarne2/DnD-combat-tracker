@@ -36,15 +36,17 @@ Select **Use scroll** or **Use item** to record one unit spent. The sheet immedi
 
 Select **Cast** on a concentration spell or use its scroll. The header shows the active spell and remaining duration. Use **Manage** to advance in-game time, or **Damage** to enter damage after reductions and choose the rules for the save DC. Record the result of each prompted Constitution save.
 
-In the **Companions** rail or header roster, add an imported template or a custom companion. The roster shows HP and AC. Select a companion to see its details and editing controls.
+Expand a card in the **Companions** sidebar to adjust HP, track charges, add a condition, or inspect attacks and abilities. Add an imported template or a custom companion from either the sidebar or the **Companions** page. Collapse the sidebar for more room in Combat.
 
-Use **Next Turn** to advance timers. Without other initiative entries, each click advances one round. Optional initiative settings are in **Layout**. The HP card holds **Set HP**, **Damage**, and **Rest**. Damage uses temporary HP first. Long rests heal to known maximum HP and clear temporary HP. For a short rest, enter the healing you rolled. Cast directly from a spell row and select a spell slot when needed. The preview saves progress locally.
+Use **Initiative** in the **Encounter** panel to set the order. **Next Turn** advances to the next participant. Without other initiative entries, each click advances one round. **Undo** reverses the last combat change shown in the panel. The HP card holds **Set HP**, **Damage**, and **Rest**. Damage uses temporary HP first. Long rests heal to known maximum HP and clear temporary HP. For a short rest, enter the healing you rolled. The preview saves progress locally.
 
 Choose an action tab or search across visible groups. Selecting a row opens its details beside the list on desktop and within the row on narrow screens. Drag the desktop divider to resize the panes, or use **Hide details** to widen the action list. Select an ability tile to inspect its check and saving throw. **Attack** records your latest weapon attack for the encounter. **Character** opens the full sheet and **Layout** opens display preferences.
 
+Use **Pin to Quick Actions** in the inspector or **Pin action** in the strip to add a direct execution shortcut. The star keeps an option in **Favorites** for browsing. The strip also offers cannon creation and activation for imported variants. Use the × next to a shortcut to unpin it.
+
 Use **Traits** to find features and **Track uses or effect** to set up a counter or toggle. Create a shared pool such as Ki in **Manage resources**, then choose it and set the cost on each ability. **Tracked abilities** also holds custom imbuements and known Artificer infusions. During a long rest, you can review prepared spells and switch which imbuements and infusions are active. **Bonus Action** lists supported ongoing actions, such as Heat Metal and active Eldritch Cannons.
 
-In **Effects**, add a custom effect such as **Berserk**, choose its target, and set when it ends. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
+In **Active effects**, add a condition or effect such as **Berserk**, choose its target, and set when it ends. Include a mechanical note such as **Advantage on Strength checks**. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
 
 To try the cannon variants and a ranger companion, generate the companion playtest sheet.
 

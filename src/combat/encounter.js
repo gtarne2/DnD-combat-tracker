@@ -51,7 +51,10 @@ const previewEncounter = (() => {
         ? { spent: JSON.parse(localStorage.getItem(legacyKey)) }
         : JSON.parse(saved);
       state = snapshot(value);
-      history = Array.isArray(value?.undo) ? value.undo.slice(-32).map(snapshot) : [];
+      history = Array.isArray(value?.undo) ? value.undo.slice(-32).map((entry) => ({
+        before: snapshot(entry?.before ?? entry),
+        label: typeof entry?.label === "string" ? entry.label : "",
+      })) : [];
     } catch (error) {
       if (!(error instanceof SyntaxError)) persisted = false;
     }
@@ -64,7 +67,8 @@ const previewEncounter = (() => {
   function save() {
     while (persisted) {
       try {
-        localStorage.setItem(key, JSON.stringify({ ...state, undo: history }));
+        const undo = history.map(({before, label}) => ({...before, label}));
+        localStorage.setItem(key, JSON.stringify({ ...state, undo }));
         break;
       } catch (error) {
         if (error?.name === "QuotaExceededError" && history.length) history.shift();
@@ -88,13 +92,14 @@ const previewEncounter = (() => {
     }
   }
 
-  function transact(update, { undo = true } = {}) {
+  function transact(update, { undo = true, label = "" } = {}) {
     locked(() => {
       const draft = structuredClone(state);
-      if (!update(draft)) return;
+      const result = update(draft);
+      if (!result) return;
       for (const reconcile of reconciliations) reconcile(draft);
       if (JSON.stringify(draft) === JSON.stringify(state)) return;
-      if (undo) history = [...history, state].slice(-32);
+      if (undo) history = [...history, {before: state, label: typeof result === "string" ? result : label}].slice(-32);
       state = draft;
       save();
     });
@@ -102,8 +107,9 @@ const previewEncounter = (() => {
 
   function undo() {
     locked(() => {
-      const previous = history.pop();
-      if (!previous) return;
+      const entry = history.pop();
+      if (!entry) return;
+      const previous = entry.before;
       // Keep IDs monotonic so a stale confirmation or save cannot target a later event.
       previous.focus.sequence = Math.max(previous.focus.sequence, state.focus.sequence);
       if (state.companions) {
@@ -117,7 +123,8 @@ const previewEncounter = (() => {
       for (const reconcile of reconciliations) reconcile(previous);
       state = previous;
       save();
-      status.textContent = "Combat update undone.";
+      status.textContent = entry.label ? "Combat update undone · " + entry.label + "." : "Combat update undone.";
+      document.dispatchEvent(new Event("preview-encounter-undo"));
     });
   }
 
@@ -129,5 +136,6 @@ const previewEncounter = (() => {
   });
   read();
   return { transact, undo, current: () => state, isPersisted: () => persisted,
-    canUndo: () => history.length > 0, reconcile: (callback) => reconciliations.push(callback) };
+    canUndo: () => history.length > 0, undoLabel: () => history.at(-1)?.label || "",
+    reconcile: (callback) => reconciliations.push(callback) };
 })();

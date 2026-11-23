@@ -1,0 +1,19 @@
+<section id="quick-actions" aria-labelledby="quick-actions-heading">
+  <div class="quick-heading">
+    <h3 id="quick-actions-heading">Quick Actions</h3>
+    <button type="button" class="quiet-button" id="quick-manage">Pin action</button>
+    <button type="button" class="quiet-button" id="quick-toggle" aria-controls="quick-items" aria-expanded="true">Hide</button>
+  </div>
+  <div id="quick-items"></div>
+</section>
+<dialog id="quick-editor" aria-labelledby="quick-editor-title">
+  <form id="quick-form">
+    <h2 id="quick-editor-title">Pin a Quick Action</h2>
+    <label>Action <select name="action" required></select></label>
+    <p id="quick-picker-empty" hidden>No additional tracked actions are available to pin.</p>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="quick-cancel">Cancel</button>
+      <button type="submit">Pin action</button>
+    </div>
+  </form>
+</dialog>

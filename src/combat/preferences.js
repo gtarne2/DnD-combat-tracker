@@ -30,6 +30,12 @@ const layoutPreferences = (() => {
   const stored = readPreferences();
   let inspectorSplit = typeof stored.inspectorSplit === "number"
     && stored.inspectorSplit > 0 && stored.inspectorSplit < 100 ? stored.inspectorSplit : 57;
+  let companionsCollapsed = stored.companionsCollapsed === true;
+  let quickActionsCollapsed = stored.quickActionsCollapsed === true;
+  const quickActions = new Map(Array.isArray(stored.quickActions) ? stored.quickActions
+    .filter((entry) => Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "string") : []);
+  const hiddenQuickActions = new Set(Array.isArray(stored.hiddenQuickActions)
+    ? stored.hiddenQuickActions.filter((key) => typeof key === "string") : []);
   const keysIn = (values, allowed) =>
     Array.isArray(values) ? [...new Set(values.filter((key) => allowed.has(key)))] : [];
   const storedOrder = keysIn(stored.order, groups);
@@ -46,6 +52,7 @@ const layoutPreferences = (() => {
       try {
         localStorage.setItem(storageKey, JSON.stringify({
           order, hidden: [...hidden], pins, overrides: Object.fromEntries(overrides), inspectorSplit,
+          companionsCollapsed, quickActionsCollapsed, quickActions: [...quickActions], hiddenQuickActions: [...hiddenQuickActions],
         }));
         status.textContent = message;
         return;
@@ -172,8 +179,31 @@ const layoutPreferences = (() => {
   renderStats();
   renderPins();
   openPanel(location.hash);
-  return { inspectorSplit, setInspectorSplit(value) {
-    inspectorSplit = value;
-    savePreferences("Details width saved.");
-  } };
+  return {
+    inspectorSplit,
+    setInspectorSplit(value) {
+      inspectorSplit = value;
+      savePreferences("Details width saved.");
+    },
+    companionsCollapsed: () => companionsCollapsed,
+    setCompanionsCollapsed(value) {
+      companionsCollapsed = value;
+      savePreferences("Companion sidebar preference saved.");
+    },
+    quickActionsCollapsed: () => quickActionsCollapsed,
+    setQuickActionsCollapsed(value) {
+      quickActionsCollapsed = value;
+      savePreferences("Quick Actions preference saved.");
+    },
+    quickActions: () => new Map(quickActions),
+    showsQuickAction: (entry) => entry.builtIn ? !hiddenQuickActions.has(entry.key) : quickActions.has(entry.key),
+    setQuickAction(entry, pinned) {
+      if (entry.builtIn) {
+        if (pinned) hiddenQuickActions.delete(entry.key);
+        else hiddenQuickActions.add(entry.key);
+      } else if (pinned) quickActions.set(entry.key, entry.name);
+      else quickActions.delete(entry.key);
+      savePreferences(pinned ? "Quick Action pinned." : "Quick Action unpinned.");
+    },
+  };
 })();

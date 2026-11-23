@@ -43,7 +43,7 @@ const consumableCards = (() => {
     previewEncounter.transact((state) => {
       const amount = spend(state, key);
       status.textContent = amount === null ? `No ${name} available.` : `Used ${name}. ${amount} remaining.`;
-      return amount !== null;
+      return amount !== null && "using " + name;
     });
   });
 

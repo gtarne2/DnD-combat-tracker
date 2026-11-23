@@ -17,8 +17,8 @@ const concentrationControls = (() => {
   let replacement = null;
   let directCast = null;
 
-  function formatRemaining(seconds) {
-    if (seconds < 60 && seconds % 6 === 0) {
+  function formatRemaining(seconds, label) {
+    if (/\brounds?\b/i.test(label) && seconds % 6 === 0) {
       return `${seconds / 6} round${seconds === 6 ? "" : "s"} remaining`;
     }
     const units = [[3600, "h"], [60, "min"], [1, "sec"]];
@@ -42,10 +42,11 @@ const concentrationControls = (() => {
     activeLabel.closest(".focus-status").classList.toggle("has-concentration", Boolean(active));
     duration.textContent = !active ? "" : active.remaining === null
       ? active.label || "Duration unavailable"
-      : formatRemaining(active.remaining);
+      : formatRemaining(active.remaining, active.label);
     const effectSummary = byId("effect-concentration");
     effectSummary.hidden = !active;
-    effectSummary.textContent = active ? "Concentration · " + active.name + " · " + duration.textContent : "";
+    byId("effect-concentration-name").textContent = active?.name || "";
+    byId("effect-concentration-duration").textContent = duration.textContent;
     duration.hidden = !active;
     actions.hidden = !active;
     time.hidden = !active || active.remaining === null;
@@ -77,7 +78,7 @@ const concentrationControls = (() => {
     focus.pending = [];
     focus.last = null;
     status.textContent = `Concentrating on ${spell.name}.`;
-    return true;
+    return spell.scrollKey === null ? "casting " + spell.name : "using a scroll of " + spell.name;
   }
 
   function cast(source, scrollKey = null) {
@@ -130,7 +131,7 @@ const concentrationControls = (() => {
       }
       if (proposal.focus) return start(state, proposal.focus);
       status.textContent = `Cast ${proposal.name}.`;
-      return Boolean(slot);
+      return slot && "casting " + proposal.name;
     });
   }
 
@@ -227,7 +228,7 @@ const concentrationControls = (() => {
       });
       status.textContent = feedback;
       return true;
-    });
+    }, {label: "recording damage"});
     rules.value = previewEncounter.current().focus.rules;
     byId("damage-dialog").close();
   });
@@ -249,7 +250,7 @@ const concentrationControls = (() => {
       focus.last = { dc: current.dc, result };
       if (result === "failure") clear(focus);
       status.textContent = result === "success" ? "Concentration maintained." : "Concentration ended.";
-      return true;
+      return "recording a concentration save";
     });
   });
 
@@ -267,18 +268,20 @@ const concentrationControls = (() => {
       } else {
         status.textContent = "Concentration duration updated.";
       }
-      return updated.changed;
+      return updated.changed && "advancing game time";
     });
   });
 
-  byId("end-concentration").addEventListener("click", () => {
+  function endConcentration() {
     previewEncounter.transact((state) => {
       if (!state.focus.active) return false;
       clear(state.focus);
       status.textContent = "Concentration ended.";
-      return true;
+      return "ending concentration";
     });
-  });
+  }
+  byId("end-concentration").addEventListener("click", endConcentration);
+  byId("effect-end-concentration").addEventListener("click", endConcentration);
 
   document.addEventListener("preview-encounter-change", render);
   render();

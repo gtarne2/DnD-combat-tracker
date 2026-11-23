@@ -58,14 +58,17 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         escape(&mut html, &identity);
         html.push_str("</p>");
     }
-    html.push_str("</div></div>");
+    html.push_str("<div id=\"owner-effects\" class=\"status-chips\" role=\"group\" aria-label=\"Character effects\" hidden></div></div></div>");
     render_stats(&mut html, &sheet.profile.stats);
     html.push_str(include_str!("concentration.html"));
     render_abilities(&mut html, &sheet.profile.stats);
     html.push_str("<section class=\"resource-strip\" aria-labelledby=\"resource-heading\"><h2 id=\"resource-heading\">Resources</h2><ul id=\"encounter-resources\"></ul><button type=\"button\" class=\"quiet-button\" data-dialog=\"resource-settings\">Manage resources</button></section></section>");
     html.push_str("<section class=\"combat-workspace\" id=\"combat\" aria-labelledby=\"options-heading\"><div class=\"workspace-heading\"><h2 id=\"options-heading\">Combat options</h2>\
-        <div class=\"workspace-tools\"><label class=\"option-search\"><span class=\"visually-hidden\">Search combat options</span><input type=\"search\" id=\"option-search\" placeholder=\"Search options\"></label><button type=\"button\" id=\"toggle-inspector\" aria-controls=\"option-inspector\" aria-expanded=\"true\">Hide details</button></div></div>\
-        <div id=\"cannon-controls\" hidden></div><nav class=\"action-tabs\" aria-label=\"Combat options\"><span id=\"group-navigation\">");
+        <div class=\"workspace-tools\"><button type=\"button\" id=\"open-companion-sidebar\" class=\"quiet-button\" aria-controls=\"companion-roster-content\">Add companion</button><label class=\"option-search\"><span class=\"visually-hidden\">Search combat options</span><input type=\"search\" id=\"option-search\" placeholder=\"Search options\"></label><button type=\"button\" id=\"toggle-inspector\" aria-controls=\"option-inspector\" aria-expanded=\"true\">Hide details</button></div></div>");
+    html.push_str(include_str!("quick-actions.html"));
+    html.push_str(
+        "<nav class=\"action-tabs\" aria-label=\"Combat options\"><span id=\"group-navigation\">",
+    );
     for group in &sheet.groups {
         if group.action != ActionGroup::Other || !group.options.is_empty() {
             write!(
@@ -169,8 +172,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     }
     html.push_str("</div><p id=\"no-groups\" class=\"empty\" hidden>All action sections are hidden. Use Layout to show them again.</p><p id=\"no-options\" class=\"empty\" hidden>No matching options.</p>\
         </div><div id=\"inspector-divider\" role=\"separator\" aria-label=\"Resize action list\" aria-orientation=\"vertical\" aria-controls=\"all-options\" tabindex=\"0\"></div><aside class=\"option-inspector\" id=\"option-inspector\" aria-label=\"Selected option\"><p class=\"empty\">Select an option to read its details.</p></aside></div></section>\
-        <section id=\"companion-workspace\" hidden><button id=\"back-to-actions\">Back to actions</button><div id=\"combat-companion-detail\"></div></section><aside class=\"combat-sidebar\" id=\"effect-home\" aria-label=\"Effects\">");
+        <aside class=\"combat-sidebar\" id=\"effect-home\" aria-label=\"Encounter and active effects\">");
     render_encounter(&mut html, sheet);
+    html.push_str("<div class=\"sidebar-reference\">");
     html.push_str(include_str!("effects.html"));
     html.push_str(include_str!("playbook.html"));
     html.push_str("<div id=\"imported-infusions\" hidden>");
@@ -182,7 +186,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         html.push_str("</span>");
     }
     html.push_str("</div>");
-    html.push_str("</aside>");
+    html.push_str("</div></aside>");
     render_rolls(&mut html, sheet);
     html.push_str("<dialog id=\"layout-dialog\" aria-labelledby=\"layout-dialog-title\"><div class=\"dialog-heading\"><h2 id=\"layout-dialog-title\">Layout</h2><form method=\"dialog\"><button>Close</button></form></div>");
     render_layout(&mut html, sheet);
@@ -200,6 +204,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("consumables.js"));
     html.push_str(include_str!("concentration.js"));
     html.push_str(include_str!("playbook.js"));
+    html.push_str(include_str!("quick-actions.js"));
     html.push_str(include_str!("dashboard.js"));
     html.push_str("</script></body></html>");
     html
@@ -449,7 +454,10 @@ fn render_stats(html: &mut String, stats: &KeyStats) {
             "<h3>{label}</h3><p class=\"stat-number\" data-stat=\"{key}\">"
         )
         .unwrap();
-        escape(html, value.unwrap_or("Unavailable"));
+        escape(
+            html,
+            value.unwrap_or(if key == "ac" { "—" } else { "Unavailable" }),
+        );
         html.push_str("</p>");
         if key == "hp" {
             html.push_str("<span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"health-actions\"><button type=\"button\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-dialog=\"rest-picker\">Rest</button></div>");

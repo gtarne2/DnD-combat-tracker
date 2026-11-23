@@ -1,13 +1,14 @@
 <section id="encounter" aria-labelledby="encounter-heading">
-  <div class="initiative-heading"><h2 id="encounter-heading">Encounter</h2><strong id="round-number">Round 1</strong></div>
-  <p id="current-turn"></p>
+  <div class="initiative-heading"><h2 id="encounter-heading">Encounter</h2><button type="button" class="quiet-button" data-dialog="encounter-settings" id="manage-initiative">Initiative</button></div>
+  <div class="initiative-current"><strong id="round-number">Round 1</strong><p id="current-turn"></p></div>
   <p id="last-attack" hidden></p>
 
   <div class="initiative-footer">
     <div class="turn-actions">
       <button type="button" id="next-turn">Next Turn</button>
-      <button type="button" id="undo-turn" aria-label="Undo combat update" title="Undo combat update" disabled>↶</button>
+      <button type="button" id="undo-turn" disabled>Undo</button>
     </div>
+    <span id="undo-label" hidden></span>
     <span id="encounter-storage"></span>
   </div>
 </section>

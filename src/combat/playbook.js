@@ -60,7 +60,7 @@ const playbook = (() => {
       if (ability.kind !== "use" && ability.active) {
         ability.active = false;
         useFeedback(ability.name + " deactivated.");
-        return true;
+        return "deactivating " + ability.name;
       }
       if (ability.pool && !encounterTracker.spendResource(state, ability.pool, ability.cost)) {
         const pool = pools(state).find((entry) => entry.key === ability.pool);
@@ -70,7 +70,7 @@ const playbook = (() => {
       ability.uses = (ability.uses || 0) + 1;
       ability.active = ability.kind !== "use";
       useFeedback(ability.name + (ability.active ? " activated." : " used."));
-      return true;
+      return "using " + ability.name;
     });
   }
 
@@ -103,7 +103,7 @@ const playbook = (() => {
         return false;
       }
       useFeedback(current.pool.name + " used.");
-      return true;
+      return "using " + current.pool.name;
     });
   }
   function openAbility(values = {}) {
@@ -207,9 +207,9 @@ const playbook = (() => {
         else hp.temporary = temporary;
       }
       progress.followupUses = {...progress.followupUses, [action.key]: turn};
-      status.textContent = `${action.name} used as a bonus action.`;
+      useFeedback(action.name + " used as a bonus action.");
       if (action.variant === "protector" && protector.open) protector.close();
-      return true;
+      return "using " + action.name;
     });
   }
 
@@ -228,6 +228,7 @@ const playbook = (() => {
       recordFollowup(action);
       return;
     }
+    if (protector.open) return;
     pendingProtector = action;
     protectorForm.reset();
     protectorFeedback.textContent = "";
@@ -258,6 +259,20 @@ const playbook = (() => {
     }
     recordFollowup(pendingProtector, recipients, protectorForm.elements.amount.valueAsNumber);
   });
+
+  function followupUsed(action, state) {
+    return state.progress?.followupUses?.[action.key] === (state.progress?.turnSequence || 0);
+  }
+
+  function followupButton(action, state, label = "Use bonus action", usedLabel = "Used this turn") {
+    const used = followupUsed(action, state);
+    const control = button(used ? usedLabel : label, () => activateFollowup(action));
+    control.dataset.followupKey = action.key;
+    control.disabled = used;
+    if (used) control.title = "Used this turn";
+    return control;
+  }
+
   function render() {
     const state = previewEncounter.current();
     const actions = followups(state);
@@ -313,37 +328,13 @@ const playbook = (() => {
       row.append(controls);
       list.append(row);
     }
-    const cannonControls = byId("cannon-controls");
-    cannonControls.querySelectorAll("[data-fire]").forEach(control => control.remove());
     followupList.replaceChildren();
     for (const action of actions) {
       const row = make("article");
       const text = make("div");
-      text.append(action.companion ? button(action.name, () => {
-        document.querySelector(`[data-pick-companion="${action.companion}"]`)?.click();
-      }) : make("strong", action.name));
+      text.append(action.companion ? button(action.name, () => companionControls.showCard(action.companion)) : make("strong", action.name));
       if (action.notes) text.append(make("p", action.notes));
-      const used = state.progress?.followupUses?.[action.key] === (state.progress?.turnSequence || 0);
-      const use = button(used ? "Used this turn" : "Use bonus action", () => activateFollowup(action));
-      use.disabled = used;
-      if (action.companion) {
-        cannonControls.hidden = false;
-        const activation = make("div");
-        activation.className = "cannon-activation";
-        activation.dataset.fire = action.key;
-        const fire = button("Activate " + action.name.replace(/^Eldritch Cannon\s*[-—:]?\s*/i, ""), () => activateFollowup(action));
-        fire.disabled = used;
-        if (used) fire.textContent += " · used";
-        activation.append(fire);
-        if (action.detail) {
-          const details = make("details");
-          details.append(make("summary", action.roll || "Action details"), make("p", action.detail));
-          activation.append(details);
-        } else if (action.roll) activation.append(make("span", action.roll));
-        cannonControls.append(activation);
-      }
-      cannonControls.hidden = !cannonControls.children.length;
-      row.append(text, use);
+      row.append(text, followupButton(action, state));
       followupList.append(row);
     }
     document.dispatchEvent(new Event("followups-changed"));
@@ -457,5 +448,6 @@ const playbook = (() => {
 
   document.addEventListener("preview-encounter-change", render);
   render();
-  return {isPrepared, featureUse, activateFeature, hasPreparation: spells.size > 0};
+  return {isPrepared, featureUse, activateFeature, followups, followupUsed, followupButton,
+    hasPreparation: spells.size > 0};
 })();

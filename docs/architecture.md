@@ -60,13 +60,19 @@ Aurora companion definitions and their linked actions, traits, and reactions for
 
 Tracker cards snapshot an imported template or start as a custom companion. Each instance owns its edits, HP, duration, and turn mode. A selected Aurora companion seeds a card once, so re-import can offer new templates without overwriting edited cards or restoring a removed one. The browser preview stores cards alongside encounter data, supports copying an edited card, and shows separate initiative entries in descending order with shared turns grouped under the owner. Remaining rounds can also be adjusted on each card.
 
+The Combat sidebar and Companions page show the same expandable roster. The sidebar scrolls separately from the action list and remembers its collapsed state. Each card stores its own manually tracked resources and charges with the rest of the companion state. Conditions and effects use the companion's stable participant ID in the shared effect list. Removing a companion ends its active effects in the same encounter update. Undo brings back the card and its effects.
+
+## Quick Actions
+
+Quick Actions preferences are separate from Favorites. Standard shortcuts store the source option's pin key and, for consumables, its inventory stack key. The strip uses the existing cast, attack, consumable, and feature handlers. Cannon creation shortcuts use template IDs. Active cannon shortcuts use companion instance IDs and call the same activation handler as the companion card and the Bonus Action list. That handler checks the shared turn-use record and applies Protector temporary HP in one encounter update.
+
 ## Encounter tracking
 
 Initiative uses stable participant IDs and descending scores, with the owner first on ties, then separate companions and other combatants in creation order. Editing a score keeps the current participant when possible. Advancing past the final entry increments the round and advances concentration and active companion durations by one round. Owner HP starts at the available Aurora baseline, and the tracker can override current and maximum HP. Damage applies to HP and the concentration check in one change.
 
 Aurora can repeat multiclass spell slot totals on more than one spellcasting entry. The importer takes the highest exported shared total per slot level and keeps Warlock Pact Magic separate. Unambiguous feature capacities come from their imported usage labels. The preview supports manually adding resource pools and editing capacities.
 
-Rust commands keep an encounter undo history. The standalone preview saves turns, HP, resources, companions, concentration, consumables, and up to 32 previous snapshots together in browser storage, keyed by the character save. Its companion rail exposes the roster and turn controls. Selecting a companion uses the same inspector region as a combat option. Initiative setup is optional and lives in a separate dialog. In the browser, the first participant is already current when the sequence is unset, so a solo Next Turn advances one round, including companion, effect, and concentration timers. Undo restores the previous combat state, including compound updates such as damage plus a concentration prompt. Re-imported source data and layout preferences live outside the undo snapshots.
+Rust commands keep an encounter undo history. The standalone preview saves turns, HP, resources, companions, concentration, consumables, and up to 32 previous snapshots together in browser storage, keyed by the character save. Each snapshot can carry a label for the change it reverses. Older snapshots remain undoable. The encounter panel keeps round, turn, initiative, and undo visible while the effects below it scroll. In the browser, the first participant is already current when the sequence is unset, so a solo Next Turn advances one round, including companion, effect, and concentration timers. Undo restores the previous combat state, including compound updates such as damage and its concentration prompt. Re-imported source data and layout preferences live outside the undo snapshots.
 
 ## Ongoing effects
 
@@ -78,8 +84,10 @@ The browser keeps manually tracked ability uses, shared resource costs, toggleab
 
 Custom effects belong to stable character, companion, or combatant IDs. Each has a name, notes, and an expiration rule. Round durations tick when initiative wraps, advancing the in-game clock by six seconds. Explicit elapsed time advances time-based effects and concentration. Turn-boundary durations count the matching starts or ends of the selected participant's turn. A companion acting with its owner uses the owner's turn.
 
+Condition is a display type available with any expiration rule. The cards show the effect name, duration or boundary, and any entered mechanical modifier. The main character header shows active concentration and compact indicators for the owner's effects. Companion cards and the right-side panel read conditions and remaining duration from the same effect records.
+
 Starting initiative processes the first start boundary. Advancing processes the outgoing end boundary, any round rollover, and the incoming start boundary in one update. Reordering initiative leaves durations as they were. Expired or manually ended effects are available for review and editing, and can be removed. Effects are included in the same saved encounter and undo history as initiative.
 
-The standalone dashboard uses the existing option groups, pins and encounter projections for its action list, inspector, favorites and companion disclosures. Session journal and note text use separate per-character browser keys outside the encounter undo history.
+Session journal and note text use separate per-character browser keys outside the encounter undo history.
 
 Cannon shortcuts show imported action descriptions and Artificer spellcasting bonuses when available. A Protector activation records bonus-action use and grants temporary HP to the selected recipients in one undoable update. Companion cards store temporary HP in the same encounter snapshot as their regular HP, with existing cards defaulting to zero.
