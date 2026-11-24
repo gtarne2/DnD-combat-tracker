@@ -6,6 +6,33 @@ function setupReferencePages(rows) {
     return element;
   }
 
+  const currencyForm = byId("inventory-currency");
+  if (currencyForm) {
+    const [filename, template] = JSON.parse(byId("aurora-currency-file").textContent);
+    const fields = [...currencyForm.querySelectorAll("input")];
+    const imported = fields.map((field) => field.valueAsNumber);
+    const status = byId("currency-save-status");
+    currencyForm.addEventListener("input", () => { status.textContent = ""; });
+    currencyForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const balances = fields.map((field) => field.valueAsNumber);
+      const parts = template.map((part) => {
+        if (typeof part === "string") return part;
+        const [coin, original] = part;
+        return balances[coin] === imported[coin] && original !== undefined
+          ? original : String(balances[coin]);
+      });
+      const file = new Blob(parts, {type: "application/xml"});
+      const url = URL.createObjectURL(file);
+      const link = node("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      status.textContent = "Download started.";
+    });
+  }
+
   const inventory = byId("inventory-content");
   const items = new Map();
   for (const row of rows) {

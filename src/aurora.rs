@@ -8,10 +8,13 @@ use std::{
 use roxmltree::{Document, Node};
 
 mod content;
+mod currency;
 mod profile;
 mod rolls;
 
 pub use content::{ContentDefinition, ContentElement, ContentNode};
+pub use currency::AuroraCurrency;
+pub(crate) use currency::{CurrencyPart, DENOMINATIONS};
 pub use profile::{ABILITIES, CharacterProfile, KeyStats, ProfileField, ProfileSection};
 pub use rolls::{RollBonuses, RollModifier, RollProficiency, SKILLS, ToolProficiency};
 
@@ -20,6 +23,7 @@ use content::ContentIndex;
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedCharacter {
     pub name: Option<String>,
+    pub currency: Option<AuroraCurrency>,
     pub profile: CharacterProfile,
     pub spell_slots: SpellSlots,
     pub spellcasting: Vec<SpellcastingStats>,
@@ -467,6 +471,7 @@ pub fn import_character_with_content(
 
     Ok(ImportedCharacter {
         name,
+        currency: AuroraCurrency::read(&save_xml, build, save_path),
         profile,
         spell_slots,
         spellcasting,

@@ -20,6 +20,12 @@ The launcher stores selected folders alongside individual file paths. The CLI re
 
 The import catalog follows exact IDs named by grants, ID-based selections, and embedded descriptions. This makes related options such as the Artillerist's cannon variants available even when the save names only the parent feature. The catalog records unavailable targets and visits each ID once. Saved selections retain their own lists, and rule data retains conditions such as levels and support expressions for later evaluation by the app.
 
+## Saving currency
+
+The importer reads copper, silver, electrum, gold, and platinum from `build/input/currency` and locates their values in the original UTF-8 save. Inventory replaces the edited values in a browser download, preserving the surrounding XML and file encoding. Missing denominations start at zero and receive their currency elements on export.
+
+Standalone previews include the character XML needed for export. Edits are held in the open sheet, and saving downloads a new `.dnd5e` copy. The tracker stores encounter state separately in the browser.
+
 ## Re-importing a character
 
 A Rust character session keeps the Aurora snapshot and its source paths alongside tracker-owned encounter state, layout, and pins. Re-import reads the same save path so a character rename leaves the session attached. The session loads the entire new snapshot before applying it. A failed read or parse leaves the previous snapshot, sources, and tracker state available for retry. Callers can supply an updated list of content files in Aurora load order.

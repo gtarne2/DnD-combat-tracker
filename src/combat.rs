@@ -1,8 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 
 use crate::aurora::{
-    CharacterProfile, ContentDefinition, ContentElement, ContentNode, ImportedCharacter,
-    SpellcastingStats, is_feature_kind,
+    AuroraCurrency, CharacterProfile, ContentDefinition, ContentElement, ContentNode,
+    ImportedCharacter, SpellcastingStats, is_feature_kind,
 };
 use crate::companion::{CompanionRoster, CompanionTemplate, companion_templates};
 use crate::concentration::ConcentrationSpell;
@@ -115,6 +115,7 @@ pub struct CombatGroup {
 #[derive(Debug, PartialEq, Eq)]
 pub struct CombatSheet {
     pub character_name: Option<String>,
+    pub currency: Option<AuroraCurrency>,
     pub profile: CharacterProfile,
     pub groups: [CombatGroup; 4],
     pub companion_templates: Vec<CompanionTemplate>,
@@ -147,6 +148,7 @@ impl CombatSheet {
         companions.sync_imported(character);
         let mut sheet = Self {
             character_name: character.name.clone(),
+            currency: character.currency.clone(),
             profile: character.profile.clone(),
             companion_templates: companion_templates(character),
             companions,

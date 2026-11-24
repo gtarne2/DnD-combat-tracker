@@ -60,6 +60,8 @@ On **Features & Traits**, choose **Organize groups** to collect and reorder the 
 
 Open an item in **Inventory** to follow its linked attacks. Use **Table notes** on an item or attack to add a reminder or choose which gear a saved attack uses.
 
+In **Inventory**, you can edit copper, silver, electrum, gold, and platinum in **Currency**. Choose **Save Aurora File** to download an updated `.dnd5e` copy, then open it in Aurora.
+
 In **Active effects**, add a condition or effect such as **Berserk**, choose its target, and set when it ends. Include a mechanical note such as **Advantage on Strength checks**. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
 
 To try the cannon variants and a ranger companion, generate the companion playtest sheet.

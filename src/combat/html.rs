@@ -1,7 +1,8 @@
 use std::fmt::Write;
 
 use crate::aurora::{
-    ABILITIES, CharacterProfile, ContentNode, KeyStats, ProfileSection, RollModifier, SKILLS,
+    ABILITIES, AuroraCurrency, CharacterProfile, ContentNode, CurrencyPart, DENOMINATIONS,
+    KeyStats, ProfileSection, RollModifier, SKILLS,
 };
 
 use super::{ActionGroup, CombatOption, CombatSheet, ConsumableAmount, OptionKind, moxie};
@@ -235,9 +236,11 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_full_sheet(&mut html, &sheet.profile);
     html.push_str("</section>\
         <section class=\"sheet-page\" id=\"features-page\" data-view-scroll=\"features\" aria-labelledby=\"features-title\" hidden><div class=\"sheet-heading\"><h2 id=\"features-title\">Features &amp; Traits</h2><button type=\"button\" id=\"manage-feature-groups\">Organize groups</button></div><div id=\"feature-groups\"></div></section>\
-        <section class=\"sheet-page\" id=\"inventory-page\" data-view-scroll=\"inventory\" aria-labelledby=\"inventory-title\" hidden><h2 id=\"inventory-title\">Inventory</h2><div id=\"inventory-content\" class=\"reference-content\"></div></section>\
         <section class=\"sheet-page\" id=\"journal-page\" data-view-scroll=\"journal\" aria-labelledby=\"journal-title\" hidden><h2 id=\"journal-title\">Journal</h2><div id=\"journal-content\" class=\"reference-content\"></div></section>\
         <section class=\"sheet-page\" id=\"notes-page\" data-view-scroll=\"notes\" aria-labelledby=\"notes-title\" hidden><h2 id=\"notes-title\">Notes</h2><div id=\"notes-content\" class=\"reference-content\"></div></section>\
+        <section class=\"sheet-page\" id=\"inventory-page\" data-view-scroll=\"inventory\" aria-labelledby=\"inventory-title\" hidden><h2 id=\"inventory-title\">Inventory</h2>");
+    render_currency(&mut html, sheet.currency.as_ref());
+    html.push_str("<div id=\"inventory-content\" class=\"reference-content\"></div></section>\
         <dialog id=\"resource-reference\" aria-labelledby=\"resource-reference-title\"><div class=\"dialog-heading\"><h2 id=\"resource-reference-title\"></h2><form method=\"dialog\"><button>Close</button></form></div><div id=\"resource-reference-content\"></div></dialog>");
     html.push_str(include_str!("sheet-reference.html"));
     html.push_str("</main><script>");
@@ -258,6 +261,66 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("dashboard.js"));
     html.push_str("</script></body></html>");
     html
+}
+
+fn render_currency(html: &mut String, currency: Option<&AuroraCurrency>) {
+    let Some(currency) = currency else {
+        html.push_str("<p>Currency unavailable in this save.</p>");
+        return;
+    };
+    html.push_str("<form id=\"inventory-currency\"><fieldset class=\"inventory-currency\"><legend>Currency</legend><div class=\"currency-balances\">");
+    for ((tag, label), balance) in DENOMINATIONS.into_iter().zip(currency.balances) {
+        write!(
+            html,
+            "<label>{label}<input id=\"{tag}-amount\" type=\"number\" min=\"0\" max=\"{}\" step=\"1\" inputmode=\"numeric\" required",
+            AuroraCurrency::MAX
+        )
+        .unwrap();
+        if let Some(amount) = balance {
+            write!(html, " value=\"{amount}\"").unwrap();
+        } else {
+            html.push_str(" placeholder=\"Unknown\"");
+        }
+        html.push_str("></label>");
+    }
+    html.push_str("</div><div class=\"currency-save\"><button class=\"gold-button\" type=\"submit\">Save Aurora File</button><p id=\"currency-save-status\" role=\"status\"></p></div></fieldset></form>");
+    html.push_str("<script type=\"application/json\" id=\"aurora-currency-file\">[");
+    json_string(html, &currency.filename);
+    html.push_str(",[");
+    for (index, part) in currency.parts.iter().enumerate() {
+        if index > 0 {
+            html.push(',');
+        }
+        match part {
+            CurrencyPart::Xml(xml) => json_string(html, xml),
+            CurrencyPart::Balance { coin, original } => {
+                write!(html, "[{coin}").unwrap();
+                if let Some(original) = original {
+                    html.push(',');
+                    json_string(html, original);
+                }
+                html.push(']');
+            }
+        }
+    }
+    html.push_str("]]</script>");
+}
+
+fn json_string(html: &mut String, value: &str) {
+    html.push('"');
+    for ch in value.chars() {
+        match ch {
+            '"' => html.push_str("\\\""),
+            '\\' => html.push_str("\\\\"),
+            '<' => html.push_str("\\u003c"), // Keep the JSON inside its script element.
+            '\n' => html.push_str("\\n"),
+            '\r' => html.push_str("\\r"),
+            '\t' => html.push_str("\\t"),
+            '\0'..='\u{1f}' => write!(html, "\\u{:04x}", u32::from(ch)).unwrap(),
+            _ => html.push(ch),
+        }
+    }
+    html.push('"');
 }
 
 fn render_option_facts(html: &mut String, option: &CombatOption) {

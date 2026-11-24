@@ -21,6 +21,7 @@ A personal Windows app that uses an Aurora character and its content to show com
 | R15 | Show skills, saves, and passive scores directly on Character. Let players dock skills in Combat and search the entire sheet without changing the current page. Keep senses, languages, tools, movement, and background features easy to find. |
 | R16 | Let players organize Features & Traits into named groups and set their own order. Show timing, triggers, costs, and rest recovery separately. Track shared class pools such as Moxie alongside individual uses and let the player record outcomes. |
 | R17 | Link imported gear and saved attacks where the association is clear. Allow local notes and corrections to the association. |
+| R18 | Show and edit copper, silver, electrum, gold, and platinum balances in Inventory. Save an Aurora `.dnd5e` copy with the updated balances and the original character data. |
 
 ## First playtest
 

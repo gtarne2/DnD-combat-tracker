@@ -74,6 +74,17 @@
 .reference-links .reference-note { flex-basis: 100%; padding: 5px 7px; border-left: 2px solid #547086; background: var(--well); }
 .reference-meta { color: var(--gold); margin-block: 7px; }
 #inventory-content summary { cursor: pointer; }
+.inventory-currency {
+  min-width: 0; margin: 0 0 12px; padding: 10px 12px 12px; border: 1px solid var(--line);
+  border-radius: var(--round); background: var(--well);
+}
+.inventory-currency legend { padding-inline: 4px; color: var(--gold); font-weight: 650; }
+.currency-balances, .currency-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.currency-balances label { display: grid; gap: 4px; font-weight: 650; }
+.currency-balances input { width: 12ch; }
+.currency-save { margin-top: 10px; }
+#currency-save-status { color: var(--muted); font-size: 12px; }
+#currency-save-status:empty { display: none; }
 
 #sheet-reference, #feature-group-editor { width: min(94vw, 760px); }
 #sheet-reference-query { width: 100%; }
