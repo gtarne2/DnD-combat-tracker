@@ -25,7 +25,7 @@ pub(super) fn is_pool(id: &str, name: &str) -> bool {
     id == "ID_DMSG_PUGL_CLASS_FEATURE_MOXIE" || name.eq_ignore_ascii_case("Moxie")
 }
 
-fn requirement(value: Option<&str>, character: &ImportedCharacter) -> Option<bool> {
+pub(super) fn requirement(value: Option<&str>, character: &ImportedCharacter) -> Option<bool> {
     let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
         return Some(true);
     };
@@ -117,6 +117,8 @@ pub(super) fn pool(
         name: "Moxie".into(),
         capacity,
         recovery,
+        recharge_die: None,
+        dawn_recharge: None,
     })
 }
 

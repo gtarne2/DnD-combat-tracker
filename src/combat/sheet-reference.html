@@ -23,6 +23,7 @@
   <div class="dialog-heading"><h2 id="feature-group-heading">Organize feature groups</h2><form method="dialog"><button>Close</button></form></div>
   <form id="feature-group-form">
     <div class="group-editor-fields"><label>Group <select id="feature-group-choice"></select></label><label>Group name <input name="name" maxlength="60" required></label></div>
+    <div class="focus-form"><button type="button" id="move-feature-group-up">Move group up</button><button type="button" id="move-feature-group-down">Move group down</button></div>
     <div class="group-editor-columns">
       <section aria-labelledby="group-included-heading"><h3 id="group-included-heading">In this group</h3><ol id="group-included"></ol></section>
       <section aria-labelledby="group-available-heading"><h3 id="group-available-heading">Add features</h3><label for="group-picker-query" class="visually-hidden">Filter available features</label><input id="group-picker-query" type="search" placeholder="Filter features"><ul id="group-available"></ul></section>

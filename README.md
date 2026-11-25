@@ -16,9 +16,14 @@ and `.\launcher\build.cmd`, then open the launcher in `target\release`.
 2. Click **Add folder** to scan a parent folder and all its subfolders for XML each time you open the sheet. You can also use **Add files** for individual XML files or open the sheet with the save alone. Files inside a folder load in path order. To give an override priority, add it separately and move it below the folder.
 3. Click **Open Combat Sheet** to open it in your default browser.
 
-The launcher remembers your last successful file selections. After editing the
-character in Aurora, click **Open Combat Sheet** again. The launcher refreshes
-the same local sheet so that the same browser profile can retain your progress.
+Supported cantrips show their dice at your character's level. Choose a slot in the cast dialog to
+preview supported damage, healing, or projectile counts. Class features can use imported counters
+and shared pools such as Ki or Sorcery Points.
+
+The launcher remembers your file selections and stays in the Windows notification area. After editing
+the character in Aurora, open **Session → Refresh from Aurora** and review the changes before applying
+them. Use the launcher to edit the content file list. **Session** also exports and restores tracker
+backups. To move an existing tracker session to an Aurora copy, open that copy and restore the backup there.
 
 ## Generate a sheet from the command line
 
@@ -48,9 +53,9 @@ Open **Roll Bonuses** below the ability tiles to search skills, saves, ability c
 
 **Character** puts skills, saves, passive scores, and exploration information together. In Combat, select **Skills** to show the list in the details pane. Use **Find on sheet** or press `/` to look up a feature, spell, check, or item from any page.
 
-During exploration or roleplay, use **Character**, **Companions**, **Inventory**, **Journal**, or **Notes**. The header keeps HP, abilities, resources, and concentration in reach, and active effects remain alongside the page. The sheet remembers your tab, selected action, scroll positions, and open panels when you return or reopen it.
+During exploration or roleplay, use **Character**, **Companions**, **Inventory**, or **Journal**. Add dated Journal entries with links to sheet references or encounter activity. Your original journal and notes stay available below them. In Combat, **Activity** shows the current log and **Rosters and archive** holds saved rosters and previous encounters.
 
-Use **Pin to Quick Actions** in the inspector or **Pin action** in the strip to add a direct execution shortcut. The star keeps an option in **Favorites** for browsing. The strip also offers cannon creation and activation for imported variants. Use the × next to a shortcut to unpin it.
+Use **Pin to Quick Actions** in the inspector or **Pin action** in the strip to add a direct execution shortcut. The star keeps an option in **Favorites** for browsing. Use **Organize favorites** on that tab to reorder your pins. The strip also offers cannon creation and activation for imported variants. Use the × next to a shortcut to unpin it.
 
 Use **Traits** to find features and **Track uses or effect** to set up a counter or toggle. Create a shared pool such as Ki in **Manage resources**, then choose it and set the cost on each ability. **Tracked abilities** also holds custom imbuements and known Artificer infusions. During a long rest, you can review prepared spells and switch which imbuements and infusions are active. **Bonus Action** lists supported ongoing actions, such as Heat Metal and active Eldritch Cannons.
 
@@ -60,7 +65,7 @@ On **Features & Traits**, choose **Organize groups** to collect and reorder the 
 
 Open an item in **Inventory** to follow its linked attacks. Use **Table notes** on an item or attack to add a reminder or choose which gear a saved attack uses.
 
-In **Inventory**, you can edit copper, silver, electrum, gold, and platinum in **Currency**. Choose **Save Aurora File** to download an updated `.dnd5e` copy, then open it in Aurora.
+In **Inventory**, edit copper, silver, electrum, gold, and platinum in **Currency**. Pending edits persist when you reload. Choose **Export Aurora copy** to download an updated `.dnd5e` file, then open it in Aurora.
 
 In **Active effects**, add a condition or effect such as **Berserk**, choose its target, and set when it ends. Include a mechanical note such as **Advantage on Strength checks**. For start or end of turn, choose whose turn to follow and how many matching boundaries to count. Use **Advance game time** for elapsed time outside initiative. Edit an effect to adjust its remaining duration, or use **End effect** to end it manually.
 

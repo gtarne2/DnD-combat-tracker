@@ -1,6 +1,7 @@
 <section id="encounter" aria-labelledby="encounter-heading">
   <div class="initiative-heading"><h2 id="encounter-heading">Encounter</h2><button type="button" class="quiet-button danger-outline" data-dialog="end-encounter-dialog" id="end-encounter" aria-haspopup="dialog">End Encounter</button></div>
   <div class="initiative-current"><strong id="round-number">Round 1</strong><p id="current-turn"></p><button type="button" class="quiet-button" data-dialog="encounter-settings" id="manage-initiative">Initiative</button></div>
+  <ol id="combat-turn-order" aria-label="Initiative order"></ol>
 
   <div class="initiative-footer">
     <div class="turn-actions">
@@ -8,20 +9,60 @@
       <button type="button" id="start-encounter" hidden>Start Encounter</button>
       <button type="button" id="undo-turn" disabled>Undo</button>
     </div>
+    <div class="focus-form encounter-extras"><button type="button" id="action-economy-open">Turn actions</button><button type="button" data-dialog="encounter-library">Rosters and archive</button><button type="button" data-dialog="encounter-activity">Activity</button></div>
     <span id="undo-label" hidden></span>
     <span id="encounter-storage"></span>
   </div>
   <p id="last-attack" hidden></p>
+  <p id="attack-sequence" hidden></p>
+  <div id="attack-outcome" class="focus-form" hidden><button type="button" id="attack-hit">Record hit</button><button type="button" id="attack-miss">Record miss</button></div>
+  <div id="attack-riders" class="focus-form" hidden></div>
+  <p id="spell-turn-reminder" role="status" hidden></p>
 </section>
 <dialog id="end-encounter-dialog" aria-labelledby="end-encounter-heading" aria-describedby="end-encounter-message">
   <form method="dialog">
     <h2 id="end-encounter-heading">End this encounter?</h2>
     <p id="end-encounter-message">Turn tracking will stop. Your character, companions, resources, concentration, and ongoing effects will be preserved.</p>
+    <label>Encounter title <input id="end-encounter-name" maxlength="100" placeholder="Optional"></label>
     <div class="focus-form companion-edit-actions">
       <button value="cancel" autofocus>Cancel</button>
       <button value="end" id="confirm-end-encounter" class="danger-outline">End Encounter</button>
     </div>
   </form>
+</dialog>
+<dialog id="action-economy" aria-labelledby="action-economy-title">
+  <div class="dialog-heading"><h2 id="action-economy-title">Turn actions</h2><form method="dialog"><button>Close</button></form></div>
+  <label>Participant <select id="economy-participant"></select></label>
+  <label><input type="checkbox" id="economy-enabled"> Track Action, Bonus Action, and Reaction</label>
+  <p>Uses reset at the start of the participant's turn. Enable an override for the next use of a specific action type.</p>
+  <div id="economy-controls" class="resource-list"></div>
+</dialog>
+<dialog id="encounter-activity" aria-labelledby="encounter-activity-title">
+  <div class="dialog-heading"><h2 id="encounter-activity-title">Encounter activity</h2><form method="dialog"><button>Close</button></form></div>
+  <label>Record <select id="activity-encounter"></select></label>
+  <ol id="encounter-log" class="encounter-log"></ol>
+</dialog>
+<dialog id="encounter-library" aria-labelledby="encounter-library-title">
+  <div class="dialog-heading"><h2 id="encounter-library-title">Rosters and archive</h2><form method="dialog"><button>Close</button></form></div>
+  <form class="focus-form" id="save-roster-form"><label>Roster name <input name="name" required maxlength="80"></label><button>Save current roster</button></form>
+  <p>Loading a roster adds its combatants and companions and sets the saved initiative scores.</p>
+  <div class="focus-form"><label>Saved roster <select id="saved-rosters"></select></label><button type="button" id="load-roster">Load roster</button><button type="button" id="remove-roster">Delete roster</button></div>
+  <p id="roster-status" role="status"></p>
+  <h3>Archived encounters</h3>
+  <ol id="encounter-archives" class="encounter-log"></ol>
+</dialog>
+<dialog id="heal-owner" aria-labelledby="heal-owner-heading">
+  <div class="dialog-heading"><h2 id="heal-owner-heading">Heal hit points</h2><form method="dialog"><button>Cancel</button></form></div>
+  <form class="focus-form" id="heal-owner-form"><label>Healing <input name="amount" type="number" min="1" max="4294967295" required autofocus></label><button>Apply healing</button></form>
+</dialog>
+<dialog id="combatant-hp" aria-labelledby="combatant-hp-heading">
+  <div class="dialog-heading"><h2 id="combatant-hp-heading"></h2><form method="dialog"><button>Close</button></form></div>
+  <div id="combatant-hp-content"></div>
+</dialog>
+<dialog id="all-resources" aria-labelledby="all-resources-heading">
+  <div class="dialog-heading"><h2 id="all-resources-heading">Resources</h2><form method="dialog"><button>Close</button></form></div>
+  <p>Pin the pools you want in the Compact Combat header.</p>
+  <ul id="resource-pool-list" class="resource-list"></ul>
 </dialog>
 <dialog id="encounter-settings" aria-labelledby="encounter-settings-heading">
   <div class="dialog-heading"><h2 id="encounter-settings-heading">Manage initiative</h2><form method="dialog"><button>Close</button></form></div>
@@ -58,7 +99,9 @@
           <form class="focus-form" id="encounter-resource-form">
             <label>Resource name <input name="name" maxlength="80" required></label>
             <label>Maximum uses <input name="capacity" type="number" min="1" max="4294967295" required></label>
-            <label>Recovers on <select name="recovery"><option value="">Manual reset</option><option value="short">Short or long rest</option><option value="long">Long rest</option></select></label>
-            <button>Add resource</button>
+            <label>Recovers on <select name="recovery"><option value="">Manual reset</option><option value="short">Short or long rest</option><option value="long">Long rest</option><option value="dawn">Dawn</option></select></label>
+            <button id="save-resource">Add resource</button>
+            <button type="button" id="remove-resource" class="danger-outline" hidden>Remove resource</button>
           </form>
+          <button type="button" id="restore-resource" hidden>Restore resource</button>
 </dialog>

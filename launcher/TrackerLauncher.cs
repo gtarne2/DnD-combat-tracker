@@ -28,6 +28,8 @@ internal sealed class TrackerLauncher : Form
     private readonly Label status = new Label();
     private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 290 };
     private string characterPath;
+    private RefreshBridge bridge;
+    private readonly NotifyIcon tray = new NotifyIcon { Text = "Aurora Combat Tracker", Icon = SystemIcons.Application };
     private string SettingsPath { get { return Path.Combine(appData, "last-import.txt"); } }
 
     [STAThread]
@@ -66,6 +68,12 @@ internal sealed class TrackerLauncher : Form
         Place(this, status, 16, 295, 608, 22);
         Place(this, open, 452, 321, 172, 30);
         AcceptButton = open;
+        var trayMenu = new ContextMenuStrip();
+        trayMenu.Items.Add("Open launcher", null, delegate { Show(); Activate(); });
+        trayMenu.Items.Add("Exit refresh service", null, delegate { Close(); });
+        tray.ContextMenuStrip = trayMenu;
+        tray.DoubleClick += delegate { Show(); Activate(); };
+        FormClosed += delegate { if (bridge != null) bridge.Dispose(); tray.Dispose(); trayMenu.Dispose(); };
 
         browse.Click += delegate { ChooseCharacter(); };
         add.Click += delegate { AddContent(); };
@@ -218,16 +226,27 @@ internal sealed class TrackerLauncher : Form
         UpdateButtons();
         status.Text = "Importing character...";
         string[] sources = new[] { characterPath }.Concat(content.Items.Cast<string>()).ToArray();
+        RefreshBridge candidate = null;
         try
         {
-            string preview = await GeneratePreview(sources);
+            candidate = new RefreshBridge(Path.Combine(appData, "Previews"), directory => GeneratePreview(sources, directory));
+            string preview = await candidate.Open();
             if (IsDisposed)
                 return;
             Process.Start(new ProcessStartInfo(preview) { UseShellExecute = true });
-            status.Text = "Combat sheet opened in your browser.";
-            try { File.WriteAllLines(SettingsPath, sources); }
-            catch (IOException) { status.Text = "Combat sheet opened. Could not remember these selections."; }
-            catch (UnauthorizedAccessException) { status.Text = "Combat sheet opened. Could not remember these selections."; }
+            if (bridge != null) bridge.Dispose();
+            bridge = candidate;
+            candidate = null;
+            bool remembered = false;
+            try { File.WriteAllLines(SettingsPath, sources); remembered = true; }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            if (!remembered)
+                MessageBox.Show(this, "The combat sheet opened, but the launcher could not remember these selections.",
+                    "Selections not saved", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            status.Text = "";
+            tray.Visible = true;
+            Hide();
         }
         catch (Exception error)
         {
@@ -238,6 +257,7 @@ internal sealed class TrackerLauncher : Form
         }
         finally
         {
+            if (candidate != null) candidate.Dispose();
             if (!IsDisposed)
             {
                 selection.Enabled = true;
@@ -246,11 +266,10 @@ internal sealed class TrackerLauncher : Form
         }
     }
 
-    private async Task<string> GeneratePreview(string[] sources)
+    private async Task<string> GeneratePreview(string[] sources, string previewDirectory)
     {
         if (!File.Exists(tracker))
             throw new FileNotFoundException("Extract combat-sheet.exe into the same folder as the launcher.");
-        string previewDirectory = Path.Combine(appData, "Previews");
         // Double trailing separators so they cannot escape the closing quote.
         string arguments = string.Join(" ", new[] { previewDirectory }.Concat(sources).Select(
             path => "\"" + path + new string('\\', path.Length - path.TrimEnd('\\').Length) + "\""));

@@ -21,6 +21,7 @@ pub struct KeyStats {
     pub max_hp: Option<i32>,
     pub armor_class: Option<i32>,
     pub speed: Option<String>,
+    pub scores: [Option<i32>; 6],
     pub modifiers: [Option<i32>; 6],
     pub saves: [Option<i32>; 6],
     pub checks: [Option<i32>; 6],
@@ -73,6 +74,7 @@ pub(super) fn read_profile(
     build: Node<'_, '_>,
     summary: &[SavedReference<'_, '_>],
     definitions: &BTreeMap<String, Option<ContentDefinition>>,
+    level: Option<u32>,
 ) -> CharacterProfile {
     use ProfileSection::{Background, Identity, Lore, Personality};
     let display = child(root, "display-properties");
@@ -149,11 +151,7 @@ pub(super) fn read_profile(
         .flat_map(|node| children_named(node, "element"))
         .filter(|node| node.attribute("type") == Some("Level"))
         .collect();
-    let level = display
-        .and_then(|node| child(node, "level"))
-        .and_then(number)
-        .or_else(|| (!levels.is_empty()).then_some(levels.len() as i32))
-        .filter(|level| *level > 0);
+    let level = level.and_then(|level| i32::try_from(level).ok());
     let inventory: BTreeMap<_, _> = child(build, "equipment")
         .into_iter()
         .flat_map(|items| children_named(items, "item"))
@@ -180,14 +178,15 @@ pub(super) fn read_profile(
         .filter(|rule| active_stat(rule, &active))
         .collect();
 
-    let ability_modifiers = ABILITIES.map(|ability| {
+    let scores = ABILITIES.map(|ability| {
         let key = ability.to_ascii_lowercase();
         let base = child(build, "abilities")
             .and_then(|node| child(node, &key))
             .and_then(number)?;
         let bonus = stat_bonus(&modifiers, &key);
-        Some((base + bonus - 10).div_euclid(2))
+        Some(base + bonus)
     });
+    let ability_modifiers = scores.map(|score| score.map(|score| (score - 10).div_euclid(2)));
     let rolls = read_rolls(summary, definitions, &active, level, ability_modifiers);
     let max_hp = max_hp(&levels, summary, definitions, &active, ability_modifiers[2])
         .map(|base| base + stat_bonus(&modifiers, "hp"));
@@ -199,6 +198,7 @@ pub(super) fn read_profile(
             max_hp,
             armor_class,
             speed,
+            scores,
             modifiers: ability_modifiers,
             saves: rolls.saves.map(|roll| roll.total()),
             checks: rolls.checks.map(|roll| roll.total()),

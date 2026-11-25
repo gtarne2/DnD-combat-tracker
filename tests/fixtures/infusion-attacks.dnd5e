@@ -1,0 +1,39 @@
+<character>
+  <display-properties><class>Artificer</class><level>10</level></display-properties>
+  <build>
+    <input>
+      <name>Indigo Forge</name>
+      <attacks>
+        <attack identifier="copper-blade" name="Copper Blade" attack="+6 vs AC" damage="1d8+3 slashing" displayed="true" />
+        <attack identifier="spare-hammer" name="Spare Hammer" attack="+4 vs AC" damage="1d6+1 bludgeoning" displayed="true" />
+      </attacks>
+    </input>
+    <abilities><constitution>14</constitution></abilities>
+    <magic>
+      <spellcasting name="Artificer" attack="7" dc="15">
+        <slots s1="3" />
+        <cantrips>
+          <spell id="ID_TEST_SPELL_LENS_RAY" name="Lens Ray" />
+          <spell id="ID_TEST_SPELL_GLOW" name="Signal Glow" />
+        </cantrips>
+        <spells><spell id="ID_TEST_SPELL_SHOCK_RING" name="Shock Ring" level="1" prepared="true" /></spells>
+      </spellcasting>
+      <spellcasting name="Wizard" attack="5" dc="13">
+        <cantrips><spell id="ID_TEST_SPELL_WIZARD_BOLT" name="Wizard Bolt" /></cantrips>
+      </spellcasting>
+    </magic>
+    <elements>
+      <element id="ID_LEVEL_1" type="Level" />
+      <element id="ID_LEVEL_2" type="Level">
+        <element name="Artificer Infusion" registered="ID_TEST_ARTIFICER_INFUSION_MIND_SHARPENER" />
+        <element name="Artificer Infusion" registered="ID_TEST_ARTIFICER_INFUSION_ENHANCED_WEAPON" />
+        <element name="Artificer Infusion" registered="ID_TEST_ARTIFICER_INFUSION_ENHANCED_ARCANE_FOCUS" />
+      </element>
+    </elements>
+    <sum>
+      <element id="ID_TEST_CLASS_ARTIFICER" type="Class" />
+      <element id="ID_INTERNAL_OPTION_ALLOW_AVERAGE_HP" type="Option" />
+      <element id="ID_TEST_ARTILLERIST_ARCANE_FIREARM" type="Class Feature" />
+    </sum>
+  </build>
+</character>

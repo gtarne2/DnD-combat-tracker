@@ -16,6 +16,8 @@ const layoutPreferences = (() => {
   const profile = document.body.dataset.profile;
   const storageKey = profile && `aurora-combat-layout-v1:${profile}`;
   const status = byId("layout-status");
+  const favoriteOrder = byId("favorite-order");
+  const favoriteStatus = byId("favorite-order-status");
   const form = byId("stat-settings");
 
   function readPreferences() {
@@ -28,6 +30,19 @@ const layoutPreferences = (() => {
   }
 
   const stored = readPreferences();
+  let compact = stored.compact !== false;
+  let pinnedResources = Array.isArray(stored.pinnedResources) ? stored.pinnedResources.filter((key) => typeof key === "string") : null;
+  const compactToggle = byId("compact-combat");
+  function renderCompact() {
+    document.body.classList.toggle("compact-combat", compact);
+    compactToggle.checked = compact;
+  }
+  renderCompact();
+  compactToggle.onchange = () => {
+    compact = compactToggle.checked;
+    renderCompact();
+    savePreferences("Combat layout saved.");
+  };
   let inspectorSplit = typeof stored.inspectorSplit === "number"
     && stored.inspectorSplit > 0 && stored.inspectorSplit < 100 ? stored.inspectorSplit : 57;
   let companionsCollapsed = stored.companionsCollapsed === true;
@@ -53,6 +68,7 @@ const layoutPreferences = (() => {
         localStorage.setItem(storageKey, JSON.stringify({
           order, hidden: [...hidden], pins, overrides: Object.fromEntries(overrides), inspectorSplit,
           companionsCollapsed, quickActionsCollapsed, quickActions: [...quickActions], hiddenQuickActions: [...hiddenQuickActions],
+          compact, pinnedResources,
         }));
         status.textContent = message;
         return;
@@ -103,8 +119,46 @@ const layoutPreferences = (() => {
     byId("pinned-cards").replaceChildren(...copies);
     byId("pinned").hidden = false;
     if (!copies.length) byId("pinned-cards").textContent = "Star an option or stat to see it here.";
+    byId("organize-favorites").hidden = pins.length < 2;
     document.dispatchEvent(new Event("combat-options-change"));
   }
+
+  function renderFavoriteOrder(focusKey, direction) {
+    favoriteOrder.replaceChildren();
+    for (const [index, key] of pins.entries()) {
+      const name = sources.get(key)[0].querySelector("[data-pin-toggle]").dataset.pinToggle;
+      const row = document.createElement("li");
+      const label = document.createElement("span");
+      label.textContent = name;
+      row.append(label);
+      for (const [step, text] of [[-1, "Move up"], [1, "Move down"]]) {
+        const control = document.createElement("button");
+        control.type = "button";
+        control.textContent = text;
+        control.setAttribute("aria-label", `${text} ${name}`);
+        control.disabled = pins[index + step] === undefined;
+        control.addEventListener("click", () => {
+          [pins[index], pins[index + step]] = [pins[index + step], pins[index]];
+          const container = byId("pinned-cards");
+          const cards = [...container.children];
+          for (const pin of pins) container.append(...cards.filter((card) => card.dataset.pin === pin));
+          savePreferences("Favorites order saved.");
+          favoriteStatus.textContent = `${name} moved to position ${index + step + 1} of ${pins.length}. ${status.textContent}`;
+          renderFavoriteOrder(key, step);
+        });
+        row.append(control);
+      }
+      favoriteOrder.append(row);
+      if (key === focusKey) {
+        const preferred = direction < 0 ? row.children[1] : row.children[2];
+        (preferred.disabled ? row.querySelector("button:not(:disabled)") : preferred)?.focus();
+      }
+    }
+  }
+  byId("organize-favorites").addEventListener("click", () => {
+    favoriteStatus.textContent = "";
+    renderFavoriteOrder();
+  });
 
   function renderStats() {
     for (const [key, node] of stats) {
@@ -180,6 +234,8 @@ const layoutPreferences = (() => {
   renderPins();
   openPanel(location.hash);
   return {
+    pinnedResources: () => pinnedResources,
+    setPinnedResources: (keys) => { pinnedResources = keys; savePreferences("Resource pins saved."); },
     statOverride: (key) => overrides.get(key),
     inspectorSplit,
     setInspectorSplit(value) {

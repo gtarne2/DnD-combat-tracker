@@ -64,9 +64,9 @@ article { min-width: 0; overflow-wrap: anywhere; }
 .command-nav :is(a, button)[aria-current], .action-tabs a[data-current] {
   color: var(--gold); border-color: #705836; background: #322b27;
 }
-.layout-trigger { margin-left: auto; flex: none; }
-#encounter-status { margin-left: auto; min-width: 0; color: var(--teal); font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
-#encounter-status:not(:empty) + .layout-trigger { margin-left: 0; }
+.command-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; margin-left: auto; }
+.command-tools button { white-space: nowrap; }
+#encounter-status { flex: 1; min-width: 0; color: var(--teal); font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
 
 .dashboard {
   --companion-rail-width: 210px;
@@ -100,6 +100,13 @@ article { min-width: 0; overflow-wrap: anywhere; }
 .temp-hp { color: #bbd8ff; font-size: 13px; font-weight: 650; white-space: nowrap; }
 .health-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .health-actions button { padding: 2px 6px; }
+.quick-temp-hp { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.quick-temp-hp label { font-size: 12px; color: var(--muted); }
+.quick-temp-hp input { width: 4em; }
+.quick-temp-hp :is(input,button) { min-height: 27px; padding: 2px 5px; }
+.option-roll-adjustment { color: var(--teal); font-size: 12px; align-self: center; }
+.option-row .option-roll-adjustment { display: none; }
+.option-roll-extra { color: var(--teal); font-weight: 650; }
 .health-actions [data-dialog="damage-dialog"] { border-color: #6e4e51; color: #fac9c7; }
 .stat-grid [data-stat="speed"] { font-size: 14px; line-height: 1.4; text-wrap: balance; }
 .overview > .saves-card { grid-area: abilities; }
@@ -123,15 +130,21 @@ article { min-width: 0; overflow-wrap: anywhere; }
 .saves-card .pin-button { position: static; grid-area: rolls; justify-self: end; }
 #concentration { grid-area: focus; padding: 5px 9px; background: var(--well); border: 1px solid var(--line); border-radius: 5px; }
 .focus-panel { display: grid; gap: 5px; }
-.focus-status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; }
-.focus-status :is(h2, .focus-spell) { flex-basis: 100%; }
+.focus-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 6px; }
+.focus-status :is(h2, .focus-spell) { grid-column: 1 / -1; }
 #active-concentration { font-size: 18px; font-weight: 700; color: var(--muted); }
 .has-concentration #active-concentration { color: var(--gold); }
 #concentration:has(.has-concentration) { border-color: #997747; background: #29241e; }
 #concentration-duration { color: var(--text); font-size: 13px; }
+#concentration-actions { position: relative; grid-column: 2; }
 #concentration-actions summary { font-size: 13px; }
-#concentration-actions[open] { flex-basis: 100%; }
-#concentration-actions form { margin: 4px 0; }
+.concentration-menu {
+  position: absolute; z-index: 2; inset-block-start: 100%; inset-inline-end: -4px;
+  width: 176px; padding: 8px; border: 1px solid #997747; border-radius: var(--round);
+  background: var(--panel); box-shadow: 0 6px 18px #0008;
+}
+.concentration-menu form { margin-bottom: 6px; }
+.concentration-menu input[type="number"] { width: 54px; }
 .focus-form { display: flex; gap: 5px 7px; flex-wrap: wrap; align-items: end; }
 .focus-form label, dialog label { font-size: 11px; color: var(--muted); }
 .focus-form :is(label input, label select) { display: block; }
@@ -168,6 +181,44 @@ article { min-width: 0; overflow-wrap: anywhere; }
 #encounter-resources button { padding: 0 3px; min-width: 22px; min-height: 25px; }
 .quiet-button { font-size: 13px; background: transparent; color: var(--muted); }
 .resource-strip .quiet-button { flex: none; padding-block: 2px; }
+.compact-combat[data-session-page="combat"] #encounter-resources .unpinned-resource { display: none; }
+.compact-combat[data-session-page="combat"] #encounter-resources { flex-wrap: nowrap; max-height: none; overflow-x: auto; }
+.compact-combat[data-session-page="combat"] #encounter-resources li { flex: none; }
+#combat-turn-order, .resource-list { list-style: none; margin: 0; padding: 0; overflow: auto; }
+#combat-turn-order { max-height: 112px; margin-bottom: 5px; }
+#combat-turn-order li, .resource-list li { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-bottom: 1px solid var(--line); }
+#combat-turn-order li[aria-current] { background: var(--surface); color: var(--gold); }
+#combat-turn-order li button, .resource-list li button:last-child { margin-left: auto; }
+#combat-turn-order .initiative-hp, #combat-turn-order button { white-space: nowrap; }
+.resource-list { max-height: min(55vh, 500px); }
+.encounter-extras { margin-block: 5px; gap: 3px; }
+.encounter-extras button { padding: 2px 5px; font-size: 12px; }
+.encounter-log { list-style: none; display: grid; gap: 5px; padding-left: 0; }
+.encounter-log li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 5px; border-bottom: 1px solid var(--line); }
+.encounter-log li > strong { flex-basis: 100%; }
+.encounter-log :is(time, small) { color: var(--muted); }
+#import-report ul { overflow-wrap: anywhere; }
+#import-report :is(p, details, section), #session-files :is(p, label) { margin-block: 7px; }
+#session-files > label { display: block; }
+@media (min-width: 1080px) {
+  .compact-combat[data-session-page="combat"] .overview { padding: 5px 8px; gap: 4px 8px; }
+  .compact-combat[data-session-page="combat"] .identity-mark { display: none; }
+  .compact-combat[data-session-page="combat"] .identity h1 { font-size: 19px; }
+  .compact-combat[data-session-page="combat"] .ability-tile { min-height: 36px; }
+  .compact-combat[data-session-page="combat"] .ability-tile strong { font-size: 15px; }
+  .compact-combat[data-session-page="combat"] .stat-card { padding-block: 3px; }
+  .compact-combat[data-session-page="combat"] .health-actions { display: inline-flex; margin-top: 1px; }
+  .compact-combat[data-session-page="combat"] .quick-temp-hp { margin-top: 2px; }
+  .compact-combat[data-session-page="combat"] .resource-strip { padding-top: 3px; }
+  .compact-combat[data-session-page="combat"] #concentration-last { display: none; }
+  .compact-combat[data-session-page="combat"] #quick-items { max-height: 64px; }
+}
+@media (min-width: 1250px) {
+  .compact-combat[data-session-page="combat"] .overview {
+    grid-template-columns: minmax(150px, 215px) minmax(375px, 465px) minmax(225px, 340px) minmax(290px, 390px) minmax(0, 1fr);
+  }
+  .compact-combat[data-session-page="combat"] .health-actions { display: flex; }
+}
 
 #encounter { grid-area: initiative; display: flex; flex-direction: column; min-height: 0; }
 .initiative-heading, .workspace-heading, .rail-heading, .dialog-heading {
@@ -228,7 +279,7 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 }
 .option-category > h3 span { color: var(--muted); font-size: 12px; font-weight: 400; }
 .option-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) 90px 32px; align-items: center;
+  display: grid; grid-template-columns: minmax(0, 1fr) 104px 32px; align-items: center;
   border: 1px solid var(--line); border-top: 0; background: var(--well);
 }
 .option-row:last-child { border-radius: 0 0 4px 4px; }
@@ -259,7 +310,13 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 .option-meta { font-size: 13px; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
 .option-row .pin-button { grid-column: 3; }
 .option-execute { min-width: 0; }
-.option-row .option-execute { grid-column: 2; grid-row: 1; display: flex; justify-content: flex-end; padding-right: 5px; }
+.option-row .option-execute { grid-column: 2; grid-row: 1; display: grid; padding-right: 5px; }
+.option-row .consumable { display: grid; }
+.option-row .option-execute button { width: 100%; }
+.option-row :is([data-charge-count], [data-bind-charge]) { display: none; }
+@media (max-width: 1079px) {
+  .option-row.selected-option [data-bind-charge] { display: block; margin-top: 3px; }
+}
 .option-execute button { font-size: 13px; font-weight: 650; padding: 3px 6px; }
 .option-execute button:not(:disabled) { color: var(--gold); border-color: #846b44; background: #332b22; }
 .option-execute button:hover:not(:disabled) { color: #fff0ca; border-color: var(--gold); background: #493a28; }
@@ -282,6 +339,12 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
   .pick-option > :is(.option-title, .option-roll, .option-range, .option-badges) { grid-column: 1; grid-row: auto; }
 }
 #cast-warning, #cast-slot-notice { color: var(--gold); margin: 6px 0; }
+#cast-roll-preview { margin-top: 5px; color: var(--teal); font-weight: 650; }
+.reaction-trigger { grid-column: 1 / -1; color: var(--muted); font-size: 11px; font-weight: 500; }
+#spell-filter-form > label, #cast-targets label, #ongoing-spell-targets label { display: block; margin-top: 4px; }
+#cast-target-field { max-height: 24vh; overflow: auto; border: 1px solid var(--line); }
+#spell-turn-reminder, #attack-sequence { color: var(--teal); margin: 3px 0; }
+#attack-riders button, #attack-outcome button { padding: 2px 5px; }
 #rest-summary, #rest-hp { margin: 6px 0; }
 #short-rest-healing input { display: block; }
 [data-dialog="rest-picker"] { border-color: #78613c; color: var(--gold); }
@@ -305,6 +368,10 @@ dd { overflow-wrap: anywhere; }
 .description :is(th,td) { padding: 3px; border: 1px solid var(--line); }
 #pinned-cards { display: grid; gap: 4px; }
 #pinned-cards .option-row { border-top: 1px solid var(--line); border-radius: 4px; }
+.favorites-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px; margin-bottom: 6px; }
+#favorite-order { margin: 0; padding: 0; list-style: none; }
+#favorite-order li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+#favorite-order li span { overflow-wrap: anywhere; }
 
 .combat-sidebar { grid-area: sidebar; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
 .combat-sidebar > section, .sidebar-reference > section { padding: 7px; }
@@ -351,6 +418,14 @@ dd { overflow-wrap: anywhere; }
 .infusion-list > div { display: flex; align-items: start; justify-content: space-between; gap: 6px; }
 .infusion-list details { min-width: 0; }
 .infusion-list button { flex: none; font-size: 11px; }
+.infusion-list details > p { margin: 4px 0; }
+.infusion-list summary small { color: var(--teal); white-space: nowrap; }
+.infusion-target { display: grid; gap: 3px; margin: 6px 0; }
+.infusion-target select { width: 100%; }
+.infusion-target small, .firearm-toggle small { color: var(--teal); }
+.firearm-toggle { display: block; padding: 6px 8px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--round); }
+.firearm-toggle small { display: block; margin-inline-start: 22px; }
+#ability-attack-options { min-width: 0; padding: 6px 10px 10px; }
 .rest-checklist { display: grid; gap: 3px; padding: 6px; max-height: 35vh; overflow: auto; }
 .rest-checklist label { display: flex; gap: 5px; align-items: center; }
 #playbook-status { color: var(--teal); margin-top: 4px; font-size: 11px; }
@@ -369,6 +444,8 @@ dd { overflow-wrap: anywhere; }
 .quick-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 1px 3px; background: var(--well); border: 1px solid var(--line); border-radius: 5px; }
 .quick-entry > .quick-remove { min-height: 25px; padding: 0 4px; color: var(--muted); background: transparent; border-color: transparent; }
 .quick-entry > button, .quick-entry .option-execute button { min-height: 28px; font-size: 12px; }
+.quick-entry .option-execute { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; }
+.quick-entry .option-roll-adjustment { order: 1; }
 .quick-entry :is(.option-availability, .consumable-quantity, [data-focus-spell]) { display: none; }
 .quick-entry details[open] { flex-basis: 100%; }
 .quick-entry details summary { min-height: 26px; font-size: 12px; }
@@ -477,6 +554,7 @@ dialog::backdrop { background: #050a13bb; }
     scrollbar-color: #415269 var(--well);
   }
   .sidebar-reference > section > .rail-heading { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+  .sidebar-reference > .effects-empty:not(:has(#ended-effects[open]:not([hidden]))) { flex-shrink: 0; }
   .option-list, .option-inspector, .sheet-page { overscroll-behavior: contain; scrollbar-gutter: stable; }
   .option-inspector { min-width: 0; padding: 13px 15px; background: #111a26; }
   .option-inspector header { display: grid; gap: 5px; margin-bottom: 8px; }
@@ -532,7 +610,6 @@ dialog::backdrop { background: #050a13bb; }
   .command-bar { flex-wrap: wrap; gap: 4px 10px; padding: 6px 8px; }
   .command-nav { order: 3; width: 100%; gap: 2px; }
   #encounter-status { order: 4; flex-basis: 100%; }
-  .command-bar #encounter-status:not(:empty) + .layout-trigger { margin-left: auto; }
   .command-nav a, .command-nav button { padding-inline: 5px; font-size: 11px; }
   section { scroll-margin-top: 89px; }
   .dashboard { grid-template-columns: minmax(0,1fr); grid-template-areas: "overview" "initiative" "combat" "sidebar"; padding: 5px; gap: 6px; }
@@ -562,11 +639,15 @@ dialog::backdrop { background: #050a13bb; }
 body:is(:not(.has-companions, .show-empty-roster), [data-session-page="companions"]) #companion-roster-home { display: none; }
 #companions { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 7px; overflow: hidden; }
 #companion-roster-content { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-color: #415269 var(--well); }
+#companion-roster-home #companion-roster-content { scrollbar-gutter: stable; }
 .companions-collapsed #companion-roster-home .rail-heading { justify-content: center; }
 .companions-collapsed #companion-roster-home h2 { display: none; }
 #no-companions { color: var(--muted); }
 .companion-card { border: 1px solid var(--line); background: var(--well); padding: 4px 7px; border-radius: 5px; min-width: 0; }
 .companion-card[open] { border-color: #736448; }
+.companion-card-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 6px; }
+.companion-card-toolbar [data-companion-action="advance"],
+.companion-card-toolbar:not(:has([data-companion-action="economy"])) [data-companion-action="remove"] { grid-column: 1 / -1; }
 .companion-card > summary strong { color: var(--text); font-weight: 650; }
 .companion-card > summary small { display: block; color: var(--teal); font-size: 12px; margin-top: 2px; }
 .companion-card > summary .status-chips { margin: 4px 0 0; }

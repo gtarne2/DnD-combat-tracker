@@ -1,0 +1,39 @@
+<dialog id="session-files" aria-labelledby="session-files-title">
+  <div class="dialog-heading"><h2 id="session-files-title">Tracker session</h2><form method="dialog"><button>Close</button></form></div>
+  <p>Back up encounter progress, layout, pins, journal, notes, and local edits. Open a moved or exported Aurora save and restore the backup to link your session to that copy.</p>
+  <button type="button" id="export-session">Export tracker backup</button>
+  <label>Choose tracker backup <input type="file" id="import-session" accept=".json,application/json"></label>
+  <div id="restore-session-preview" hidden>
+    <p id="restore-session-summary"></p>
+    <button type="button" id="confirm-restore-session" class="danger-outline">Replace current tracker session</button>
+  </div>
+  <p id="session-file-status" role="status"></p>
+  <div class="focus-form"><button type="button" id="view-import-report">Import report</button><button type="button" id="refresh-aurora">Refresh from Aurora</button></div>
+  <p id="aurora-refresh-status" role="status"></p>
+</dialog>
+<dialog id="bind-charge-pool" aria-labelledby="bind-charge-heading">
+  <form id="bind-charge-form">
+    <h2 id="bind-charge-heading">Bind a charge pool</h2>
+    <label>Resource pool <select name="pool" required></select></label>
+    <div class="focus-form companion-edit-actions"><button type="button" id="cancel-bind-charge">Cancel</button><button>Bind pool</button></div>
+  </form>
+</dialog>
+<dialog id="import-report" aria-labelledby="import-report-title">
+  <div class="dialog-heading"><h2 id="import-report-title">Import report</h2><form method="dialog"><button>Close</button></form></div>
+  <p id="import-unavailable"></p>
+  <details><summary id="import-missing-summary"></summary><ul id="import-missing"></ul></details>
+  <details><summary id="import-sources-summary"></summary><ul id="import-sources"></ul></details>
+  <section id="import-changes" hidden><h3>Changes in this refresh</h3><ul></ul></section>
+  <button type="button" id="apply-aurora-refresh" hidden>Apply Aurora refresh</button>
+  <p id="apply-refresh-status" role="status"></p>
+</dialog>
+<dialog id="reconcile-consumables" aria-labelledby="reconcile-title">
+  <form>
+    <h2 id="reconcile-title">Review imported consumables</h2>
+    <p>Enter how many units Aurora already accounts for. The remaining tracker usage will be deducted from the new import.</p>
+    <div id="consumable-changes" class="focus-form"></div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="cancel-reconcile-consumables">Cancel</button><button>Reconcile quantities</button>
+    </div>
+  </form>
+</dialog>

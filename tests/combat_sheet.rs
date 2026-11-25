@@ -36,6 +36,61 @@ fn detail<'a>(option: &'a CombatOption, label: &str) -> Option<&'a str> {
 }
 
 #[test]
+fn imports_infusion_recharge_and_only_marks_damaging_artificer_spells_for_firearm() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &fixtures.join("infusion-attacks.dnd5e"),
+        &fixtures.join("infusion-attacks.xml"),
+    )
+    .unwrap();
+    let sheet = CombatSheet::from_character(&character);
+    let charges = sheet
+        .resources
+        .iter()
+        .find(|resource| resource.name == "Mind Sharpener")
+        .unwrap();
+    assert_eq!(
+        (charges.capacity, charges.recovery, charges.recharge_die),
+        (4, "short", Some(4))
+    );
+    let weapon = sheet.infusion_attacks["ID_TEST_ARTIFICER_INFUSION_ENHANCED_WEAPON"];
+    assert_eq!(
+        (weapon.scope, weapon.attack, weapon.damage),
+        ("weapon", 2, 2)
+    );
+    let focus = sheet.infusion_attacks["ID_TEST_ARTIFICER_INFUSION_ENHANCED_ARCANE_FOCUS"];
+    assert_eq!((focus.scope, focus.attack, focus.damage), ("spell", 2, 0));
+    assert!(sheet.arcane_firearm);
+    for name in ["Lens Ray", "Shock Ring"] {
+        assert!(
+            option(&sheet, ActionGroup::Action, name).artificer_damage,
+            "{name}"
+        );
+    }
+    for name in ["Copper Blade", "Signal Glow", "Wizard Bolt"] {
+        assert!(
+            !option(&sheet, ActionGroup::Action, name).artificer_damage,
+            "{name}"
+        );
+    }
+    let mut character = character;
+    character
+        .class_levels
+        .insert("ID_TEST_CLASS_ARTIFICER".to_owned(), 9);
+    let lower_level = CombatSheet::from_character(&character);
+    assert_eq!(
+        lower_level.infusion_attacks["ID_TEST_ARTIFICER_INFUSION_ENHANCED_WEAPON"].attack,
+        1
+    );
+    character
+        .build_elements
+        .retain(|reference| reference.content_id != "ID_TEST_ARTILLERIST_ARCANE_FIREARM");
+    let no_firearm = CombatSheet::from_character(&character);
+    assert!(!no_firearm.arcane_firearm);
+    assert!(!option(&no_firearm, ActionGroup::Action, "Lens Ray").artificer_damage);
+}
+
+#[test]
 fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
     let sheet = sheet();
     let bow = option(&sheet, ActionGroup::Action, "Signal Bow");
@@ -70,6 +125,14 @@ fn groups_attacks_spells_scrolls_items_and_features_with_their_mechanics() {
     assert_eq!(rod.kind, OptionKind::Item);
     assert_eq!(detail(rod, "Cost"), Some("1 charge"));
     assert_eq!(detail(rod, "Uses"), Some("3/Day"));
+    assert_eq!(rod.charge_cost, Some(1));
+    let rod_pool = sheet
+        .resources
+        .iter()
+        .find(|pool| pool.name == "Signal Rod charges")
+        .unwrap();
+    assert_eq!(rod_pool.capacity, 3);
+    assert_eq!(rod_pool.recovery, "long");
 
     let turret = option(&sheet, ActionGroup::BonusAction, "Signal Turret");
     assert_eq!(turret.kind, OptionKind::Feature);
@@ -149,7 +212,8 @@ fn renders_all_groups_and_full_linked_descriptions_as_inline_disclosures() {
     assert!(html.contains("Lvl 3 · Tinkerer · Beacon Keeper"));
     assert!(html.contains("id=\"inspector-divider\" role=\"separator\""));
     assert!(html.contains("id=\"inventory-page\" data-view-scroll=\"inventory\""));
-    assert!(html.contains("id=\"notes-page\" data-view-scroll=\"notes\""));
+    assert!(html.contains("id=\"journal-page\" data-view-scroll=\"journal\""));
+    assert!(html.contains("<div class=\"journal-columns\"><div id=\"journal-content\"></div><div id=\"notes-content\"></div></div>"));
     assert!(html.contains("data-record-attack=\"Signal Bow\""));
     assert!(html.contains("data-ritual-cast"));
     assert!(html.contains("<details><summary>Full description</summary>"));
@@ -168,6 +232,7 @@ fn shows_character_stats_and_preserves_lore_in_the_full_sheet() {
     assert_eq!(stats.armor_class, Some(18));
     assert_eq!(stats.speed.as_deref(), Some("40 ft. walk · 40 ft. swim"));
     assert_eq!(stats.modifiers[2], Some(3));
+    assert_eq!(stats.scores[2], Some(16));
     assert_eq!(stats.checks[2], Some(3));
     assert_eq!(
         stats.saves,
@@ -182,6 +247,9 @@ fn shows_character_stats_and_preserves_lore_in_the_full_sheet() {
     assert!(html.contains("data-stat=\"con\">+6"));
     assert_eq!(html.matches("class=\"ability-tile\"").count(), 6);
     assert!(html.contains("data-ability=\"Constitution\" data-check=\"+3\""));
+    assert!(html.contains(
+        "data-open-roll=\"checks|Constitution\"><span>Constitution</span><span><b>16</b>"
+    ));
     let full = html.split_once("id=\"full-sheet\"").unwrap().1;
     assert!(full.contains("Rowan &amp; Mira kept the coast lit.\nThey now chart the fog."));
     assert!(full.contains("I always leave a light in the window."));

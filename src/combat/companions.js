@@ -9,7 +9,7 @@ const companionControls = (() => {
   const toggle = byId("toggle-companions");
   const rendered = new Map();
   const textFields = ["name", "kind", "armor", "speed", "stats", "attacks", "abilities", "command", "duration"];
-  const numberFields = ["currentHp", "maxHp", "temporary", "rounds", "initiative"];
+  const numberFields = ["currentHp", "maxHp", "temporary", "remaining", "initiative"];
   const number = (value) => value === "" || value == null ? null : Number(value);
   const blank = () => ({ cards: [], seen: [], sequence: 0, owner: null });
   let edit;
@@ -20,7 +20,9 @@ const companionControls = (() => {
     const card = Object.fromEntries(textFields.map((field) => [field, node.dataset[field] || ""]));
     card.maxHp = number(node.dataset.maxHp);
     card.currentHp = node.hasAttribute("data-current-hp") ? number(node.dataset.currentHp) : card.maxHp;
-    card.rounds = number(node.dataset.rounds);
+    const duration = parseDuration(card.duration);
+    card.timerUnit = duration?.unit || "rounds";
+    card.remaining = card.timerUnit === "seconds" ? duration.amount : number(node.dataset.rounds) ?? duration?.amount ?? null;
     card.initiative = number(node.dataset.turnScore);
     card.turn = card.initiative === null ? "owner" : "separate";
     return card;
@@ -31,6 +33,37 @@ const companionControls = (() => {
     id.includes("ELDRITCH_CANNON") || /^Eldritch Cannon\b/i.test(card.name)));
   const seeds = [...document.querySelectorAll("[data-companion-seed]")];
   for (const [id, details] of templates) add.elements.template.add(new Option(details.name, id));
+
+  function isCannon(card) {
+    return card.templateId?.includes("ELDRITCH_CANNON") || /^Eldritch Cannon\b/i.test(card.name || "");
+  }
+
+  function timer(card) {
+    if (card.timerUnit) return {unit: card.timerUnit, amount: card.remaining};
+    const unit = parseDuration(card.duration)?.unit || "rounds";
+    return {unit, amount: card.rounds == null ? null : card.rounds * (unit === "seconds" ? 6 : 1)};
+  }
+
+  function destroyed(card) {
+    return card.currentHp === 0 && (card.zeroHp === "vanish" || !card.zeroHp && isCannon(card));
+  }
+
+  function available(card) {
+    return !destroyed(card) && timer(card).amount !== 0;
+  }
+
+  function advance(card, unit, count, state) {
+    const duration = timer(card);
+    if (duration.unit !== unit || !(duration.amount > 0) || destroyed(card)) return false;
+    card.timerUnit = unit;
+    card.remaining = Math.max(0, duration.amount - count);
+    delete card.rounds;
+    if (!card.remaining) {
+      effectControls.endForRemovedTarget(state, "companion:" + card.id);
+      previewEncounter.log(state, "expiration", `${card.name} expired`);
+    }
+    return true;
+  }
 
   function node(tag, text) {
     const result = document.createElement(tag);
@@ -60,9 +93,10 @@ const companionControls = (() => {
   function createCannon(id) {
     const template = cannonTemplates.get(id);
     if (!template) return;
-    update((roster) => {
-      roster.cards.push({ ...template, templateId: id, rounds: template.rounds ?? parseRounds(template.duration),
-        id: ++roster.sequence });
+    update((roster, state) => {
+      if (!actionEconomy.spend(state, "owner", "action")) return false;
+      roster.cards.push({ ...template, templateId: id, zeroHp: "vanish", id: ++roster.sequence });
+      previewEncounter.log(state, "action", `Created ${template.name}`);
       return "creating " + template.name;
     });
   }
@@ -113,36 +147,25 @@ const companionControls = (() => {
   }
 
   function hpControls(card) {
-    const form = node("form");
-    form.className = "companion-damage";
-    const label = node("label", "HP adjustment");
-    const amount = node("input");
-    Object.assign(amount, {type: "number", min: "1", max: "4294967295", required: true, name: "amount"});
-    label.append(amount);
-    const damage = node("button", "Damage");
-    const heal = node("button", "Heal");
-    damage.value = "damage";
-    heal.value = "heal";
-    damage.disabled = heal.disabled = card.currentHp == null;
-    form.append(label, damage, heal);
-    form.onsubmit = (event) => {
-      event.preventDefault();
-      const change = amount.valueAsNumber;
-      if (!Number.isInteger(change) || change < 1 || change > 0xffffffff) return;
-      const isHealing = event.submitter?.value === "heal";
-      updateCard(card.id, (target) => {
-        if (target.currentHp == null) return false;
+    return encounterTracker.hpAdjustment((change, isHealing) => {
+      updateCard(card.id, (target, _, state) => {
+        if (target.currentHp == null || !available(target)) return false;
+        const priorHp = target.currentHp;
+        const priorTemp = target.temporary || 0;
         if (isHealing) {
           target.currentHp = Math.min(target.maxHp ?? 0xffffffff, target.currentHp + change);
         } else {
           const absorbed = Math.min(target.temporary || 0, change);
           target.temporary = (target.temporary || 0) - absorbed;
           target.currentHp = Math.max(0, target.currentHp - (change - absorbed));
+          if (destroyed(target)) effectControls.endForRemovedTarget(state, "companion:" + target.id);
         }
+        const moved = Math.abs(priorHp - target.currentHp) + Math.abs(priorTemp - (target.temporary || 0));
+        if (!moved) return false;
+        previewEncounter.log(state, isHealing ? "healing" : "damage", `${target.name} · ${moved} ${isHealing ? "HP restored" : "damage"} · ${target.currentHp} HP left`);
         return (isHealing ? "healing " : "damaging ") + target.name;
       });
-    };
-    return form;
+    }, card.currentHp != null && available(card));
   }
 
   function disclosure(label, content, expanded) {
@@ -198,18 +221,29 @@ const companionControls = (() => {
     }
     const chips = node("span");
     chips.className = "status-chips";
-    if (card.rounds === 0) chips.append(node("span", "Expired"));
-    else if (card.rounds != null) {
-      const remaining = /\b(?:second|minute|hour|day)s?\b/i.test(card.duration)
-        ? effectControls.displayTime(card.rounds * 6)
-        : card.rounds + (card.rounds === 1 ? " round" : " rounds");
+    const duration = timer(card);
+    if (destroyed(card)) chips.append(node("span", "Destroyed · vanished"));
+    else if (duration.amount === 0) chips.append(node("span", "Expired"));
+    else if (duration.amount != null) {
+      const remaining = duration.unit === "seconds" ? effectControls.displayTime(duration.amount)
+        : duration.amount + (duration.amount === 1 ? " round" : " rounds");
       chips.append(node("span", remaining + " left"));
     }
     if (state.progress?.current === "companion:" + card.id) chips.append(node("span", "Current turn"));
     for (const item of chips.children) item.className = "status-chip";
     chips.append(...effectControls.indicators(effects, 3));
     if (chips.childElementCount) summary.append(chips);
-    panel.append(summary, hpControls(card));
+    const controls = node("div");
+    controls.className = "companion-card-actions companion-card-toolbar";
+    controls.append(button("Edit", "edit", "Edit " + card.name), button("Duplicate", "duplicate", "Duplicate " + card.name));
+    if (available(card)) controls.append(button("Turn actions", "economy", "Track turn actions: " + card.name));
+    const remove = button("Remove", "remove", "Remove " + card.name);
+    remove.className = "danger-outline";
+    controls.append(remove);
+    if (duration.unit === "rounds" && duration.amount > 0 && available(card)) {
+      controls.append(button("−1 round", "advance", "Advance one round: " + card.name));
+    }
+    panel.append(summary, controls, hpControls(card));
 
     if (command) {
       const commandControl = playbook.followupButton(command, state);
@@ -246,12 +280,6 @@ const companionControls = (() => {
     }
     status.append(effectButtons);
     panel.append(disclosure("Conditions and effects", status, expanded));
-    const controls = node("div");
-    controls.className = "companion-card-actions";
-    controls.append(button("Edit", "edit", "Edit " + card.name), button("Duplicate", "duplicate", "Duplicate " + card.name));
-    if (card.rounds > 0) controls.append(button("−1 round", "advance", "Advance one round: " + card.name));
-    controls.append(button("Remove", "remove", "Remove " + card.name));
-    panel.append(controls);
     for (const section of panel.querySelectorAll("[data-companion-section]")) {
       section.dataset.viewDisclosure = panel.dataset.viewDisclosure + ":" + section.dataset.companionSection;
       if (!old) sessionView.restoreDisclosure(section);
@@ -280,7 +308,7 @@ const companionControls = (() => {
       const command = commands.get(card.id);
       const current = state.progress?.current === "companion:" + card.id;
       const signature = JSON.stringify([card, effects, effects.map(display.remaining), command,
-        command && playbook.followupUsed(command, state), current]);
+        command && playbook.followupReason(command, state), current]);
       const old = rendered.get(card.id);
       let element = old?.element;
       if (old?.signature !== signature) {
@@ -300,17 +328,22 @@ const companionControls = (() => {
     form.elements.initiative.required = separate;
   }
 
-  function parseRounds(duration) {
+  function parseDuration(duration) {
     const rule = /^(?:up to\s+)?(\d+)\s+(round|second|minute|hour|day)s?\.?$/i.exec(duration);
     if (!rule) return null;
-    const seconds = Number(rule[1]) * { round: 6, second: 1, minute: 60, hour: 3600, day: 86400 }[rule[2].toLowerCase()];
-    return seconds > 0 && seconds <= 0xffffffff ? Math.ceil(seconds / 6) : null;
+    const kind = rule[2].toLowerCase();
+    const amount = Number(rule[1]) * { round: 1, second: 1, minute: 60, hour: 3600, day: 86400 }[kind];
+    return amount > 0 && amount <= 0xffffffff ? {unit: kind === "round" ? "rounds" : "seconds", amount} : null;
   }
 
   function openEditor(values, id = null) {
     edit = { id, templateId: values.templateId || null, resources: values.resources };
+    const duration = timer(values);
+    form.elements.timerUnit.value = duration.unit;
+    form.elements.zeroHp.value = isCannon(values) ? "vanish" : values.zeroHp || "keep";
+    form.elements.zeroHp.disabled = Boolean(isCannon(values));
     for (const name of [...textFields, ...numberFields, "turn"]) {
-      form.elements.namedItem(name).value = values[name] ?? (name === "turn" ? "owner" : "");
+      form.elements.namedItem(name).value = (name === "remaining" ? duration.amount : values[name]) ?? (name === "turn" ? "owner" : "");
     }
     turnFields();
     editor.showModal();
@@ -344,13 +377,19 @@ const companionControls = (() => {
     }
     for (const field of numberFields) entry[field] = number(data.get(field));
     if (!validTotal(form.elements.currentHp, entry.currentHp, entry.maxHp)) return;
-    if (entry.rounds === null) entry.rounds = parseRounds(entry.duration);
+    const duration = entry.remaining === null ? parseDuration(entry.duration) : null;
+    entry.remaining ??= duration?.amount ?? null;
+    entry.timerUnit = duration?.unit || data.get("timerUnit");
+    entry.zeroHp = isCannon({...entry, templateId: edit.templateId}) ? "vanish" : data.get("zeroHp") || "keep";
     entry.turn = data.get("turn");
     const proposal = edit;
     editor.close();
     if (proposal.id !== null) {
-      updateCard(proposal.id, (card) => {
+      updateCard(proposal.id, (card, _, state) => {
+        const wasAvailable = available(card);
         Object.assign(card, entry);
+        delete card.rounds;
+        if (wasAvailable && !available(card)) effectControls.endForRemovedTarget(state, "companion:" + card.id);
         return "editing " + card.name;
       });
       return;
@@ -410,32 +449,37 @@ const companionControls = (() => {
     const action = control.dataset.companionAction;
     const resourceId = Number(control.closest("[data-companion-resource]")?.dataset.companionResource);
     if (action === "edit") openEditor(card, id);
+    else if (action === "economy") actionEconomy.open(`companion:${id}`);
     else if (action === "duplicate") openEditor({
-      ...card, currentHp: card.maxHp, temporary: 0, rounds: templates.get(card.templateId)?.rounds ?? card.rounds,
+      ...card, currentHp: card.maxHp, temporary: 0,
+      ...(templates.has(card.templateId) ? {timerUnit: templates.get(card.templateId).timerUnit, remaining: templates.get(card.templateId).remaining} : {}),
       resources: card.resources?.map((entry) => ({...entry, remaining: entry.capacity})),
     });
     else if (action === "add-resource") openResource(card);
     else if (action === "edit-resource") {
       const resource = card.resources?.find((entry) => entry.id === resourceId);
       if (resource) openResource(card, resource);
-    } else updateCard(id, (target, roster, state) => {
-      if (action === "remove") {
-        roster.cards.splice(roster.cards.indexOf(target), 1);
-        effectControls.endForRemovedTarget(state, "companion:" + id);
-        return "removing " + target.name;
-      }
-      if (action === "advance" && target.rounds > 0) {
-        target.rounds -= 1;
+    } else if (action === "remove") {
+      effectControls.removeParticipant(`companion:${id}`, card.name, (state) => {
+        const index = state.companions?.cards.findIndex((card) => card.id === id) ?? -1;
+        if (index < 0) return false;
+        state.companions.cards.splice(index, 1);
+        return true;
+      });
+    } else updateCard(id, (target, _, state) => {
+      if (action === "advance" && advance(target, "rounds", 1, state)) {
         return "advancing " + target.name + " one round";
       }
       const resource = target.resources?.find((entry) => entry.id === resourceId);
       if (!resource) return false;
       if (action === "spend-resource" && resource.remaining > 0) {
         resource.remaining -= 1;
+        previewEncounter.log(state, "resource", `Spent 1 · ${target.name} · ${resource.name}`);
         return "spending " + resource.name;
       }
       if (action === "restore-resource" && resource.remaining < resource.capacity) {
         resource.remaining += 1;
+        previewEncounter.log(state, "resource", `Recovered 1 · ${target.name} · ${resource.name}`);
         return "restoring " + resource.name;
       }
       return false;
@@ -463,5 +507,5 @@ const companionControls = (() => {
       previewEncounter.transact(syncSeeds, { undo: false });
     }
   }
-  return { cannonTemplates, createCannon, place, showCard, start };
+  return { cannonTemplates, createCannon, place, showCard, start, available, advance };
 })();

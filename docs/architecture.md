@@ -1,6 +1,6 @@
 # Architecture
 
-## Initial design
+## Planned desktop shell
 
 **Rust** owns the Aurora importer and encounter state. The importer turns a character save and its content definitions into data the app can use. The combat logic owns how damage, concentration, companion changes, and timed effects update an encounter. Keep this logic testable without opening the desktop window.
 
@@ -8,7 +8,13 @@
 
 **Svelte and TypeScript** render the combat sheet and handle interactions such as opening a description or changing the layout. A change to encounter state, such as spending a scroll, goes through a Rust command.
 
+The shipped Windows workflow uses the Windows Forms launcher, the Rust importer and renderer, and a local browser sheet. The browser owns live encounter updates, undo, preferences, and backups. Rust remains the source of imported data and also provides the encounter model for the planned shell.
+
 Aurora is the source of character build data. The tracker owns the session and layout, so re-import can update available options without resetting the fight. Companion behavior comes from imported definitions and editable cards. The Artillerist’s cannon exercises the same companion system as a ranger’s pet or a summon.
+
+## Planned home Wi-Fi multiplayer
+
+The proposed Rust party helper connects each local player sheet to one host. Players own character mutations and choose what the DM may inspect. A DM host owns the shared encounter clock and monster instances. Manual play is the default, with optional attack assistance. The phased plan specifies the wire contract, visibility rules, delivery and undo semantics, monster pack sources, and acceptance checks. [Multiplayer and DM implementation plan](local-multiplayer-plan.md)
 
 ## Aurora content import
 
@@ -24,7 +30,7 @@ The import catalog follows exact IDs named by grants, ID-based selections, and e
 
 The importer reads copper, silver, electrum, gold, and platinum from `build/input/currency` and locates their values in the original UTF-8 save. Inventory replaces the edited values in a browser download, preserving the surrounding XML and file encoding. Missing denominations start at zero and receive their currency elements on export.
 
-Standalone previews include the character XML needed for export. Edits are held in the open sheet, and saving downloads a new `.dnd5e` copy. The tracker stores encounter state separately in the browser.
+Standalone previews include the character XML needed for export. Pending edits live in the browser view preferences by denomination. **Export Aurora copy** downloads a new `.dnd5e` file. The tracker stores encounter state separately in the browser.
 
 ## Re-importing a character
 
@@ -34,13 +40,21 @@ Pins for saved equipment, spells, build elements, and companions follow the exac
 
 ## Combat sheet
 
+The combat projection reads character level from the save and class levels from its class assignments. It recognizes explicit cantrip damage milestones and separate beam attacks in the resolved spell text. Supported higher-slot clauses supply dice increments and separate projectile counts to the cast dialog. Healing previews use the named casting ability when the save supplies it. Exported spell attack bonuses and DCs take precedence over ability and proficiency calculations. Unsupported or ambiguous prose stays available for reference. Scrolls retain their own imported mechanics.
+
+Feature usage and summaries can reference Aurora stats with `{{stat}}`. The projection evaluates integers, proficiency, ability modifiers, named class levels, and stat references with cycle detection. It sums unnamed contributions and takes the highest value in each named bonus group. It uses the owning class for level thresholds and can include applicable contributions from other active features granted by that class. Ambiguous ownership, unsupported conditions, and unresolved values stay in the source text. Later content files still take precedence when a definition ID is overridden.
+
+Recognized Ki, Sorcery Points, Superiority Dice, and Channel Divinity rules can supply shared pools. A feature binds to a shared pool when its cost and source are unambiguous. Lay on Hands uses a variable spend that the player chooses. Resource use, rest recovery, activity, and undo continue through the same encounter transaction. The player resolves rolls, targets, and effects at the table.
+
 Rust projects the imported character into a combat sheet that can be rendered independently of encounter updates. It uses Aurora's action labels and spell casting times for grouping. Saved attacks and weapons appear under Action. The importer reads weapon and feature references from Aurora's calculated build summary as well as the direct selections. Clearly stated item activations, charge costs, and fixed save DCs can be read from descriptions when equivalent metadata is absent. Options with another casting time or unidentified activation remain visible in a separate section.
 
 The projection uses saved spellcasting attack modifiers and save DCs for spells that call for them. A scroll uses its linked spell's casting time, range, and description with the scroll's own costs and roll values. A generated scroll ID can omit the source prefix, so it resolves only when the supplied library has exactly one matching spell ID suffix. Features recorded in the save and unconditional feature grants can provide combat options. Descriptions with level-specific action or usage metadata show that level alongside the option.
 
 The current browser preview is a standalone HTML file generated by the Rust CLI. Its dashboard keeps initiative, key stats, resources, combat options, effects, and companions in separate regions. The primary layout targets 1920×1080 with aligned action and roll columns and independently scrolling panes. Action filters and search work within the configured groups. Selecting an option shows its details in an adjacent inspector on wide screens or inline on narrow screens. The desktop divider supports pointer and keyboard resizing and keeps its width in the per-character layout preferences. Collapsing the inspector keeps the current selection. Description markup is limited to a safe set of formatting tags. The combat sheet data can also feed the planned Svelte view.
 
-The portable Windows launcher uses Windows Forms file dialogs. It passes the selected save and ordered content paths to the same CLI as a terminal import. The CLI writes each character's preview to a stable filename derived from its canonical save path and replaces it only after generation succeeds. The launcher opens it in the default browser and keeps the last successful selections under `%LOCALAPPDATA%\Aurora Combat Tracker`. This gives repeats of the same import a stable local URL for the preview's browser storage.
+The Windows Forms launcher passes the selected save and ordered content paths to the CLI. The launcher keeps the stable file URL derived from the canonical save path, opens the preview in the default browser, and remembers selections under `%LOCALAPPDATA%\Aurora Combat Tracker`. It hides the picker and stays in the notification area to handle refresh. Import or browser-launch errors keep the picker open for retry.
+
+The launcher listens on an ephemeral loopback port while open. Each sheet gets a random refresh token. The bridge accepts stage and apply requests, and the source paths remain in the launcher. Stage runs the CLI with the same source order and a separate output directory. The page compares the staged HTML's definition fingerprints, sources, stats, equipment, options, and resource baselines in an inert document. Apply atomically replaces the file only for the currently staged revision. A failed import or canceled preview leaves the current file and browser session available. CLI previews can show an import report independently of the launcher.
 
 ## Key stats and character layout
 
@@ -50,7 +64,7 @@ The standalone preview stores stat overrides, ordered pins, and section order an
 
 ## Session navigation
 
-The browser keeps the character overview and the sidebars mounted while switching the center pane among Combat, Character, Companions, Inventory, Journal, and Notes. The encounter controls appear in Combat. The Companions page moves the existing roster into the center pane. Active Effects and Tracked Abilities each scroll within the right sidebar on desktop. On narrow viewports, selecting an action opens its rules inline and the sidebar sections stack.
+The browser keeps the character overview and the sidebars mounted while switching the center pane among Combat, Character, Features & Traits, Companions, Inventory, and Journal. The encounter controls appear in Combat. The Companions page moves the existing roster into the center pane. Active Effects and Tracked Abilities each scroll within the right sidebar on desktop. On narrow viewports, selecting an action opens its rules inline and the sidebar sections stack.
 
 The preview saves the current page, combat filter and selection, disclosure states, and scroll positions under a per-character view key. Encounter snapshots, layout preferences, and writing keep their existing keys. The inspector's preferred split stays in layout preferences. CSS clamps its rendered width when space is tight and applies the preferred split when space returns.
 
@@ -64,7 +78,7 @@ Features & Traits groups store ordered references to imported options and backgr
 
 Aurora supplies inventory amounts and instance identifiers. The tracker records units used against the item ID and its instance identifier. Entries without an identifier share a stack by content ID. A missing amount represents one unit. Invalid amounts stay unavailable. Consumable classification uses scroll IDs and item metadata, including potion and ammunition types. Stackability and charges alone do not make a reusable item consumable.
 
-Using a consumable subtracts one unit from the active stack and disables further use at zero. The Rust session keeps the usage record when Aurora content changes or the save is re-imported. The standalone preview records the same per-stack usage in browser storage and updates every visible copy, including pins. Re-import supplies the new starting quantities and the tracker continues to subtract the units already recorded. The Aurora files are read-only.
+Using a consumable subtracts one from its stack and updates every visible copy. The browser stores the last imported amount and pending use by stack key. An import with a different amount on a spent stack surfaces both amounts and pending use. The player can credit any of those units to Aurora. The resulting baseline and pending usage are saved together, and historical usage snapshots are rebased so undo keeps the source reconciliation. Older browser sessions establish a starting baseline on the first open with this version. Aurora sources stay read-only.
 
 ## Concentration
 
@@ -76,19 +90,23 @@ Each recorded hit with positive damage after reductions adds a save while concen
 
 Aurora companion definitions and their linked actions, traits, and reactions form a reusable template catalog. The Artillerist's canonical Eldritch Cannon feature contributes its granted variants to the same catalog. Structured setters take precedence over the canonical cannon's recognizable description fields, and the full imported text remains available on the card. Unresolved formulas stay as reference text.
 
-Tracker cards snapshot an imported template or start as a custom companion. Each instance owns its edits, HP, duration, and turn mode. A selected Aurora companion seeds a card once, so re-import can offer new templates without overwriting edited cards or restoring a removed one. The browser preview stores cards alongside encounter data, supports copying an edited card, and shows separate initiative entries in descending order with shared turns grouped under the owner. Remaining rounds can also be adjusted on each card.
+Tracker cards snapshot an imported template or start as a custom companion. Each instance owns its edits, HP, duration unit, zero-HP rule, and turn mode. A selected Aurora companion seeds a card once. The shared availability rule removes a vanished cannon or expired summon from initiative and executable actions and keeps its card available for review. Older saved timers derive their unit from the saved duration label. Round-based summons tick on round advances. Elapsed-time summons tick on the shared clock, including six seconds on initiative rollover and time advanced by rests.
 
-The Combat sidebar and Companions page show the same expandable roster. The sidebar scrolls separately from the action list and remembers its collapsed state. Each card stores its own manually tracked resources and charges with the rest of the companion state. Conditions and effects use the companion's stable participant ID in the shared effect list. Removing a companion ends its active effects in the same encounter update. Undo brings back the card and its effects.
+The Combat sidebar and Companions page show the same expandable roster. The sidebar scrolls separately from the action list and remembers its collapsed state. Card resources, conditions, and effects use the same saved companion identity. Removing a combatant or companion ends effects on that target. The removal dialog can reassign or end each active effect anchored to that turn. The removal, selections, and initiative reconciliation share one undo snapshot.
 
 ## Quick Actions
 
 Quick Actions preferences are separate from Favorites. Standard shortcuts store the source option's pin key and, for consumables, its inventory stack key. The strip uses the existing cast, attack, consumable, and feature handlers. Cannon creation shortcuts use template IDs. Active cannon shortcuts use companion instance IDs and call the same activation handler as the companion card and the Bonus Action list. That handler checks the shared turn-use record and applies Protector temporary HP in one encounter update.
+
+The Favorites organizer changes the order of the existing pin keys in layout preferences. Options that share a pin key move together, and the attached combat cards keep their selection when moved.
 
 ## Encounter tracking
 
 Initiative uses stable participant IDs and descending scores, with the owner first on ties, then separate companions and other combatants in creation order. Editing a score keeps the current participant when possible. Advancing past the final entry increments the round and advances concentration and active companion durations by one round. Owner HP starts at the available Aurora baseline, and the tracker can override current and maximum HP. Damage applies to HP and the concentration check in one change.
 
 Aurora can repeat multiclass spell slot totals on more than one spellcasting entry. The importer takes the highest exported shared total per slot level and keeps Warlock Pact Magic separate. Unambiguous feature capacities come from their imported usage labels. The preview supports manually adding resource pools and editing capacities.
+
+Removing a resource records its key in the undoable encounter snapshot. It becomes unavailable to actions while removed. Rest recovery still applies, and the resource can be restored from Manage Resources with its existing settings and bindings.
 
 Moxie uses its own resource key. The projection can read a literal maximum from the Moxie feature summary or resolve the summary's Aurora stat from applicable Pugilist class levels. Unknown values can be entered in the resource editor. Spending Moxie, recording a limited reaction that refills it, and recording a trick with a player-confirmed save result all use the existing undoable encounter update. A feature's own rest counter remains separate from the shared pool.
 
@@ -98,7 +116,11 @@ Ending an encounter records its inactive state in the same undo history. Snapsho
 
 ## Ongoing effects
 
-The Aurora importer catalogs selected artificer infusions from the save and uses the selected item for Replicate Magic Item. The browser tracks which known infusions are active alongside custom imbuements. It does not infer which equipment is infused or recalculate item bonuses. Temporary HP lives with the owner’s HP in the encounter snapshot. Damage uses temporary HP first and still checks concentration against damage taken. A long rest clears temporary HP.
+The Aurora importer catalogs selected artificer infusions from the save and uses the selected item for Replicate Magic Item. Charge pools can come from Aurora's charge setter or the full infusion description. The projection carries the recharge die into the existing resource model. Mind Sharpener uses the tracker's rest-based recharge rule, and the browser records the rolled recovery in the same undoable update as the rest.
+
+The browser stores active infusions and their optional attack assignments in the character’s encounter snapshot. Known infusion bonuses and class-level upgrades come from their imported rules. A player chooses their own weapon or spell attacks as the target when the bonus still needs to be added to Aurora's totals. Custom imbuements can use the same target types and store their own bonuses. Combat rows, the inspector, Quick Actions, and attack records use the same calculation. Arcane Firearm requires the imported feature and a damaging spell from the Artificer casting source. Its extra die remains a separate reminder for one damage roll.
+
+Temporary HP lives with the owner’s HP in the encounter snapshot. The quick field keeps the higher of the current and offered values. Damage uses temporary HP first and still checks concentration against damage taken. A long rest clears temporary HP.
 
 The dashboard shows base ability modifiers in the character header. Each tile opens its ability check and saving throw values. The Roll Bonuses dialog uses the same imported check and save totals and shows the components for skills, initiative, and passive scores. The importer reads numeric and supported proficiency and ability references from active Aurora rules. It uses the highest contribution for named bonuses and marks unresolved roll inputs as unavailable. Saving throw overrides appear alongside the imported breakdown. Attack rolls and spellcasting totals use the existing exported data, including a casting ability where supplied. A tool shows its proficiency contribution because the applicable ability depends on the check. Inspection leaves encounter state untouched.
 
@@ -114,6 +136,28 @@ Condition is a display type available with any expiration rule. The cards show t
 
 Advancing initiative processes the outgoing end boundary, any round rollover, and the incoming start boundary in one update. Reordering initiative leaves durations as they were. Expired or manually ended effects are available for review and editing, and can be removed. Effects are included in the same saved encounter and undo history as initiative.
 
-Session journal and note text use separate per-character browser keys outside the encounter undo history.
+The Journal page keeps both legacy editors at their original keys and stores dated entries in the view preferences. Journal entries can link to a sheet reference or a stable activity ID in the current or an archived encounter. The player can search entry text, dates, and link labels. Existing Notes navigation resolves to the combined page.
 
 Cannon shortcuts show imported action descriptions and Artificer spellcasting bonuses when available. A Protector activation records bonus-action use and grants temporary HP to the selected recipients in one undoable update. Companion cards store temporary HP in the same encounter snapshot as their regular HP, with existing cards defaulting to zero.
+
+## Session portability and Combat controls
+
+The version 1 tracker backup contains the encounter, undo history, layout and pins, browser view and corrections, and legacy writing. Restore validates the file and previews what it will replace. It writes to the currently open profile, so the same backup can move progress to another browser profile or Aurora path. Chrome or another supported browser continues to own live storage.
+
+Compact Combat keeps pinned resource pools in the header and moves access to the other pools to a dialog. The layout keeps its saved inspector width and visibility. The compact initiative list reads the same order as roster editing. Owner healing and combatant and companion HP adjustments commit through the encounter transaction. Resource buttons restore keyboard focus after repaint, and follow-up actions participate in the same search as imported options.
+
+Charged equipment uses the stable inventory identity to bind an imported or user-selected pool. Known daily pools currently recover on a long rest. The player can adjust the pool in Manage resources. Slot, ritual, and free-use modes show their tracked costs at cast time. Chosen costs, turn action availability, and concentration changes commit atomically.
+
+The activity log lives in the same undoable snapshot as HP, turns, and resources. Ending an encounter archives a named record with its initiative roster, round, and activity. Starting resets the active record and keeps ongoing character state. Saved roster templates and effect presets live in view preferences. Loading a roster reuses matching participants when possible and adds missing ones. Effect presets retain duration, target, turn, and modifier notes, and unavailable participant defaults can be reviewed before applying.
+
+Optional Action, Bonus Action, and Reaction counters are stored by participant. Usage resets at that participant's next turn start. Companions acting with the owner share the owner's turn boundary, with their own optional counters. Cannon commands use the owner's Bonus Action. An explicit override applies to one use of the selected action type. The standard action handlers check and update these counters in the same transaction as their costs.
+
+## Combat actions, spell targets, and item timings
+
+The Rust projection resolves Extra Attack and Sneak Attack through the same class stat evaluator. The browser charges the optional Action counter once at the start of a weapon sequence. Later strikes can use different weapons. Hit and miss outcomes are attached to the current recorded attack. A player may confirm Sneak Attack once per turn or spend a supported maneuver's shared pool on a hit.
+
+Resolved spell metadata feeds the searchable reaction text, spell filters, and casting dialog. The player selects an incoming event before applying damage, and the reaction list uses prepared spell, slot, and reaction availability. Shield records a temporary effect against the trigger. The player decides the final damage. Supported conditions such as metal armor apply only to the cast being recorded. The tracker logs the chosen advantage and leaves the roll to the player.
+
+Supported target-count clauses are evaluated at the selected slot level. Bless and Moonbeam use participant IDs and the active concentration record. Concentration ending or replacement ends the linked effects in the same transaction. Moonbeam reminders appear when marked creatures start their turns. The player marks which creatures are in the area and resolves saves and damage.
+
+Attunement preferences are saved by stable inventory key and use the exported selection as their baseline when present. The activation check uses that same state on all charged-item surfaces. Explicit dawn formulae use a separate recovery schedule. Advance to dawn updates elapsed time and charges together, with the entered elapsed time independent of the item recovery roll.

@@ -4,14 +4,24 @@ const previewEncounter = (() => {
   const legacyKey = `aurora-combat-consumables-v1:${profile}`;
   const status = document.getElementById("encounter-status");
   const emptyFocus = () => ({ active: null, pending: [], last: null, sequence: 0, rules: "2014" });
+  const emptyProgress = () => ({round: 1, current: null, hp: null, actors: [], sequence: 0, used: {}, resources: [], effects: []});
   const integer = (number) => Number.isSafeInteger(number) && number >= 0;
   let persisted = Boolean(key);
   const reconciliations = [];
   let state = { spent: {}, focus: emptyFocus(), companions: null, progress: null };
   let history = [];
 
+  function log(state, kind, label, source = "") {
+    const progress = state.progress ||= emptyProgress();
+    const activity = progress.activity ||= [];
+    activity.push({id: ++progress.sequence, at: new Date().toISOString(),
+      round: progress.active === false ? null : progress.round, kind, label, source});
+  }
+
   function snapshot(value) {
     return {
+      importedStacks: Object.fromEntries(Object.entries(value?.importedStacks || {})
+        .filter(([, amount]) => amount === null || integer(amount) && amount <= 0xffffffff)),
       spent: Object.fromEntries(Object.entries(value?.spent || {})
         .filter(([, used]) => integer(used) && used > 0 && used <= 0xffffffff)),
       focus: focusFrom(value?.focus),
@@ -61,7 +71,15 @@ const previewEncounter = (() => {
   }
 
   function refresh() {
+    const focused = document.activeElement;
+    const area = focused.closest("article, form, [data-followup-key], #combat-turn-order");
     document.dispatchEvent(new Event("preview-encounter-change"));
+    if (focused === document.body || !focused.matches("button, input, select") || (document.activeElement !== focused && document.activeElement !== document.body)) return;
+    if (focused.isConnected && !focused.matches(":disabled") && focused.getClientRects().length) return;
+    const fallback = [...(area?.querySelectorAll("button:not(:disabled), input:not(:disabled), summary") || [])]
+      .find((control) => control.getClientRects().length && !control.closest("[inert]"));
+    (fallback || (focused.closest("#combat-turn-order") ? document.getElementById("manage-initiative")
+      : document.querySelector("#option-search:not([hidden])")))?.focus({preventScroll: true});
   }
 
   function save() {
@@ -92,14 +110,22 @@ const previewEncounter = (() => {
     }
   }
 
-  function transact(update, { undo = true, label = "" } = {}) {
+  function transact(update, { undo = true, label = "", rebase = null } = {}) {
     locked(() => {
       const draft = structuredClone(state);
       const result = update(draft);
       if (!result) return;
       for (const reconcile of reconciliations) reconcile(draft);
       if (JSON.stringify(draft) === JSON.stringify(state)) return;
+      const previousEffects = new Map((state.progress?.effects || []).map((effect) => [effect.id, effect]));
+      for (const effect of draft.progress?.effects || []) {
+        const previous = previousEffects.get(effect.id);
+        if (previous && effectControls.active(previous) && !effectControls.active(effect) && (!effect.ended || effect.endedByRest)) {
+          log(draft, "expiration", `${effect.name} expired`, `effect:${effect.id}`);
+        }
+      }
       if (undo) history = [...history, {before: state, label: typeof result === "string" ? result : label}].slice(-32);
+      if (rebase) for (const entry of history) rebase(entry.before);
       state = draft;
       save();
     });
@@ -110,6 +136,7 @@ const previewEncounter = (() => {
       const entry = history.pop();
       if (!entry) return;
       const previous = entry.before;
+      previous.importedStacks = state.importedStacks;
       // Keep IDs monotonic so a stale confirmation or save cannot target a later event.
       previous.focus.sequence = Math.max(previous.focus.sequence, state.focus.sequence);
       if (state.companions) {
@@ -117,7 +144,7 @@ const previewEncounter = (() => {
         previous.companions.sequence = Math.max(previous.companions.sequence, state.companions.sequence);
       }
       if (state.progress) {
-        previous.progress ||= {round: 1, current: null, hp: null, actors: [], sequence: 0, used: {}, resources: []};
+        previous.progress ||= emptyProgress();
         previous.progress.sequence = Math.max(previous.progress.sequence, state.progress.sequence);
       }
       for (const reconcile of reconciliations) reconcile(previous);
@@ -135,7 +162,7 @@ const previewEncounter = (() => {
     }
   });
   read();
-  return { transact, undo, current: () => state, isPersisted: () => persisted,
+  return { transact, undo, log, emptyProgress, current: () => state, isPersisted: () => persisted,
     canUndo: () => history.length > 0, undoLabel: () => history.at(-1)?.label || "",
     reconcile: (callback) => reconciliations.push(callback) };
 })();

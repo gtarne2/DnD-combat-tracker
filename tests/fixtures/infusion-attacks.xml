@@ -1,0 +1,33 @@
+<elements>
+  <element id="ID_TEST_CLASS_ARTIFICER" name="Artificer" type="Class">
+    <setters><set name="hd">d8</set></setters>
+  </element>
+  <element id="ID_TEST_ARTILLERIST_ARCANE_FIREARM" name="Arcane Firearm" type="Class Feature">
+    <description><p>Cast an artificer spell through this focus to add 1d8 to one damage roll.</p></description>
+  </element>
+  <element id="ID_TEST_ARTIFICER_INFUSION_MIND_SHARPENER" name="Mind Sharpener" type="Class Feature">
+    <description><p>The infused robe has 4 charges. It regains 1d4 expended charges each dawn.</p></description>
+  </element>
+  <element id="ID_TEST_ARTIFICER_INFUSION_ENHANCED_WEAPON" name="Enhanced Weapon" type="Class Feature">
+    <description><p>This weapon grants a +1 bonus to attack and damage rolls. The bonus increases to +2 when you reach 10th level in this class.</p></description>
+  </element>
+  <element id="ID_TEST_ARTIFICER_INFUSION_ENHANCED_ARCANE_FOCUS" name="Enhanced Arcane Focus" type="Class Feature">
+    <description><p>The focus grants a +1 bonus to spell attack rolls. This bonus increases to +2 when you reach 10th level in this class.</p></description>
+  </element>
+  <element id="ID_TEST_SPELL_LENS_RAY" name="Lens Ray" type="Spell">
+    <description><p>Make a ranged spell attack that deals 1d10 radiant damage on a hit.</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set></setters>
+  </element>
+  <element id="ID_TEST_SPELL_SHOCK_RING" name="Shock Ring" type="Spell">
+    <description><p>Targets make a Dexterity saving throw or take 2d6 lightning damage.</p></description>
+    <setters><set name="level">1</set><set name="time">1 action</set></setters>
+  </element>
+  <element id="ID_TEST_SPELL_GLOW" name="Signal Glow" type="Spell">
+    <description><p>The lens emits colored light for 1d4 rounds. This spell deals no damage.</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set></setters>
+  </element>
+  <element id="ID_TEST_SPELL_WIZARD_BOLT" name="Wizard Bolt" type="Spell">
+    <description><p>Make a ranged spell attack that deals 1d8 force damage on a hit.</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set></setters>
+  </element>
+</elements>

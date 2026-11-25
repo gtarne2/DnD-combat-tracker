@@ -12,7 +12,20 @@ function setupReferencePages(rows) {
     const fields = [...currencyForm.querySelectorAll("input")];
     const imported = fields.map((field) => field.valueAsNumber);
     const status = byId("currency-save-status");
-    currencyForm.addEventListener("input", () => { status.textContent = ""; });
+    const edits = {...sessionView.get("currencyEdits")};
+    fields.forEach((field, index) => {
+      if (Object.hasOwn(edits, field.id) && edits[field.id] === String(imported[index])) delete edits[field.id];
+      if (Object.hasOwn(edits, field.id)) field.value = edits[field.id];
+    });
+    currencyForm.addEventListener("input", (event) => {
+      status.textContent = "";
+      const field = event.target;
+      if (!fields.includes(field)) return;
+      if (field.value === String(imported[fields.indexOf(field)])) delete edits[field.id];
+      else edits[field.id] = field.value;
+      sessionView.set("currencyEdits", {...edits});
+      sessionView.save();
+    });
     currencyForm.addEventListener("submit", (event) => {
       event.preventDefault();
       const balances = fields.map((field) => field.valueAsNumber);
@@ -34,6 +47,12 @@ function setupReferencePages(rows) {
   }
 
   const inventory = byId("inventory-content");
+  const filter = node("select");
+  filter.setAttribute("aria-label", "Filter inventory");
+  for (const [label, value] of [["All items", "all"], ["Equipped gear", "equipped"], ["Consumables", "consumable"], ["Charged items", "charged"], ["Requires attunement", "attunement"]]) {
+    filter.add(new Option(label, value));
+  }
+  inventory.before(filter);
   const items = new Map();
   for (const row of rows) {
     const body = row.querySelector(".option-body");
@@ -43,10 +62,13 @@ function setupReferencePages(rows) {
   for (const [index, row] of [...items].sort(([left], [right]) => Number(left) - Number(right))) {
     const body = row.querySelector(".option-body");
     const item = node("details");
+    item.dataset.sheetEntry = row.dataset.sheetEntry;
     item.dataset.viewDisclosure = "inventory:" + index + ":" + row.dataset.pin;
+    if (body.hasAttribute("data-equipped")) item.dataset.equipped = "";
     const summary = node("summary");
     const title = node("strong", row.querySelector(".option-title").textContent);
     const liveQuantity = row.querySelector("[data-stack-count]");
+    if (liveQuantity) item.dataset.consumableItem = "";
     const quantity = liveQuantity?.cloneNode(true)
       || node("span", body.dataset.inventoryQuantity === undefined ? "Qty unknown" : "Qty " + body.dataset.inventoryQuantity);
     quantity.className = "inventory-quantity";
@@ -56,11 +78,33 @@ function setupReferencePages(rows) {
     const description = body.querySelector(".description");
     if (facts) item.append(facts.cloneNode(true));
     if (description) item.append(description.cloneNode(true));
+    const sourceTools = row.querySelector(".option-execute");
+    if (sourceTools.hasAttribute("data-attunement-key")) {
+      item.dataset.requiresAttunement = "";
+      combatTools.inventoryAttunement(item, sourceTools);
+    }
+    const charge = row.querySelector("[data-charge-key]");
+    if (charge || [...(facts?.querySelectorAll("dt") || [])].some((fact) => fact.textContent === "Recharge")) item.dataset.charged = "";
+    if (charge) {
+      const tools = row.querySelector(".option-execute").cloneNode(true);
+      chargedItems.render(tools, previewEncounter.current());
+      item.append(tools);
+    }
     if (!facts && !description) item.append(node("p", "No item details were available in the import."));
     sheetReference.addOptionLinks(item, row.dataset.sheetEntry);
     inventory.append(item);
   }
-  if (!items.size) inventory.append(node("p", "No inventory items in this sheet."));
+  const empty = node("p", "No inventory items match this filter.");
+  inventory.append(empty);
+  const inventorySelectors = {all: "details", equipped: "[data-equipped]", consumable: "[data-consumable-item]", charged: "[data-charged]", attunement: "[data-requires-attunement]"};
+  filter.value = Object.hasOwn(inventorySelectors, sessionView.get("inventoryFilter")) ? sessionView.get("inventoryFilter") : "all";
+  function filterInventory() {
+    for (const item of inventory.querySelectorAll(":scope > details")) item.hidden = !item.matches(inventorySelectors[filter.value]);
+    empty.hidden = Boolean(inventory.querySelector(":scope > details:not([hidden])"));
+    sessionView.set("inventoryFilter", filter.value);
+  }
+  filter.onchange = filterInventory;
+  filterInventory();
 
   for (const [page, title, labelText] of [["journal", "Journal", "Session journal"], ["notes", "Notes", "Session notes"]]) {
     const content = byId(page + "-content");

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character>
+  <display-properties><level>11</level></display-properties>
+  <build>
+    <input><name>Combat Options Fixture</name><attacks>
+      <attack name="Practice Blade" identifier="blade" attack="+6" damage="1d6+3 piercing"/>
+      <attack name="Practice Bow" identifier="bow" attack="+6" damage="1d6+3 piercing"/>
+    </attacks></input>
+    <abilities><strength>10</strength><dexterity>16</dexterity><constitution>12</constitution><intelligence>16</intelligence><wisdom>14</wisdom><charisma>8</charisma></abilities>
+    <elements>
+      <element type="Level" id="ID_LEVEL_1" class="ID_FIX_FIGHTER"/><element type="Level" id="ID_LEVEL_2" class="ID_FIX_FIGHTER"/>
+      <element type="Level" id="ID_LEVEL_3" class="ID_FIX_FIGHTER"/><element type="Level" id="ID_LEVEL_4" class="ID_FIX_FIGHTER"/>
+      <element type="Level" id="ID_LEVEL_5" class="ID_FIX_FIGHTER"/>
+      <element type="Level" id="ID_LEVEL_6" class="ID_FIX_ROGUE"/><element type="Level" id="ID_LEVEL_7" class="ID_FIX_ROGUE"/>
+      <element type="Level" id="ID_LEVEL_8" class="ID_FIX_ROGUE"/><element type="Level" id="ID_LEVEL_9" class="ID_FIX_ROGUE"/>
+      <element type="Level" id="ID_LEVEL_10" class="ID_FIX_ROGUE"/><element type="Level" id="ID_LEVEL_11" class="ID_FIX_MAGE"/>
+    </elements>
+    <sum>
+      <element type="Class" id="ID_FIX_FIGHTER"/><element type="Class" id="ID_FIX_ROGUE"/><element type="Class" id="ID_FIX_MAGE"/>
+      <element type="Class Feature" id="ID_FIX_EXTRA"/><element type="Class Feature" id="ID_FIX_SNEAK"/>
+      <element type="Class Feature" id="ID_FIX_MANEUVER_POOL"/><element type="Class Feature" id="ID_FIX_MANEUVER"/>
+      <element type="Class Feature" id="ID_FIX_INTERCEPT"/>
+    </sum>
+    <equipment><item id="ID_FIX_WAND" identifier="ember-wand"/></equipment>
+    <magic><spellcasting name="Test Magic" ability="Intelligence" attack="7" dc="15">
+      <slots s1="3" s2="3" s3="2"/>
+      <cantrips><spell id="ID_FIX_TOUCH"/></cantrips>
+      <spells><spell id="ID_FIX_WARD" level="1" prepared="true"/><spell id="ID_FIX_RALLY" level="1" prepared="true"/><spell id="ID_FIX_BEAM" level="2" prepared="true"/></spells>
+    </spellcasting></magic>
+  </build>
+</character>

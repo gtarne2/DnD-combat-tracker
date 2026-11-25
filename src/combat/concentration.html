@@ -6,12 +6,15 @@
       <p id="concentration-duration" hidden></p>
       <details id="concentration-actions" data-view-disclosure="concentration-tools" hidden>
         <summary>Manage</summary>
+        <div class="concentration-menu">
         <form id="concentration-time" class="focus-form">
           <label>Elapsed <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
-          <label>Unit <select name="unit"><option value="6">Rounds</option><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select></label>
+          <label>Unit <select name="unit"><option value="rounds">Rounds</option><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select></label>
           <button type="submit">Advance time</button>
         </form>
         <button id="end-concentration" type="button">End concentration</button>
+        <button id="manage-spell-targets" type="button" hidden>Manage spell targets</button>
+        </div>
       </details>
     </div>
     <div id="concentration-save" class="focus-save" hidden>
@@ -28,6 +31,8 @@
   <form id="concentration-damage" class="focus-form">
     <label>Damage after reductions <input name="damage" type="number" min="1" max="4294967295" required autofocus></label>
     <label>Concentration rules <select id="concentration-rules"><option value="2014">2014</option><option value="2024">2024</option></select></label>
+    <label id="incoming-event-field" hidden>Incoming event <select id="incoming-event"><option value="">Other damage</option><option value="attack">Attack hit</option><option value="missile">Magic Missile</option></select></label>
+    <div id="reaction-reminders" class="focus-form" hidden></div>
     <button type="submit">Apply damage</button>
   </form>
 </dialog>
@@ -35,8 +40,15 @@
   <form id="cast-form">
     <h2 id="cast-heading"></h2>
     <p id="cast-warning" hidden></p>
-    <p id="cast-slot-notice" hidden>No eligible spell slots remain. Choose Cast without a slot for a ritual or other free casting.</p>
-    <label id="cast-slot-field">Spell slot <select name="slot" required></select></label>
+    <p id="cast-slot-notice" hidden>No eligible spell slots remain.</p>
+    <label id="cast-slot-field">Casting method <select name="slot" required></select></label>
+    <label id="cast-free-pool" hidden>Free-use pool <select name="freePool"></select></label>
+    <p id="cast-cost" role="status"></p>
+    <p id="cast-roll-preview" hidden></p>
+    <p id="cast-material-notice" hidden></p>
+    <label id="cast-advantage-field" hidden><input type="checkbox" name="situational"> <span id="cast-advantage-condition"></span></label>
+    <fieldset id="cast-target-field" hidden><legend>Spell targets</legend><div id="cast-targets"></div><p id="cast-target-feedback" role="status"></p></fieldset>
+    <label id="cast-firearm-field" class="firearm-toggle" hidden><input type="checkbox" name="firearm"> Cast through Arcane Firearm <small>+1d8 to one damage roll</small></label>
     <div class="focus-form companion-edit-actions">
       <button id="cancel-cast" type="button">Cancel</button>
       <button>Confirm cast</button>

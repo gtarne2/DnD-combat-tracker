@@ -9,8 +9,12 @@ use crate::concentration::ConcentrationSpell;
 use crate::encounter::EncounterProgress;
 use crate::inventory::{ConsumableUses, consumable_amounts, consumable_key, is_scroll};
 
+mod feature_rules;
 mod html;
+mod infusion;
 mod moxie;
+mod spell_options;
+mod spell_scaling;
 
 pub use html::{render_html, render_html_with_profile};
 
@@ -84,7 +88,16 @@ pub struct CombatOption {
     pub linked_item: Option<String>,
     pub summary: Option<String>,
     pub moxie: Option<moxie::MoxieUse>,
+    pub artificer_damage: bool,
     pub consumable: Option<ConsumableAmount>,
+    pub charge_cost: Option<u32>,
+    pub cast_previews: Vec<String>,
+    pub spell_options: spell_options::SpellOptions,
+    pub attunement: Option<String>,
+    pub initially_attuned: bool,
+    pub hit_maneuver: bool,
+    pub resource_binding: Option<feature_rules::ResourceBinding>,
+    pub feature_level_available: bool,
     pub concentration: Option<ConcentrationSpell>,
 }
 
@@ -92,6 +105,7 @@ pub struct CombatOption {
 pub struct InventoryListing {
     pub index: usize,
     pub quantity: Option<u32>,
+    pub equipped: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,6 +139,19 @@ pub struct CombatSheet {
     pub casting_rolls: Vec<SpellcastingStats>,
     pub infusions: Vec<(String, String)>,
     pub reference_features: Vec<CombatOption>,
+    pub infusion_attacks: std::collections::BTreeMap<String, infusion::InfusionAttack>,
+    pub arcane_firearm: bool,
+    pub attacks_per_action: u32,
+    pub sneak_attack: Option<String>,
+    definitions: Vec<ImportDefinition>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct ImportDefinition {
+    id: String,
+    name: String,
+    source: Option<String>,
+    fingerprint: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -133,6 +160,42 @@ pub struct CombatResource {
     pub name: String,
     pub capacity: u32,
     pub recovery: &'static str,
+    pub recharge_die: Option<u32>,
+    pub dawn_recharge: Option<(u32, u32)>,
+}
+
+fn import_definitions(character: &ImportedCharacter) -> Vec<ImportDefinition> {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let sources: std::collections::BTreeMap<_, _> = character
+        .definitions
+        .iter()
+        .chain(&character.companion_definitions)
+        .collect();
+    sources
+        .into_iter()
+        .map(|(id, definition)| {
+            let mut hash = DefaultHasher::new();
+            let mut name = id.clone();
+            let source = definition.as_ref().map(|definition| {
+                if let Some(label) = &definition.name {
+                    name.clone_from(label);
+                }
+                format!("{:?}", definition.element).hash(&mut hash);
+                let path = definition.source_path.to_string_lossy();
+                match &definition.file_version {
+                    Some(version) => format!("{path} · version {version}"),
+                    None => path.into_owned(),
+                }
+            });
+            ImportDefinition {
+                id: id.clone(),
+                name,
+                source,
+                fingerprint: format!("{:016x}", hash.finish()),
+            }
+        })
+        .collect()
 }
 
 impl CombatSheet {
@@ -157,6 +220,11 @@ impl CombatSheet {
             casting_rolls: character.spellcasting.clone(),
             infusions: character.infusions.clone(),
             reference_features: Vec::new(),
+            infusion_attacks: infusion::attack_bonuses(character),
+            arcane_firearm: false,
+            attacks_per_action: feature_rules::attacks_per_action(character),
+            sneak_attack: feature_rules::sneak_attack(character),
+            definitions: import_definitions(character),
             groups: ActionGroup::ALL.map(|action| CombatGroup {
                 action,
                 options: Vec::new(),
@@ -290,6 +358,7 @@ impl CombatSheet {
                     inventory: Some(InventoryListing {
                         index,
                         quantity: item.inventory.as_ref().and_then(|entry| entry.quantity),
+                        equipped: item.inventory.as_ref().is_some_and(|entry| entry.equipped),
                     }),
                     consumable,
                 },
@@ -320,18 +389,93 @@ impl CombatSheet {
             );
         }
         sheet.add_features(character);
+        sheet.arcane_firearm = sheet
+            .groups
+            .iter()
+            .flat_map(|group| &group.options)
+            .chain(&sheet.reference_features)
+            .any(|entry| {
+                entry.pin_key.as_deref().is_some_and(|id| {
+                    id.starts_with("Feature:") && id.ends_with("_ARTILLERIST_ARCANE_FIREARM")
+                })
+            });
+        let mut charges = std::collections::BTreeMap::new();
         for option in sheet.groups.iter_mut().flat_map(|group| &mut group.options) {
+            option.artificer_damage &= sheet.arcane_firearm;
             if let Some(item) = option.inventory {
                 option.inventory_key = Some(item_keys[item.index].clone());
+                if option.consumable.is_none() {
+                    option.charge_cost = option
+                        .details
+                        .iter()
+                        .find(|detail| detail.label == "Cost")
+                        .and_then(|detail| charge_cost(&detail.value));
+                    if (option.charge_cost.is_some()
+                        || setter(
+                            character.equipment[item.index].definition.as_ref(),
+                            "charges",
+                        )
+                        .is_some()
+                        || plain_text(&option.description)
+                            .to_ascii_lowercase()
+                            .contains("at dawn"))
+                        && let Some(pool) = charged_pool(
+                            option,
+                            character.equipment[item.index].definition.as_ref(),
+                        )
+                    {
+                        if let Some((die, bonus)) = pool.dawn_recharge {
+                            let formula = if die == 0 {
+                                "All charges".to_owned()
+                            } else if bonus > 0 {
+                                format!("1d{die} + {bonus} charges")
+                            } else {
+                                format!("1d{die} charges")
+                            };
+                            option.detail("Recharge", Some(format!("{formula} at dawn")));
+                        }
+                        charges
+                            .entry(pool.key.clone())
+                            .and_modify(|existing: &mut Option<CombatResource>| {
+                                if existing.as_ref() != Some(&pool) {
+                                    *existing = None;
+                                }
+                            })
+                            .or_insert(Some(pool));
+                    }
+                }
                 if let Some(entry) = &character.equipment[item.index].inventory {
                     if entry.equipped {
                         option.detail("Equipped", Some("Yes"));
                     }
+                    option.initially_attuned = entry.attuned;
                     option.detail("Item notes", entry.notes.as_deref());
                 }
             }
         }
         sheet.resources = resources(character, &sheet.groups, &sheet.reference_features);
+        for option in sheet.groups.iter_mut().flat_map(|group| &mut group.options) {
+            if option.feature_level_available
+                && let Some(binding) = feature_rules::bind_pool(character, option, &sheet.resources)
+                && let Some(pool) = sheet.resources.iter().find(|pool| pool.key == binding.key)
+            {
+                let usage = binding.cost.map_or_else(
+                    || format!("Choose points from {}", pool.name),
+                    |cost| format!("{cost} {}", pool.name),
+                );
+                option.detail("Cost", Some(usage));
+                let rules = plain_text(&option.description).to_ascii_lowercase();
+                option.hit_maneuver = pool.name == "Superiority Dice"
+                    && binding.cost.is_some()
+                    && rules.contains("when you hit");
+                option.detail(
+                    "Save DC",
+                    feature_rules::pool_save_dc(character, option, &binding),
+                );
+                option.resource_binding = Some(binding);
+            }
+        }
+        sheet.resources.extend(charges.into_values().flatten());
         sheet
     }
 
@@ -437,6 +581,7 @@ impl CombatSheet {
             },
         );
         let mechanics = linked_spell.or(definition);
+        let rules = feature_rules::RuleValues::new(character, id, definition);
         let time = setter(mechanics, "time");
         option.detail("Casting time", time.as_deref());
         option.detail("Range", setter(mechanics, "range"));
@@ -523,6 +668,13 @@ impl CombatSheet {
             if let Some(use_kind) = option.moxie {
                 option.detail("Trigger", use_kind.trigger);
             }
+            if let Some(summary) = &mut option.summary {
+                let resolved = rules.interpolate(summary);
+                if resolved != *summary && !resolved.contains("{{") {
+                    option.detail("At your level", Some(resolved.clone()));
+                }
+                option.summary = Some(resolved);
+            }
         }
         add_reference_facts(&mut option, definition.or(linked_spell));
         if !matches!(kind, OptionKind::Spell | OptionKind::Scroll) {
@@ -540,23 +692,76 @@ impl CombatSheet {
             text
         };
         let lower = text.to_ascii_lowercase();
-        if damage.is_none() {
+        if kind == OptionKind::Spell {
+            option.spell_options = spell_options::SpellOptions::read(
+                &text,
+                time.as_deref(),
+                option.spell_level,
+                setter(mechanics, "school"),
+                setter(mechanics, "materialComponent").as_deref(),
+            );
+            option.detail("School", option.spell_options.school.clone());
+            option.detail("Trigger", option.spell_options.trigger.clone());
+        }
+        if inventory.is_some() {
+            option.attunement = attunement(definition);
+            option.detail("Attunement", option.attunement.clone());
+        }
+        let casting_modifier = spell_scaling::casting_modifier(character, spellcasting);
+        let preview = (kind == OptionKind::Spell)
+            .then(|| {
+                spell_scaling::preview(&text, option.spell_level, character.level, casting_modifier)
+            })
+            .flatten()
+            .filter(|preview| damage.is_none() || preview.label != "Damage");
+        if let Some(preview) = preview {
+            option.detail(preview.label, Some(preview.roll));
+            option.cast_previews = preview.slots;
+        } else if damage.is_none() {
             let dice = dice_in(&text);
             if !dice.is_empty() {
                 option.detail("Dice in description", Some(dice.join(" · ")));
             }
         }
+        option.artificer_damage = kind == OptionKind::Spell
+            && spellcasting.is_some_and(|casting| {
+                casting
+                    .source_id
+                    .as_deref()
+                    .is_some_and(|id| id.ends_with("_CLASS_ARTIFICER"))
+                    || casting
+                        .name
+                        .as_deref()
+                        .is_some_and(|name| name.eq_ignore_ascii_case("Artificer"))
+            })
+            && (damage.is_some()
+                || lower
+                    .split(['.', '!', '?', ';'])
+                    .any(|clause| clause.contains("damage") && !dice_in(clause).is_empty()));
+        let casting_baseline = if kind == OptionKind::Spell {
+            casting_modifier
+                .zip(character.profile.rolls.proficiency_bonus)
+                .and_then(|(modifier, proficiency)| modifier.checked_add(proficiency))
+        } else {
+            None
+        };
         let attack = setter(definition, "attackBonus").or_else(|| {
-            lower
-                .contains("spell attack")
-                .then_some(spellcasting?.attack_bonus?)
+            if !lower.contains("spell attack") {
+                return None;
+            }
+            spellcasting
+                .and_then(|stats| stats.attack_bonus)
+                .map(i32::from)
+                .or(casting_baseline)
                 .map(|bonus| format!("{bonus:+}"))
         });
         let dc = setter(definition, "saveDC").or_else(|| {
             if !lower.contains("saving throw") {
                 return None;
             }
-            written_save_dc(&lower).or_else(|| spellcasting?.save_dc.map(|dc| dc.to_string()))
+            written_save_dc(&lower)
+                .or_else(|| spellcasting?.save_dc.map(|dc| dc.to_string()))
+                .or_else(|| casting_baseline?.checked_add(8).map(|dc| dc.to_string()))
         });
         option.detail(
             "Attack roll",
@@ -608,9 +813,56 @@ impl CombatSheet {
         if definition.is_none() && linked_spell.is_none() {
             option.detail("Aurora content", Some("Definition unavailable"));
         }
-        for activation in activations(definition, fallback) {
+        let variants = activations(definition, fallback);
+        let class_level = (kind == OptionKind::Feature
+            && variants.iter().any(|variant| variant.level.is_some()))
+        .then(|| rules.class_level())
+        .flatten();
+        for activation in &variants {
+            let level = activation.level.and_then(|level| level.parse::<u32>().ok());
+            let available = activation.level.is_none()
+                || level
+                    .zip(class_level)
+                    .is_some_and(|(need, have)| need <= have);
+            let higher_variant = class_level.is_some_and(|have| {
+                variants.iter().any(|other| {
+                    other.group == activation.group
+                        && other
+                            .level
+                            .and_then(|level| level.parse::<u32>().ok())
+                            .is_some_and(|minimum| minimum > level.unwrap_or(0) && minimum <= have)
+                })
+            });
+            let lower_variant = !available
+                && variants
+                    .iter()
+                    .any(|other| other.group == activation.group && other.level.is_none());
+            if kind == OptionKind::Feature && (higher_variant || lower_variant) {
+                continue;
+            }
             let mut entry = option.clone();
-            entry.detail("Uses", activation.usage);
+            entry.feature_level_available = kind != OptionKind::Feature || available;
+            if kind == OptionKind::Feature
+                && activation.group == ActionGroup::Reaction
+                && !entry.details.iter().any(|detail| detail.label == "Trigger")
+            {
+                let trigger = entry
+                    .summary
+                    .as_deref()
+                    .and_then(feature_reaction_trigger)
+                    .or_else(|| feature_reaction_trigger(&text));
+                entry.detail("Trigger", trigger);
+            }
+            entry.detail(
+                "Uses",
+                activation.usage.map(|usage| {
+                    if kind == OptionKind::Feature {
+                        rules.interpolate(usage)
+                    } else {
+                        usage.to_owned()
+                    }
+                }),
+            );
             entry.detail("Level", activation.level);
             self.push(activation.group, entry);
         }
@@ -633,7 +885,9 @@ fn feature_reference(
     let mut option = CombatOption::new(OptionKind::Feature, name);
     option.pin_key = Some(format!("Feature:{id}"));
     option.description = description(character, id, definition);
-    option.summary = feature_summary(definition);
+    option.summary = feature_summary(definition).map(|summary| {
+        feature_rules::RuleValues::new(character, id, definition).interpolate(&summary)
+    });
     add_reference_facts(&mut option, definition);
     option.detail("Duration", setter(definition, "duration"));
     option
@@ -675,6 +929,7 @@ fn resources(
     references: &[CombatOption],
 ) -> Vec<CombatResource> {
     let mut result = Vec::new();
+    result.extend(infusion::resources(character));
     let moxie = groups
         .iter()
         .flat_map(|group| &group.options)
@@ -711,6 +966,8 @@ fn resources(
                 } else {
                     "short"
                 },
+                recharge_die: None,
+                dawn_recharge: None,
             });
         }
     }
@@ -718,9 +975,19 @@ fn resources(
     for option in groups
         .iter()
         .flat_map(|group| &group.options)
+        .chain(references)
         .filter(|option| option.kind == OptionKind::Feature)
     {
         let Some(key) = &option.pin_key else { continue };
+        if !option.feature_level_available {
+            continue;
+        }
+        if let Some(pool) = feature_rules::shared_pool(character, option) {
+            if !result.iter().any(|resource| resource.key == pool.key) {
+                result.push(pool);
+            }
+            continue;
+        }
         for detail in option
             .details
             .iter()
@@ -736,7 +1003,18 @@ fn resources(
                 continue;
             }
             let period = period.to_ascii_lowercase();
-            let recovery = if period.contains("short rest") {
+            let improved_inspiration = key
+                == "Feature:ID_WOTC_PHB_CLASS_FEATURE_BARD_BARDIC_INSPIRATION"
+                && character.features().any(|feature| {
+                    feature.content_id == "ID_WOTC_PHB_CLASS_FEATURE_BARD_FONT_OF_INSPIRATION"
+                        && feature_summary(feature.definition.as_ref()).is_some_and(|text| {
+                            text.to_ascii_lowercase().contains("short or long rest")
+                        })
+                });
+            let recovery = if improved_inspiration
+                || period.contains("short rest")
+                || period.contains("short or long rest")
+            {
                 "short"
             } else if period.contains("long rest") {
                 "long"
@@ -762,6 +1040,8 @@ fn resources(
             name: name.to_owned(),
             capacity,
             recovery,
+            recharge_die: None,
+            dawn_recharge: None,
         })
     }));
     result
@@ -798,7 +1078,16 @@ impl CombatOption {
             linked_item: None,
             summary: None,
             moxie: None,
+            artificer_damage: false,
             consumable: None,
+            charge_cost: None,
+            cast_previews: Vec::new(),
+            spell_options: Default::default(),
+            attunement: None,
+            initially_attuned: false,
+            hit_maneuver: false,
+            resource_binding: None,
+            feature_level_available: true,
             concentration: None,
         }
     }
@@ -907,6 +1196,26 @@ fn add_activation<'a>(
     if !list.contains(&variant) {
         list.push(variant);
     }
+}
+
+fn feature_reaction_trigger(text: &str) -> Option<String> {
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    text.split(['.', '!', '?']).find_map(|sentence| {
+        let sentence = sentence.trim();
+        let lower = sentence.to_ascii_lowercase();
+        if !lower.starts_with("when ") && !lower.starts_with("if ") {
+            return None;
+        }
+        let end = [
+            ", you can use your reaction",
+            ", you can use a reaction",
+            ", you can use your own reaction",
+            ", you can expend your reaction",
+        ]
+        .iter()
+        .find_map(|phrase| lower.find(phrase))?;
+        Some(sentence[..end].to_owned())
+    })
 }
 
 fn activation_in(text: &str) -> Option<ActionGroup> {
@@ -1074,18 +1383,18 @@ fn written_save_dc(text: &str) -> Option<String> {
 
 fn written_charge_cost(text: &str) -> Option<String> {
     let tokens = words(text);
-    let mut charges = tokens.windows(3).filter_map(|words| {
-        if !matches!(words[0], "spend" | "spending" | "expend" | "expending")
-            || !matches!(words[2], "charge" | "charges")
-        {
+    let mut charges = tokens.iter().enumerate().filter_map(|(index, verb)| {
+        if !matches!(*verb, "spend" | "spending" | "expend" | "expending") {
             return None;
         }
-        match words[1] {
-            "one" => Some(1),
-            "two" => Some(2),
-            "three" => Some(3),
-            value => value.parse::<u16>().ok(),
+        let (amount, tail) = tokens.get(index + 1..)?.split_first()?;
+        if !matches!(
+            tail,
+            ["charge" | "charges", ..] | ["of", "its", "charges", ..]
+        ) {
+            return None;
         }
+        spell_options::count(amount)
     });
     let first = charges.next()?;
     charges.all(|amount| amount == first).then(|| {
@@ -1095,6 +1404,109 @@ fn written_charge_cost(text: &str) -> Option<String> {
             format!("{first} charges")
         }
     })
+}
+
+fn charge_cost(label: &str) -> Option<u32> {
+    let label = label.to_ascii_lowercase();
+    let tokens = words(&label);
+    let [amount, unit] = tokens.as_slice() else {
+        return None;
+    };
+    if !matches!(*unit, "charge" | "charges") {
+        return None;
+    }
+    let amount = match *amount {
+        "one" => 1,
+        "two" => 2,
+        "three" => 3,
+        value => value.parse().ok()?,
+    };
+    (amount > 0).then_some(amount)
+}
+
+fn charged_pool(
+    option: &CombatOption,
+    definition: Option<&ContentDefinition>,
+) -> Option<CombatResource> {
+    let key = option.inventory_key.as_deref()?;
+    let usage = option
+        .details
+        .iter()
+        .find(|detail| detail.label == "Uses")
+        .and_then(|detail| detail.value.split_once('/'));
+    let description = plain_text(&option.description).to_ascii_lowercase();
+    let tokens = words(&description);
+    let dawn_recharge = dawn_formula(&description);
+    let capacity = setter(definition, "charges")
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .or_else(|| usage.and_then(|(value, _)| value.trim().parse().ok()))
+        .or_else(|| {
+            tokens.windows(3).find_map(|phrase| match phrase {
+                ["has", value, "charges"] => spell_options::count(value),
+                _ => None,
+            })
+        })?;
+    let recovery = usage.map_or("", |(_, period)| {
+        match period.trim().to_ascii_lowercase().as_str() {
+            "short rest" | "short or long rest" => "short",
+            "long rest" | "day" => "long",
+            _ => "",
+        }
+    });
+    (capacity > 0).then(|| CombatResource {
+        key: format!("Charge:{key}"),
+        name: format!("{} charges", option.name),
+        capacity,
+        recovery: if dawn_recharge.is_some() {
+            "dawn"
+        } else {
+            recovery
+        },
+        recharge_die: None,
+        dawn_recharge,
+    })
+}
+
+fn dawn_formula(description: &str) -> Option<(u32, u32)> {
+    description.split(['.', '!', '?']).find_map(|sentence| {
+        if !sentence.contains("at dawn") {
+            return None;
+        }
+        let (_, recovery) = sentence
+            .split_once("regains ")
+            .or_else(|| sentence.split_once("regain "))?;
+        let (formula, _) = recovery
+            .split_once(" expended charges")
+            .or_else(|| recovery.split_once(" charges"))?;
+        if formula.trim() == "all" {
+            return Some((0, 0));
+        }
+        let (die, bonus) = match formula.split_once('+') {
+            Some((die, bonus)) => (die.trim(), bonus.trim().parse::<u32>().ok()?),
+            None => (formula.trim(), 0),
+        };
+        let sides: u32 = die.strip_prefix("1d")?.parse().ok()?;
+        (sides > 1 && sides.checked_add(bonus).is_some()).then_some((sides, bonus))
+    })
+}
+
+fn attunement(definition: Option<&ContentDefinition>) -> Option<String> {
+    let marker = definition?
+        .element
+        .children_named("setters")
+        .flat_map(|setters| setters.children_named("set"))
+        .find(|set| {
+            attr(set, "name") == Some("attunement")
+                && plain_text(&set.children)
+                    .trim()
+                    .eq_ignore_ascii_case("true")
+        })?;
+    Some(
+        match attr(marker, "addition").filter(|value| !value.trim().is_empty()) {
+            Some(addition) => format!("Requires attunement {addition}"),
+            None => "Requires attunement".into(),
+        },
+    )
 }
 
 fn words(text: &str) -> Vec<&str> {

@@ -23,6 +23,7 @@ use content::ContentIndex;
 #[derive(Debug, PartialEq, Eq)]
 pub struct ImportedCharacter {
     pub name: Option<String>,
+    pub level: Option<u32>,
     pub currency: Option<AuroraCurrency>,
     pub profile: CharacterProfile,
     pub spell_slots: SpellSlots,
@@ -120,6 +121,7 @@ pub struct ImportedReference {
 pub struct InventoryEntry {
     pub identifier: Option<String>,
     pub equipped: bool,
+    pub attuned: bool,
     pub notes: Option<String>,
     /// A missing amount attribute represents one unit. A malformed amount is unknown.
     pub quantity: Option<u32>,
@@ -241,6 +243,19 @@ pub fn import_character_with_content(
         .iter()
         .filter(|entry| entry.kind == Some("Level"))
         .collect();
+    let level = child(save.root_element(), "display-properties")
+        .and_then(|display| child(display, "level"))
+        .and_then(|level| level.text()?.trim().parse::<u32>().ok())
+        .filter(|level| *level > 0)
+        .or_else(|| {
+            let numbered = saved_levels
+                .iter()
+                .filter_map(|entry| entry.id.strip_prefix("ID_LEVEL_")?.parse::<u32>().ok());
+            numbered
+                .chain([saved_levels.len() as u32])
+                .max()
+                .filter(|level| *level > 0)
+        });
     let classes: BTreeSet<_> = active
         .iter()
         .chain(&build_elements)
@@ -253,23 +268,22 @@ pub fn import_character_with_content(
             *class_levels.entry(class.to_owned()).or_insert(0) += 1;
         }
     }
-    if let Some(&class) = classes.first().filter(|_| classes.len() == 1) {
-        let level = child(save.root_element(), "display-properties")
-            .and_then(|display| child(display, "level"))
-            .and_then(|level| level.text()?.trim().parse::<u32>().ok())
-            .filter(|level| *level > 0)
-            .unwrap_or(saved_levels.len() as u32);
-        if level > 0 {
-            class_levels.insert(class.to_owned(), level);
-        }
-    } else if class_levels.values().sum::<u32>() != saved_levels.len() as u32 {
+    if Some(class_levels.values().sum::<u32>()) != level {
         class_levels.clear();
+    }
+    if class_levels.is_empty()
+        && let (Some(&class), Some(level)) = (classes.first().filter(|_| classes.len() == 1), level)
+        && saved_levels
+            .iter()
+            .all(|entry| entry.node.attribute("class").is_none_or(|id| id == class))
+    {
+        class_levels.insert(class.to_owned(), level);
     }
     let mut build_ids: HashSet<_> = build_elements.iter().map(|entry| entry.id).collect();
     build_elements.extend(active.iter().copied().filter(|entry| {
         entry
             .kind
-            .is_some_and(|kind| kind == "Weapon" || is_feature_kind(kind))
+            .is_some_and(|kind| matches!(kind, "Weapon" | "Archetype") || is_feature_kind(kind))
             && build_ids.insert(entry.id)
     }));
 
@@ -398,7 +412,7 @@ pub fn import_character_with_content(
         .collect();
     let definitions = index.resolve_graph(roots);
     let companion_definitions = index.resolve_companions();
-    let profile = profile::read_profile(save.root_element(), build, &active, &definitions);
+    let profile = profile::read_profile(save.root_element(), build, &active, &definitions, level);
     let infusions = infusion_ids
         .iter()
         .copied()
@@ -450,6 +464,12 @@ pub fn import_character_with_content(
                         .and_then(|node| node.text())
                         .map(str::trim)
                         == Some("true"),
+                    attuned: reference.node.attribute("attuned") == Some("true")
+                        || ["attuned", "attunement"].iter().any(|tag| {
+                            child(reference.node, tag)
+                                .and_then(|node| node.text())
+                                .is_some_and(|value| value.trim() == "true")
+                        }),
                     notes: ["notes", "description"]
                         .into_iter()
                         .find_map(|tag| {
@@ -471,6 +491,7 @@ pub fn import_character_with_content(
 
     Ok(ImportedCharacter {
         name,
+        level,
         currency: AuroraCurrency::read(&save_xml, build, save_path),
         profile,
         spell_slots,

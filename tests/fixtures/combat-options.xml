@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element type="Class" id="ID_FIX_FIGHTER" name="Fixture Fighter"><rules>
+    <grant type="Class Feature" id="ID_FIX_EXTRA"/><grant type="Class Feature" id="ID_FIX_MANEUVER_POOL"/><grant type="Class Feature" id="ID_FIX_MANEUVER"/>
+  </rules></element>
+  <element type="Class" id="ID_FIX_ROGUE" name="Fixture Rogue"><rules><grant type="Class Feature" id="ID_FIX_SNEAK"/></rules></element>
+  <element type="Class" id="ID_FIX_MAGE" name="Fixture Mage"/>
+  <element type="Class Feature" id="ID_FIX_EXTRA" name="Training Strikes"><rules>
+    <stat name="extra attack:count" value="2" level="5" bonus="base"/>
+    <stat name="extra attack:count" value="3" level="11" bonus="base"/>
+  </rules></element>
+  <element type="Class Feature" id="ID_FIX_SNEAK" name="Fixture Sneak Damage"><rules>
+    <stat name="sneak-attack:count" value="1" level="1"/><stat name="sneak-attack:count" value="1" level="3"/>
+    <stat name="sneak-attack:count" value="1" level="5"/><stat name="sneak-attack:die" value="6"/>
+  </rules></element>
+  <element type="Class Feature" id="ID_FIX_MANEUVER_POOL" name="Practice Maneuvers">
+    <description><p>Recover the dice on a short or long rest.</p></description>
+    <rules><stat name="superiority dice:amount" value="3"/></rules>
+  </element>
+  <element type="Class Feature" id="ID_FIX_MANEUVER" name="Drive Back">
+    <description><p>When you hit your target, expend one superiority die to push the target back.</p></description>
+  </element>
+  <element type="Class Feature" id="ID_FIX_INTERCEPT" name="Guard Step">
+    <description><p>When a creature within 5 feet moves away from you, you can use your reaction to move one step.</p></description>
+  </element>
+  <element type="Spell" id="ID_FIX_TOUCH" name="Charged Touch">
+    <description><p>Make a melee spell attack that deals 1d8 lightning damage. You have advantage on the attack roll if the target is wearing armor made of metal.</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set><set name="school">Evocation</set></setters>
+  </element>
+  <element type="Spell" id="ID_FIX_WARD" name="Sudden Ward">
+    <description><p>Reaction trigger: You are hit by an attack or targeted by the magic missile spell An arc appears. You get a +5 bonus to AC until the start of your next turn.</p></description>
+    <setters><set name="level">1</set><set name="time">1 reaction</set><set name="school">Abjuration</set></setters>
+  </element>
+  <element type="Spell" id="ID_FIX_RALLY" name="Rallying Light">
+    <description><p>Choose up to three creatures. Until the spell ends, each target can roll a d4 when it makes an attack roll or saving throw.</p>
+    <p>At Higher Levels. You can target one additional creature for each slot level above 1st.</p></description>
+    <setters><set name="level">1</set><set name="time">1 action</set><set name="school">Enchantment</set>
+      <set name="duration">Concentration, up to 1 minute</set><set name="materialComponent">An amber bead worth 10 gp, which the spell consumes</set>
+    </setters>
+  </element>
+  <element type="Spell" id="ID_FIX_BEAM" name="Radiant Column">
+    <description><p>When a creature enters the spell’s area or starts its turn there, it makes a Constitution saving throw and takes 2d10 radiant damage on a failure.</p></description>
+    <setters><set name="level">2</set><set name="time">1 action</set><set name="school">Evocation</set>
+      <set name="duration">Concentration, up to 1 minute</set>
+    </setters>
+  </element>
+  <element type="Magic Item" id="ID_FIX_WAND" name="Ember Wand">
+    <description><p>The wand has 3 charges. As an action, you can expend 1 of its charges to make a spark. The wand regains 1d6 + 1 expended charges daily at dawn.</p></description>
+    <setters><set name="charges">3</set><set name="attunement" addition="by a spellcaster">true</set></setters>
+  </element>
+</elements>

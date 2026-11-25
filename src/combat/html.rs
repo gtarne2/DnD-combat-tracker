@@ -23,9 +23,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("character-sheet.css"));
     html.push_str("</style></head><body data-profile=\"");
     escape(&mut html, profile_key);
-    html.push_str("\" data-session-page=\"combat\"><header class=\"command-bar\"><a class=\"brand\" href=\"#character-overview\" aria-label=\"Aurora Combat Tracker, go to character overview\"><span class=\"brand-mark\" aria-hidden=\"true\">A</span><span><strong>Aurora</strong><small>Combat Tracker</small></span></a>\
-        <nav class=\"command-nav\" aria-label=\"Tracker\"><a href=\"#combat\" id=\"combat-nav\" data-session-nav=\"combat\" aria-current=\"page\">Combat</a><button type=\"button\" id=\"character-nav\" data-session-nav=\"character\">Character</button><button type=\"button\" data-session-nav=\"features\">Features &amp; Traits</button><button type=\"button\" id=\"companions-nav\" data-session-nav=\"companions\">Companions</button><button type=\"button\" data-session-nav=\"inventory\">Inventory</button><button type=\"button\" data-session-nav=\"journal\">Journal</button><button type=\"button\" data-session-nav=\"notes\">Notes</button></nav>\
-        <p id=\"encounter-status\" class=\"focus-feedback\" role=\"status\"></p><button type=\"button\" id=\"sheet-find\" aria-haspopup=\"dialog\" aria-keyshortcuts=\"Control+K Meta+K /\">Find on sheet <kbd>/</kbd></button><button type=\"button\" class=\"layout-trigger\" data-dialog=\"layout-dialog\">Layout</button></header><main class=\"dashboard\">");
+    html.push_str("\" data-session-page=\"combat\"><header class=\"command-bar\"><a class=\"brand\" href=\"#character-dialog\" data-session-nav=\"character\" aria-label=\"Aurora Combat Tracker, go to character overview\"><span class=\"brand-mark\" aria-hidden=\"true\">A</span><span><strong>Aurora</strong><small>Combat Tracker</small></span></a>\
+        <nav class=\"command-nav\" aria-label=\"Tracker\"><a href=\"#combat\" id=\"combat-nav\" data-session-nav=\"combat\" aria-current=\"page\">Combat</a><button type=\"button\" id=\"character-nav\" data-session-nav=\"character\">Character</button><button type=\"button\" data-session-nav=\"features\">Features &amp; Traits</button><button type=\"button\" id=\"companions-nav\" data-session-nav=\"companions\">Companions</button><button type=\"button\" data-session-nav=\"inventory\">Inventory</button><button type=\"button\" data-session-nav=\"journal\">Journal</button></nav>\
+        <p id=\"encounter-status\" class=\"focus-feedback\" role=\"status\"></p><div class=\"command-tools\" role=\"group\" aria-label=\"Sheet tools\"><button type=\"button\" id=\"review-consumables\" hidden>Review consumables</button><button type=\"button\" id=\"sheet-find\" aria-haspopup=\"dialog\" aria-keyshortcuts=\"Control+K Meta+K /\">Find on sheet <kbd>/</kbd></button><button type=\"button\" data-dialog=\"session-files\">Session</button><button type=\"button\" class=\"layout-trigger\" data-dialog=\"layout-dialog\">Layout</button></div></header><main class=\"dashboard\">");
     render_companions(&mut html, sheet);
     html.push_str("<section class=\"overview\" id=\"character-overview\" aria-label=\"Character overview\"><div class=\"identity\"><span class=\"identity-mark\" aria-hidden=\"true\">");
     let name = sheet.character_name.as_deref().unwrap_or("Character");
@@ -66,7 +66,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_stats(&mut html, &sheet.profile.stats);
     html.push_str(include_str!("concentration.html"));
     render_abilities(&mut html, &sheet.profile.stats);
-    html.push_str("<section class=\"resource-strip\" aria-labelledby=\"resource-heading\"><h2 id=\"resource-heading\">Resources</h2><ul id=\"encounter-resources\"></ul><button type=\"button\" class=\"quiet-button\" data-dialog=\"resource-settings\">Manage resources</button><button type=\"button\" data-configure-moxie id=\"configure-moxie\" hidden></button></section></section>");
+    html.push_str("<section class=\"resource-strip\" aria-labelledby=\"resource-heading\"><h2 id=\"resource-heading\">Resources</h2><ul id=\"encounter-resources\"></ul><button type=\"button\" id=\"show-all-resources\" class=\"quiet-button\" data-dialog=\"all-resources\">All pools</button><button type=\"button\" class=\"quiet-button\" data-dialog=\"resource-settings\">Manage resources</button><button type=\"button\" data-configure-moxie id=\"configure-moxie\" hidden></button></section></section>");
     html.push_str("<section class=\"combat-workspace\" id=\"combat\" aria-labelledby=\"options-heading\"><div class=\"workspace-heading\"><h2 id=\"options-heading\">Combat options</h2>\
         <div class=\"workspace-tools\"><button type=\"button\" id=\"open-companion-sidebar\" class=\"quiet-button\" aria-controls=\"companion-roster-content\">Add companion</button><label class=\"option-search\"><span class=\"visually-hidden\">Search combat options</span><input type=\"search\" id=\"option-search\" placeholder=\"Search options\"></label><button type=\"button\" id=\"toggle-skills-dock\" aria-controls=\"skills-dock\" aria-pressed=\"false\">Skills</button><button type=\"button\" id=\"toggle-inspector\" aria-controls=\"option-inspector\" aria-expanded=\"true\">Hide details</button></div></div>");
     html.push_str(include_str!("quick-actions.html"));
@@ -85,10 +85,10 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
             .unwrap();
         }
     }
-    html.push_str("</span><a href=\"#all-options\" data-filter=\"all\">All</a><a href=\"#all-options\" data-filter=\"traits\">Traits</a><a href=\"#pinned\" id=\"pinned-link\" data-filter=\"pinned\">Favorites</a><label class=\"show-unprepared\"><input type=\"checkbox\" id=\"show-unprepared\"> Show unprepared</label></nav>\
+    html.push_str("</span><a href=\"#all-options\" data-filter=\"all\">All</a><a href=\"#all-options\" data-filter=\"traits\">Traits</a><a href=\"#pinned\" id=\"pinned-link\" data-filter=\"pinned\">Favorites</a><button type=\"button\" class=\"quiet-button\" data-dialog=\"spell-filters\">Spell filters</button><label class=\"show-unprepared\"><input type=\"checkbox\" id=\"show-unprepared\"> Show unprepared</label></nav>\
         <div class=\"combat-columns\"><div class=\"option-list\" id=\"all-options\">\
         <section id=\"bonus-followups\" hidden><h3>Active bonus actions</h3><div id=\"bonus-followup-list\"></div></section>\
-        <section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><h2 id=\"pinned-heading\" class=\"visually-hidden\">Pinned</h2><div id=\"pinned-cards\"></div></section>");
+        <section id=\"pinned\" aria-labelledby=\"pinned-heading\" hidden><div class=\"favorites-heading\"><h2 id=\"pinned-heading\">Favorites</h2><button type=\"button\" id=\"organize-favorites\" data-dialog=\"favorites-dialog\" aria-haspopup=\"dialog\">Organize favorites</button></div><div id=\"pinned-cards\"></div></section>");
     html.push_str("<div id=\"action-groups\">");
     for group in &sheet.groups {
         if group.action == ActionGroup::Other && group.options.is_empty() {
@@ -109,7 +109,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         }
         for option in &group.options {
             start_card(&mut html, Some("option-row"), option.pin_key.as_deref());
-            render_option_row(&mut html, option);
+            render_option_row(&mut html, option, group.action);
             if option.pin_key.is_some() {
                 pin_button(&mut html, &option.name);
             }
@@ -120,6 +120,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
             .unwrap();
             if let Some(item) = option.inventory {
                 write!(html, " data-inventory-index=\"{}\"", item.index).unwrap();
+                if item.equipped {
+                    html.push_str(" data-equipped");
+                }
                 if let Some(quantity) = item.quantity {
                     write!(html, " data-inventory-quantity=\"{quantity}\"").unwrap();
                 }
@@ -196,7 +199,16 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("playbook.html"));
     html.push_str("<div id=\"imported-infusions\" hidden>");
     for (id, name) in &sheet.infusions {
-        html.push_str("<span data-infusion=\"");
+        html.push_str("<span");
+        if let Some(bonus) = sheet.infusion_attacks.get(id) {
+            write!(
+                html,
+                " data-attack-scope=\"{}\" data-attack-bonus=\"{}\" data-damage-bonus=\"{}\"",
+                bonus.scope, bonus.attack, bonus.damage
+            )
+            .unwrap();
+        }
+        html.push_str(" data-infusion=\"");
         escape(&mut html, id);
         html.push_str("\">");
         escape(&mut html, name);
@@ -236,22 +248,31 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_full_sheet(&mut html, &sheet.profile);
     html.push_str("</section>\
         <section class=\"sheet-page\" id=\"features-page\" data-view-scroll=\"features\" aria-labelledby=\"features-title\" hidden><div class=\"sheet-heading\"><h2 id=\"features-title\">Features &amp; Traits</h2><button type=\"button\" id=\"manage-feature-groups\">Organize groups</button></div><div id=\"feature-groups\"></div></section>\
-        <section class=\"sheet-page\" id=\"journal-page\" data-view-scroll=\"journal\" aria-labelledby=\"journal-title\" hidden><h2 id=\"journal-title\">Journal</h2><div id=\"journal-content\" class=\"reference-content\"></div></section>\
-        <section class=\"sheet-page\" id=\"notes-page\" data-view-scroll=\"notes\" aria-labelledby=\"notes-title\" hidden><h2 id=\"notes-title\">Notes</h2><div id=\"notes-content\" class=\"reference-content\"></div></section>\
         <section class=\"sheet-page\" id=\"inventory-page\" data-view-scroll=\"inventory\" aria-labelledby=\"inventory-title\" hidden><h2 id=\"inventory-title\">Inventory</h2>");
     render_currency(&mut html, sheet.currency.as_ref());
     html.push_str("<div id=\"inventory-content\" class=\"reference-content\"></div></section>\
+        <section class=\"sheet-page\" id=\"journal-page\" data-view-scroll=\"journal\" aria-labelledby=\"journal-title\" hidden><h2 id=\"journal-title\">Journal</h2>");
+    html.push_str(include_str!("journal.html"));
+    html.push_str("<div class=\"journal-columns\"><div id=\"journal-content\"></div><div id=\"notes-content\"></div></div></section>\
+        <dialog id=\"favorites-dialog\" aria-labelledby=\"favorites-dialog-title\"><div class=\"dialog-heading\"><h2 id=\"favorites-dialog-title\">Organize favorites</h2><form method=\"dialog\"><button>Done</button></form></div><ol id=\"favorite-order\"></ol><p id=\"favorite-order-status\" class=\"focus-feedback\" role=\"status\"></p></dialog>\
         <dialog id=\"resource-reference\" aria-labelledby=\"resource-reference-title\"><div class=\"dialog-heading\"><h2 id=\"resource-reference-title\"></h2><form method=\"dialog\"><button>Close</button></form></div><div id=\"resource-reference-content\"></div></dialog>");
     html.push_str(include_str!("sheet-reference.html"));
+    html.push_str(include_str!("session-files.html"));
+    html.push_str(include_str!("combat-tools.html"));
+    render_import_report(&mut html, sheet);
     html.push_str("</main><script>");
     html.push_str(include_str!("session-view.js"));
     html.push_str(include_str!("preferences.js"));
     html.push_str(include_str!("encounter.js"));
+    html.push_str(include_str!("action-economy.js"));
     html.push_str(include_str!("companions.js"));
     html.push_str(include_str!("turns.js"));
     html.push_str(include_str!("effects.js"));
     html.push_str(include_str!("consumables.js"));
     html.push_str(include_str!("concentration.js"));
+    html.push_str(include_str!("charged-items.js"));
+    html.push_str(include_str!("combat-tools.js"));
+    html.push_str(include_str!("attack-modifiers.js"));
     html.push_str(include_str!("playbook.js"));
     html.push_str(include_str!("quick-actions.js"));
     html.push_str(include_str!("reference-pages.js"));
@@ -259,8 +280,51 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("sheet-reference.js"));
     html.push_str(include_str!("feature-groups.js"));
     html.push_str(include_str!("dashboard.js"));
+    html.push_str(include_str!("encounter-library.js"));
+    html.push_str(include_str!("journal.js"));
+    html.push_str(include_str!("session-files.js"));
+    html.push_str(include_str!("import-report.js"));
     html.push_str("</script></body></html>");
     html
+}
+
+fn render_import_report(html: &mut String, sheet: &CombatSheet) {
+    let stats = &sheet.profile.stats;
+    html.push_str("<div id=\"import-stat-baselines\" hidden>");
+    for (key, value) in [
+        ("hp", stats.max_hp.map(|value| value.to_string())),
+        ("ac", stats.armor_class.map(|value| value.to_string())),
+        ("speed", stats.speed.clone()),
+    ]
+    .into_iter()
+    .chain(
+        SAVE_KEYS
+            .into_iter()
+            .zip(stats.saves)
+            .map(|(key, value)| (key, value.map(|value| format!("{value:+}")))),
+    ) {
+        write!(html, "<span data-import-stat=\"{key}\">").unwrap();
+        escape(html, value.as_deref().unwrap_or("Unavailable"));
+        html.push_str("</span>");
+    }
+    html.push_str("</div>");
+    html.push_str("<script type=\"application/json\" id=\"import-definitions\">[");
+    for (index, definition) in sheet.definitions.iter().enumerate() {
+        if index != 0 {
+            html.push(',');
+        }
+        html.push('[');
+        for field in [&definition.id, &definition.name, &definition.fingerprint] {
+            json_string(html, field);
+            html.push(',');
+        }
+        match &definition.source {
+            Some(source) => json_string(html, source),
+            None => html.push_str("null"),
+        }
+        html.push(']');
+    }
+    html.push_str("]</script>");
 }
 
 fn render_currency(html: &mut String, currency: Option<&AuroraCurrency>) {
@@ -283,7 +347,7 @@ fn render_currency(html: &mut String, currency: Option<&AuroraCurrency>) {
         }
         html.push_str("></label>");
     }
-    html.push_str("</div><div class=\"currency-save\"><button class=\"gold-button\" type=\"submit\">Save Aurora File</button><p id=\"currency-save-status\" role=\"status\"></p></div></fieldset></form>");
+    html.push_str("</div><div class=\"currency-save\"><button class=\"gold-button\" type=\"submit\">Export Aurora copy</button><p id=\"currency-save-status\" role=\"status\"></p></div></fieldset></form>");
     html.push_str("<script type=\"application/json\" id=\"aurora-currency-file\">[");
     json_string(html, &currency.filename);
     html.push_str(",[");
@@ -329,7 +393,15 @@ fn render_option_facts(html: &mut String, option: &CombatOption) {
     }
     html.push_str("<dl class=\"option-facts\">");
     for detail in &option.details {
-        write!(html, "<div><dt>{}</dt><dd>", detail.label).unwrap();
+        write!(html, "<div><dt>{}</dt><dd", detail.label).unwrap();
+        match detail.label {
+            "Attack roll" => roll_attribute(html, "data-base-attack", Some(&detail.value)),
+            "Damage" | "Dice in description" => {
+                roll_attribute(html, "data-base-damage", Some(&detail.value))
+            }
+            _ => (),
+        }
+        html.push('>');
         escape(html, &detail.value);
         html.push_str("</dd></div>");
     }
@@ -337,6 +409,19 @@ fn render_option_facts(html: &mut String, option: &CombatOption) {
 }
 
 fn render_feature_attributes(html: &mut String, option: &CombatOption) {
+    if let Some(binding) = &option.resource_binding {
+        roll_attribute(html, "data-feature-pool", Some(&binding.key));
+        if let Some(cost) = binding.cost {
+            write!(html, " data-feature-cost=\"{cost}\"").unwrap();
+        }
+    }
+    if option
+        .details
+        .iter()
+        .any(|detail| detail.label == "Uses" && detail.value.eq_ignore_ascii_case("Unlimited"))
+    {
+        html.push_str(" data-unlimited-feature");
+    }
     if option
         .pin_key
         .as_deref()
@@ -371,16 +456,30 @@ fn render_encounter(html: &mut String, sheet: &CombatSheet) {
     html.push_str(include_str!("turns.html"));
     html.push_str("<div id=\"encounter-baseline\" data-owner=\"");
     escape(html, sheet.character_name.as_deref().unwrap_or("Owner"));
-    html.push_str("\" hidden>");
+    write!(
+        html,
+        "\" data-arcane-firearm=\"{}\" data-attacks-per-action=\"{}\"",
+        sheet.arcane_firearm, sheet.attacks_per_action
+    )
+    .unwrap();
+    roll_attribute(html, "data-sneak-attack", sheet.sneak_attack.as_deref());
+    html.push_str(" hidden>");
     for resource in &sheet.resources {
         html.push_str("<span data-resource=\"");
         escape(html, &resource.key);
         write!(
             html,
-            "\" data-capacity=\"{}\" data-recovery=\"{}\">",
+            "\" data-capacity=\"{}\" data-recovery=\"{}\"",
             resource.capacity, resource.recovery
         )
         .unwrap();
+        if let Some(die) = resource.recharge_die {
+            write!(html, " data-recharge-die=\"{die}\"").unwrap();
+        }
+        if let Some((die, bonus)) = resource.dawn_recharge {
+            write!(html, " data-dawn-die=\"{die}\" data-dawn-bonus=\"{bonus}\"").unwrap();
+        }
+        html.push('>');
         escape(html, &resource.name);
         html.push_str("</span>");
     }
@@ -459,7 +558,7 @@ fn companion_data(
     html.push_str("></div>");
 }
 
-fn render_option_row(html: &mut String, option: &CombatOption) {
+fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGroup) {
     html.push_str("<h3 class=\"option-name\"><button type=\"button\" class=\"pick-option\" data-inspect aria-expanded=\"false\"><span class=\"option-title\">");
     escape(html, &option.name);
     html.push_str("</span><span class=\"option-badges\">");
@@ -500,6 +599,11 @@ fn render_option_row(html: &mut String, option: &CombatOption) {
     if option.ritual {
         html.push_str("<span class=\"option-badge\">Ritual</span>");
     }
+    if let Some(label) = &option.spell_options.material_notice {
+        html.push_str("<span class=\"option-badge\" title=\"");
+        escape(html, label);
+        html.push_str("\">Material cost</span>");
+    }
     let detail = |label| {
         option
             .details
@@ -532,15 +636,99 @@ fn render_option_row(html: &mut String, option: &CombatOption) {
         .map(str::to_owned)
         .or_else(|| detail("Save DC").map(|value| format!("DC {value}")));
     let damage = detail("Damage").or_else(|| detail("Dice in description"));
-    for (index, value) in roll.as_deref().into_iter().chain(damage).enumerate() {
+    let healing = detail("Healing").map(|value| format!("{value} healing"));
+    for (index, value) in roll
+        .as_deref()
+        .into_iter()
+        .chain(damage.or(healing.as_deref()))
+        .enumerate()
+    {
         if index != 0 {
             html.push_str(" · ");
         }
         escape(html, value);
     }
-    html.push_str("</span></button></h3><div class=\"option-execute\">");
+    html.push_str("</span>");
+    if let Some(trigger) = (group == ActionGroup::Reaction)
+        .then(|| detail("Trigger"))
+        .flatten()
+    {
+        html.push_str("<small class=\"reaction-trigger\">");
+        escape(html, trigger);
+        html.push_str("</small>");
+    }
+    html.push_str("</button></h3><div class=\"option-execute\"");
+    if group != ActionGroup::Other {
+        write!(html, " data-turn-cost=\"{}\"", anchor(group)).unwrap();
+    }
+    if !option.feature_level_available {
+        html.push_str(" data-feature-level-blocked");
+    }
+    let spell = &option.spell_options;
+    for (name, value) in [
+        ("data-school", spell.school.as_deref()),
+        ("data-material-notice", spell.material_notice.as_deref()),
+        ("data-reaction-trigger", spell.trigger.as_deref()),
+        ("data-conditional-advantage", spell.advantage),
+        ("data-save-dc", detail("Save DC")),
+    ] {
+        roll_attribute(html, name, value);
+    }
+    if !spell.incoming_events.is_empty() {
+        roll_attribute(html, "data-incoming-events", Some(spell.incoming_events));
+    }
+    if !spell.effect.is_empty() {
+        roll_attribute(html, "data-spell-effect", Some(spell.effect));
+    }
+    if !spell.target_counts.is_empty() {
+        let counts = spell
+            .target_counts
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        roll_attribute(html, "data-target-counts", Some(&counts));
+    }
+    if let Some(note) = &option.attunement {
+        roll_attribute(html, "data-attunement-note", Some(note));
+        roll_attribute(html, "data-attunement-key", option.inventory_key.as_deref());
+        if option.initially_attuned {
+            html.push_str(" data-initially-attuned");
+        }
+    }
+    if option.hit_maneuver {
+        html.push_str(" data-hit-maneuver");
+    }
+    if matches!(option.kind, OptionKind::Attack | OptionKind::Spell) {
+        write!(
+            html,
+            " data-attack-kind=\"{}\"",
+            if option.kind == OptionKind::Attack {
+                "weapon"
+            } else {
+                "spell"
+            }
+        )
+        .unwrap();
+        roll_attribute(html, "data-base-attack", detail("Attack roll"));
+        roll_attribute(html, "data-base-damage", damage);
+    }
+    if option.artificer_damage {
+        html.push_str(" data-firearm-eligible");
+    }
+    html.push_str("><small class=\"option-roll-adjustment\" data-roll-adjustment hidden></small>");
     if let Some(consumable) = &option.consumable {
         render_consumable(html, consumable, &option.name, option.kind);
+    } else if let (Some(cost), Some(key)) = (option.charge_cost, &option.inventory_key) {
+        write!(
+            html,
+            "<button type=\"button\" data-charge-cost=\"{cost}\" data-charge-key=\"Charge:"
+        )
+        .unwrap();
+        escape(html, key);
+        html.push_str("\" data-charge-name=\"");
+        escape(html, &option.name);
+        html.push_str("\">Activate</button><small data-charge-count></small><button type=\"button\" class=\"quiet-button\" data-bind-charge>Bind pool</button>");
     } else {
         match option.kind {
             OptionKind::Spell => {
@@ -552,6 +740,13 @@ fn render_option_row(html: &mut String, option: &CombatOption) {
                 }
                 if option.ritual {
                     html.push_str(" data-ritual-cast");
+                }
+                if !option.cast_previews.is_empty() {
+                    roll_attribute(
+                        html,
+                        "data-cast-previews",
+                        Some(&option.cast_previews.join("|")),
+                    );
                 }
                 html.push_str(">Cast</button>");
             }
@@ -569,6 +764,14 @@ fn render_option_row(html: &mut String, option: &CombatOption) {
         }
     }
     html.push_str("<p class=\"option-availability\" data-option-availability hidden></p></div>");
+}
+
+fn roll_attribute(html: &mut String, name: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        write!(html, " {name}=\"").unwrap();
+        escape(html, value);
+        html.push('"');
+    }
 }
 
 fn render_consumable(
@@ -631,7 +834,8 @@ fn render_stats(html: &mut String, stats: &KeyStats) {
         );
         html.push_str("</p>");
         if key == "hp" {
-            html.push_str("<span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"health-actions\"><button type=\"button\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-dialog=\"rest-picker\">Rest</button></div>");
+            html.push_str("<span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"health-actions\"><button type=\"button\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-dialog=\"heal-owner\">Heal</button><button type=\"button\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-dialog=\"rest-picker\">Rest</button></div>");
+            html.push_str("<form class=\"quick-temp-hp\" data-quick-temp-hp><label>Temp HP <input type=\"number\" name=\"temporary\" min=\"1\" max=\"4294967295\" inputmode=\"numeric\" required></label><button type=\"submit\" title=\"Keep the higher temporary HP amount\">Gain</button></form>");
         }
         pin_button(html, label);
         html.push_str("</article>");
@@ -865,7 +1069,7 @@ fn render_modifier(html: &mut String, name: &str, index: usize, roll: RollModifi
 const SAVE_KEYS: [&str; 6] = ["str", "dex", "con", "int", "wis", "cha"];
 
 fn render_layout(html: &mut String, sheet: &CombatSheet) {
-    html.push_str("<details id=\"sheet-layout\" class=\"panel\" open><summary>Combat sections and stats</summary><div class=\"panel-body\"><ul id=\"section-settings\">");
+    html.push_str("<details id=\"sheet-layout\" class=\"panel\" open><summary>Combat sections and stats</summary><div class=\"panel-body\"><label><input type=\"checkbox\" id=\"compact-combat\"> Compact Combat layout</label><ul id=\"section-settings\">");
     for group in &sheet.groups {
         if group.action == ActionGroup::Other && group.options.is_empty() {
             continue;
@@ -982,7 +1186,17 @@ fn render_character_reference(html: &mut String, profile: &CharacterProfile) {
         }
         html.push_str("</p></details>");
     }
-    html.push_str("</section></div></div><div class=\"character-reference-links\"><button type=\"button\" data-session-nav=\"features\">Features &amp; Traits</button><button type=\"button\" data-session-nav=\"inventory\">Inventory</button><button type=\"button\" data-dialog=\"roll-dialog\">All roll bonuses</button></div>");
+    html.push_str("</section></div></div><section class=\"reference-card character-abilities\" aria-label=\"Ability scores\"><div class=\"ability-score-heading\"><h3>Ability scores</h3><div class=\"ability-score-rolls\">");
+    write!(html, "<p>Proficiency bonus <strong>{}</strong></p><button type=\"button\" data-open-roll=\"other|Initiative\">Initiative <strong>{}</strong></button>", signed_roll(rolls.proficiency_bonus), signed_roll(rolls.initiative.total())).unwrap();
+    html.push_str("</div></div><ul class=\"ability-score-list\">");
+    for (index, ability) in ABILITIES.into_iter().enumerate() {
+        let score =
+            profile.stats.scores[index].map_or_else(|| "—".into(), |score| score.to_string());
+        let modifier =
+            profile.stats.modifiers[index].map_or_else(|| "—".into(), |value| format!("{value:+}"));
+        write!(html, "<li><button type=\"button\" data-open-roll=\"checks|{ability}\"><span>{ability}</span><span><b>{score}</b><small aria-label=\"Modifier {modifier}\">{modifier}</small></span></button></li>").unwrap();
+    }
+    html.push_str("</ul></section><div class=\"character-reference-links\"><button type=\"button\" data-session-nav=\"features\">Features &amp; Traits</button><button type=\"button\" data-session-nav=\"inventory\">Inventory</button><button type=\"button\" data-dialog=\"roll-dialog\">All roll bonuses</button></div>");
 }
 
 fn glance_roll(

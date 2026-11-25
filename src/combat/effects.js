@@ -20,7 +20,20 @@ const effectControls = (() => {
     return !effect.ended && (!timed(effect.kind) || effect.remaining > 0);
   }
 
-  function endForRemovedTarget(state, target) {
+  function anchoredTo(state, target) {
+    return entries(state).filter((effect) => active(effect) && effect.target !== target
+      && ["start", "end"].includes(effect.kind) && (effect.anchor || effect.target) === target);
+  }
+
+  function endForRemovedTarget(state, target, assignments = new Map()) {
+    for (const effect of anchoredTo(state, target)) {
+      const replacement = assignments.get(effect.id);
+      if (replacement) effect.anchor = replacement;
+      else {
+        effect.ended = true;
+        effect.anchorRemoved = true;
+      }
+    }
     for (const effect of entries(state)) {
       if (effect.target === target && active(effect)) {
         effect.ended = true;
@@ -28,6 +41,53 @@ const effectControls = (() => {
       }
     }
   }
+
+  const removal = byId("remove-participant");
+  const removalForm = byId("remove-participant-form");
+  let pendingRemoval;
+
+  function removeParticipant(key, name, remove) {
+    const state = previewEncounter.current();
+    const affected = anchoredTo(state, key);
+    const apply = (assignments) => {
+      previewEncounter.transact((draft) => {
+        const order = encounterTracker.turns(draft);
+        if (anchoredTo(draft, key).some((effect) => !assignments.has(effect.id))
+            || [...assignments.values()].some((replacement) => replacement && !order.some((row) => row.key === replacement))) {
+          byId("encounter-status").textContent = "Initiative or effects changed. Open participant removal again.";
+          return false;
+        }
+        if (!remove(draft)) return false;
+        endForRemovedTarget(draft, key, assignments);
+        return "removing " + name;
+      });
+    };
+    if (!affected.length) {
+      apply(new Map());
+      return;
+    }
+    const replacements = encounterTracker.turns(state).filter((row) => row.key !== key);
+    byId("remove-participant-heading").textContent = "Remove " + name;
+    byId("removed-turn-effects").replaceChildren(...affected.map((effect) => {
+      const label = node("label", effect.name);
+      const select = node("select");
+      select.name = String(effect.id);
+      select.add(new Option("End effect", ""));
+      for (const row of replacements) select.add(new Option("Follow " + row.name, row.key));
+      label.append(select);
+      return label;
+    }));
+    pendingRemoval = apply;
+    removal.showModal();
+  }
+
+  byId("cancel-participant-removal").onclick = () => removal.close();
+  removalForm.onsubmit = (event) => {
+    event.preventDefault();
+    const assignments = new Map(Array.from(new FormData(removalForm), ([id, key]) => [Number(id), key]));
+    removal.close();
+    pendingRemoval(assignments);
+  };
 
   function participants(state) {
     return new Map([
@@ -39,55 +99,105 @@ const effectControls = (() => {
 
   function initiativeEntry(state, key) {
     if (!key.startsWith("companion:")) return key;
-    const card = state.companions?.cards.find((card) => `companion:${card.id}` === key && card.rounds !== 0);
+    const card = state.companions?.cards.find((card) => `companion:${card.id}` === key && companionControls.available(card));
     return card ? card.turn === "owner" ? "owner" : key : null;
   }
 
+  function spellParticipants(state) {
+    return new Map([...participants(state)].filter(([key]) => !key.startsWith("companion:") || initiativeEntry(state, key)));
+  }
+
+  function setSpellTargets(state, focus, targets) {
+    const names = spellParticipants(state);
+    if (targets.length > focus.trackedSpell.limit || targets.some((target) => !names.has(target))) return false;
+    const progress = state.progress ||= previewEncounter.emptyProgress();
+    progress.effects ||= [];
+    const current = progress.effects.filter((effect) => active(effect) && effect.linkedFocus === focus.id);
+    for (const effect of current) if (!targets.includes(effect.target)) effect.ended = true;
+    for (const target of new Set(targets)) {
+      if (current.some((effect) => effect.target === target)) continue;
+      progress.effects.push({id: ++progress.sequence, name: focus.name, notes: focus.trackedSpell.notes, target,
+        kind: "manual", category: "effect", linkedFocus: focus.id, spellKind: focus.trackedSpell.kind,
+        source: focus.trackedSpell.source});
+    }
+    return true;
+  }
+
+  function endConcentrationEffects(state) {
+    for (const effect of entries(state)) {
+      if (active(effect) && effect.linkedFocus != null && state.focus.active?.id !== effect.linkedFocus) {
+        effect.ended = true;
+        effect.endedByConcentration = true;
+      }
+    }
+    if (!state.focus.active?.trackedSpell && state.progress) delete state.progress.spellTurnReminder;
+  }
+  previewEncounter.reconcile(endConcentrationEffects);
+
+  function recordShield(state, name, source) {
+    const progress = state.progress ||= previewEncounter.emptyProgress();
+    const effects = progress.effects ||= [];
+    const prior = effects.find((effect) => active(effect) && effect.shield);
+    if (prior) prior.ended = true;
+    effects.push({id: ++progress.sequence, name, target: "owner", category: "effect", kind: "start", anchor: "owner",
+      remaining: 1, clockLimit: 6, shield: true, source, notes: "+5 AC, including against the triggering attack. Check whether the hit still lands before recording damage."});
+  }
+
   function boundary(state, phase, current) {
+    const reminders = [];
     for (const effect of entries(state)) {
       if (active(effect) && effect.kind === phase && initiativeEntry(state, effect.anchor || effect.target) === current) {
         effect.remaining -= 1;
       }
+      if (phase === "start" && effect.spellKind === "moonbeam" && active(effect) && initiativeEntry(state, effect.target) === current) {
+        const name = participants(state).get(effect.target);
+        const reminder = effect.name + " · " + name + " · " + effect.notes;
+        reminders.push(reminder);
+        previewEncounter.log(state, "effect", reminder, effect.source);
+      }
     }
+    if (reminders.length) state.progress.spellTurnReminder = reminders.join(" · ");
   }
 
-  function advanceRounds(state, rounds) {
-    let changed = false;
+  function advanceRounds(state, rounds, {initiative = false} = {}) {
+    tickRoundEffects(state, rounds);
+    for (const card of state.companions?.cards || []) companionControls.advance(card, "rounds", rounds, state);
+    return advanceTime(state, rounds * 6, {initiative});
+  }
+
+  function tickRoundEffects(state, rounds) {
     for (const effect of entries(state)) {
       if (active(effect) && effect.kind === "rounds") {
         effect.remaining = Math.max(0, effect.remaining - rounds);
-        changed = true;
       }
     }
-    for (const card of state.companions?.cards || []) {
-      if (card.rounds > 0) {
-        card.rounds = Math.max(0, card.rounds - rounds);
-        changed = true;
-      }
-    }
-    return advanceTime(state, rounds * 6).changed || changed;
   }
 
-  function advanceTime(state, seconds) {
-    let changed = false;
+  function advanceTime(state, seconds, {initiative = false} = {}) {
+    const progress = state.progress ||= previewEncounter.emptyProgress();
+    progress.elapsedSeconds = Math.min(Number.MAX_SAFE_INTEGER, (progress.elapsedSeconds || 0) + seconds);
     let concentrationExpired = false;
+    for (const card of state.companions?.cards || []) companionControls.advance(card, "seconds", seconds, state);
     for (const effect of entries(state)) {
       if (active(effect) && effect.kind === "seconds") {
         effect.remaining = Math.max(0, effect.remaining - seconds);
-        changed = true;
+      }
+      if (!initiative && active(effect) && effect.clockLimit != null) {
+        effect.clockLimit = Math.max(0, effect.clockLimit - seconds);
+        if (!effect.clockLimit) effect.remaining = 0;
       }
     }
     const focus = state.focus;
     if (focus.active?.remaining != null) {
       focus.active.remaining = Math.max(0, focus.active.remaining - seconds);
-      changed = true;
       if (focus.active.remaining === 0) {
+        previewEncounter.log(state, "expiration", `Concentration expired · ${focus.active.name}`);
         focus.active = null;
         focus.pending = [];
         concentrationExpired = true;
       }
     }
-    return { changed, concentrationExpired };
+    return { concentrationExpired };
   }
 
   function displayTime(seconds) {
@@ -101,8 +211,10 @@ const effectControls = (() => {
   }
 
   function deadline(effect, state, names, order) {
-    if (effect.ended) return effect.targetRemoved ? "Target removed" : effect.endedByRest ? "Ended on a rest" : "Ended manually";
+    if (effect.ended) return effect.targetRemoved ? "Target removed" : effect.anchorRemoved ? "Turn participant removed"
+      : effect.endedByConcentration ? "Concentration ended" : effect.endedByRest ? "Ended on a rest" : "Ended manually";
     if (!active(effect)) return "Expired";
+    if (effect.linkedFocus != null) return "While concentrating";
     switch (effect.kind) {
       case "manual": return "Until ended manually";
       case "short": return "Until the next short or long rest";
@@ -194,6 +306,7 @@ const effectControls = (() => {
 
   function render() {
     const state = previewEncounter.current();
+    byId("game-time-elapsed").textContent = `Elapsed game time · ${displayTime(state.progress?.elapsedSeconds || 0) || "0 sec"}`;
     const effects = entries(state);
     const display = view(state);
     const signature = JSON.stringify([effects, [...display.names], [...display.order], state.progress?.round, state.progress?.active, Boolean(state.focus.active)]);
@@ -210,6 +323,7 @@ const effectControls = (() => {
       (active(effect) ? live : past).append(display.card(effect));
     }
     if (!live.childElementCount && !state.focus.active) live.append(node("p", "No active effects."));
+    byId("effects").classList.toggle("effects-empty", !activeBefore.size && !state.focus.active);
     byId("ended-effects").hidden = past.childElementCount === 0;
     const ownerEffects = byId("owner-effects");
     ownerEffects.replaceChildren(...indicators(display.activeFor("owner"), 4));
@@ -231,11 +345,10 @@ const effectControls = (() => {
     select.value = value;
   }
 
-  function open(effect, target = "owner", category = "effect") {
-    editing = effect?.id ?? null;
+  function fillEffect(effect, target, category) {
     const names = participants(previewEncounter.current());
-    choose(form.elements.target, names, effect?.target || target);
-    choose(form.elements.anchor, new Map([["", "Effect target"], ...names]), effect?.anchor || "");
+    choose(form.elements.target, names, names.has(effect?.target) ? effect.target : target);
+    choose(form.elements.anchor, new Map([["", "Effect target"], ...names]), names.has(effect?.anchor) ? effect.anchor : "");
     form.elements.name.value = effect?.name || "";
     form.elements.notes.value = effect?.notes || "";
     form.elements.category.value = effect?.category || category;
@@ -243,14 +356,29 @@ const effectControls = (() => {
     form.elements.remaining.value = Math.max(1, effect?.remaining || 1);
     form.elements.unit.value = "1";
     formFields();
+  }
+
+  const presets = () => sessionView.get("effectPresets") || [];
+  const preset = form.elements.preset;
+  const presetStatus = byId("effect-preset-feedback");
+  const deletePreset = byId("delete-effect-preset");
+  function renderPresets(selected = "") {
+    preset.replaceChildren(new Option("Choose a preset", ""), ...presets().map((entry) => new Option(entry.name, entry.name)));
+    preset.value = selected;
+    deletePreset.disabled = !selected;
+  }
+  function open(effect, target = "owner", category = "effect") {
+    editing = effect?.id ?? null;
+    renderPresets();
+    presetStatus.textContent = "";
+    fillEffect(effect, target, category);
     editor.showModal();
   }
 
   byId("add-effect").addEventListener("click", () => open());
   byId("effect-cancel").addEventListener("click", () => editor.close());
   form.elements.kind.addEventListener("change", formFields);
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
+  function readEffect() {
     const data = new FormData(form);
     const name = data.get("name").trim();
     const kind = data.get("kind");
@@ -262,10 +390,38 @@ const effectControls = (() => {
       form.elements.remaining.setCustomValidity("");
       return;
     }
-    const effect = { name, notes: data.get("notes").trim(), target: data.get("target"),
+    return { name, notes: data.get("notes").trim(), target: data.get("target"),
       category: data.get("category") === "condition" ? "condition" : "effect",
       anchor: ["start", "end"].includes(kind) ? data.get("anchor") : "", kind, remaining,
-      ended: false, endedByRest: false, targetRemoved: false };
+      ended: false, endedByRest: false, targetRemoved: false, anchorRemoved: false };
+  }
+  preset.onchange = () => {
+    const selected = presets().find((entry) => entry.name === preset.value);
+    deletePreset.disabled = !selected;
+    if (!selected) return;
+    const names = participants(previewEncounter.current());
+    const missing = !names.has(selected.target) || selected.anchor && !names.has(selected.anchor);
+    fillEffect(selected, form.elements.target.value, form.elements.category.value);
+    presetStatus.textContent = missing ? "A saved participant is unavailable. Review the target and turn." : "";
+  };
+  byId("save-effect-preset").onclick = () => {
+    if (!form.reportValidity()) return;
+    const effect = readEffect();
+    if (!effect) return;
+    sessionView.set("effectPresets", [...presets().filter((entry) => entry.name !== effect.name), effect]);
+    renderPresets(effect.name);
+    presetStatus.textContent = "Preset saved.";
+  };
+  deletePreset.onclick = () => {
+    sessionView.set("effectPresets", presets().filter((entry) => entry.name !== preset.value));
+    renderPresets();
+    presetStatus.textContent = "Preset removed.";
+  };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const effect = readEffect();
+    if (!effect) return;
+    const {name} = effect;
     const id = editing;
     editor.close();
     encounterTracker.update((progress) => {
@@ -321,14 +477,16 @@ const effectControls = (() => {
       return;
     }
     previewEncounter.transact((state) => {
-      const changed = rounds ? advanceRounds(state, elapsed) : advanceTime(state, seconds).changed;
-      feedback.textContent = changed ? "In-game time advanced." : "No in-game timers are active.";
-      return changed && "advancing game time";
+      if (rounds) advanceRounds(state, elapsed);
+      else advanceTime(state, seconds);
+      feedback.textContent = "In-game time advanced.";
+      return "advancing game time";
     });
   });
 
   document.addEventListener("preview-encounter-change", render);
   document.addEventListener("preview-encounter-undo", () => { feedback.textContent = ""; });
   render();
-  return { boundary, advanceRounds, advanceTime, displayTime, endForRemovedTarget, indicators, view, entries, active };
+  return { boundary, advanceRounds, advanceTime, tickRoundEffects, displayTime, endForRemovedTarget, removeParticipant, indicators,
+    view, entries, active, spellParticipants, setSpellTargets, recordShield };
 })();
