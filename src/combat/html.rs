@@ -283,6 +283,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("encounter-library.js"));
     html.push_str(include_str!("journal.js"));
     html.push_str(include_str!("session-files.js"));
+    html.push_str(include_str!("party.js"));
     html.push_str(include_str!("import-report.js"));
     html.push_str("</script></body></html>");
     html
