@@ -122,3 +122,32 @@ Keep digital rolling, AC comparison, and damage suggestions independently select
 ## Handoff record
 
 After each implemented phase, add a dated entry with the phase ID, verified outcome, exact checks run, and any remaining manual check. The next agent uses this record and inspects the actual code before beginning the next phase.
+
+### 2026-11-24 · P01 · Room model and durable delivery
+
+P02 can call `party::RoomService` for room commands, publishing, polling, and receipt reconciliation. The local host chooses Party or DM mode. Two players named Lark received distinct memberships and private offer streams. The tests compared the serialized replies for each player and the host, including what the DM could see after a sharing change or disconnect. [Synthetic wire exchanges](../tests/fixtures/party-exchanges.json)
+
+Competing SQLite connections produced one winner for claim versus withdrawal. A separate process committed a claim and exited before acknowledging it. On reopening the same database, the recipient resumed, replayed the claim, and accepted once. Closing a room expired pending offers and preserved outstanding claims. An injected write failure rolled back the state change, event, and receipt together. The DM revision and member-cursor tests also covered stale edits and replay across two pages.
+
+Checks on Windows with stable GNU Rust, w64devkit for bundled SQLite, and installed Chrome passed.
+
+- `cargo test --locked --test party_room` passed all 10 P01 tests.
+- `cargo test --locked --quiet` passed all 44 Rust tests. `cargo build --locked --bins` built both debug binaries.
+- `target\debug\aurora-party.exe init` ran twice with isolated `LOCALAPPDATA` and opened the expected database.
+- `node tests/browser-review.cjs` passed the existing solo-sheet regression and desktop viewport checks using synthetic saves.
+- `rustfmt --edition 2024 --check src/party.rs src/bin/aurora-party.rs tests/party_room.rs` and `git diff --check` passed.
+
+P01 has no remaining manual acceptance check. Launcher host/join, TLS, Windows-protected resume credentials, and the optional live launcher refresh rehearsal remain for P02. The physical two-PC Wi-Fi rehearsal remains outstanding.
+
+### 2026-11-25 · P02 · Host and join through the Windows launcher
+
+The launcher offers Host Party, Host as DM, Join and explicit resume. Each active launcher starts a Rust helper. Host and guest sheets show the roster in Session → Party, and a DM can open a lobby without importing a sheet. The helper routes membership through the P01 room functions. Windows DPAPI protects the persistent bindings. Shutting down the host preserves its room and certificate. Closing the room ends membership.
+
+The Windows rehearsal used independent helpers, isolated app-data directories, synthetic saves and separate Chrome profiles. The guest reloaded its sheet, lost the host, observed reconnection and recovered its original member ID across restarts. Tests exercised invite replacement and closure, unreachable hosts, incompatible versions, a changed host identity and a mismatched TLS certificate, guest role restrictions, incorrect loopback origins and capabilities, leave, fresh pairing and room closure. The LAN listener accepted TLS and rejected refresh and host-control routes. The existing refresh rehearsal staged and applied changes and preserved the previous sheet on malformed XML.
+
+- `cargo test --locked --quiet` passed all 44 Rust tests.
+- `cargo build --release --locked --bins` and `launcher\build.cmd target\p02-windows` built the two helpers and Windows launcher. The separate package directory allowed the existing release launcher to stay open.
+- `node tests/party-launcher.cjs --review-refresh` passed the multiplayer rehearsal and the existing browser regressions, including desktop viewport checks.
+- `rustfmt --edition 2024 --check src/bin/aurora-party.rs` and `git diff --check` passed.
+
+The harness exercised the launcher's native helper startup, sheet generation, DM lobby and refresh bridge. Manual interaction with the WinForms adapter picker, the Windows clipboard and a physical two-PC Wi-Fi/firewall rehearsal remain unverified. P03 can extend the party request types and browser controls for recipient-owned effects.

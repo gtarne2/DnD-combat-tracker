@@ -10,7 +10,7 @@ using System.Windows.Forms;
 
 internal sealed class TrackerLauncher : Form
 {
-    private readonly string tracker = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "combat-sheet.exe");
+    private static readonly string tracker = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "combat-sheet.exe");
     private readonly string appData = Path.Combine(
         Environment.GetEnvironmentVariable("LOCALAPPDATA") ??
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aurora Combat Tracker");
@@ -29,6 +29,7 @@ internal sealed class TrackerLauncher : Form
     private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 290 };
     private string characterPath;
     private RefreshBridge bridge;
+    private PartySession party;
     private readonly NotifyIcon tray = new NotifyIcon { Text = "Aurora Combat Tracker", Icon = SystemIcons.Application };
     private string SettingsPath { get { return Path.Combine(appData, "last-import.txt"); } }
 
@@ -67,13 +68,29 @@ internal sealed class TrackerLauncher : Form
         Place(selection, down, 536, 229, 88, 26);
         Place(this, status, 16, 295, 608, 22);
         Place(this, open, 452, 321, 172, 30);
+        var partyButton = new Button { Text = "Party..." };
+        Place(selection, partyButton, 536, 259, 88, 26);
+        var partyMenu = new ContextMenuStrip();
+        foreach (var entry in new[] { new[] { "Host Party", "host" }, new[] { "Host as DM", "dm" },
+            new[] { "Join", "join" }, new[] { "Resume party", "resume" }, new[] { "Resume DM room", "resume-dm" } })
+        {
+            string mode = entry[1];
+            partyMenu.Items.Add(entry[0], null, async delegate { await OpenParty(mode); });
+        }
+        partyButton.Click += delegate { partyMenu.Show(partyButton, 0, partyButton.Height); };
         AcceptButton = open;
         var trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("Open launcher", null, delegate { Show(); Activate(); });
         trayMenu.Items.Add("Exit refresh service", null, delegate { Close(); });
         tray.ContextMenuStrip = trayMenu;
         tray.DoubleClick += delegate { Show(); Activate(); };
-        FormClosed += delegate { if (bridge != null) bridge.Dispose(); tray.Dispose(); trayMenu.Dispose(); };
+        FormClosed += delegate {
+            if (bridge != null) bridge.Dispose();
+            if (party != null) party.Dispose();
+            partyMenu.Dispose();
+            tray.Dispose();
+            trayMenu.Dispose();
+        };
 
         browse.Click += delegate { ChooseCharacter(); };
         add.Click += delegate { AddContent(); };
@@ -220,7 +237,40 @@ internal sealed class TrackerLauncher : Form
             content.Items.Add(path);
     }
 
-    private async Task OpenSheet()
+    private async Task OpenParty(string mode)
+    {
+        PartySession candidate = null;
+        try {
+            var options = PartySession.Choose(this, mode, characterPath);
+            if (options == null) return;
+            selection.Enabled = false;
+            UpdateButtons();
+            status.Text = "Connecting party...";
+            candidate = await PartySession.Start(options);
+            if (IsDisposed) return;
+            if (candidate.Role == "dm") {
+                candidate.OpenLobby(Path.Combine(appData, "Previews"));
+                if (bridge != null) bridge.Dispose();
+                bridge = null;
+                tray.Visible = true;
+                Hide();
+            } else if (!await OpenSheet(candidate)) return;
+            if (party != null) party.Dispose();
+            party = candidate;
+            candidate = null;
+        } catch (Exception error) {
+            if (!IsDisposed) MessageBox.Show(this, error.Message, "Could not open party", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        } finally {
+            if (candidate != null) candidate.Dispose();
+            if (!IsDisposed) {
+                selection.Enabled = true;
+                UpdateButtons();
+                status.Text = "";
+            }
+        }
+    }
+
+    private async Task<bool> OpenSheet(PartySession attached = null)
     {
         selection.Enabled = false;
         UpdateButtons();
@@ -229,10 +279,10 @@ internal sealed class TrackerLauncher : Form
         RefreshBridge candidate = null;
         try
         {
-            candidate = new RefreshBridge(Path.Combine(appData, "Previews"), directory => GeneratePreview(sources, directory));
+            candidate = new RefreshBridge(Path.Combine(appData, "Previews"), directory => GeneratePreview(sources, directory), attached == null ? null : attached.Url);
             string preview = await candidate.Open();
             if (IsDisposed)
-                return;
+                return false;
             Process.Start(new ProcessStartInfo(preview) { UseShellExecute = true });
             if (bridge != null) bridge.Dispose();
             bridge = candidate;
@@ -247,13 +297,19 @@ internal sealed class TrackerLauncher : Form
             status.Text = "";
             tray.Visible = true;
             Hide();
+            if (attached == null && party != null) {
+                party.Dispose();
+                party = null;
+            }
+            return true;
         }
         catch (Exception error)
         {
             if (IsDisposed)
-                return;
+                return false;
             status.Text = "Check the selected files and try again.";
             MessageBox.Show(this, error.Message, "Could not open combat sheet", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
         }
         finally
         {
@@ -266,7 +322,7 @@ internal sealed class TrackerLauncher : Form
         }
     }
 
-    private async Task<string> GeneratePreview(string[] sources, string previewDirectory)
+    internal static async Task<string> GeneratePreview(string[] sources, string previewDirectory)
     {
         if (!File.Exists(tracker))
             throw new FileNotFoundException("Extract combat-sheet.exe into the same folder as the launcher.");

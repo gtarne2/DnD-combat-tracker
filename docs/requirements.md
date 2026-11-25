@@ -34,6 +34,8 @@ A personal Windows app that uses an Aurora character and its content to show com
 | R28 | Show authored reaction triggers and offer matching, available spell reactions while recording incoming attack or Magic Missile damage. Let the player apply situational attack modifiers when the imported spell states a supported condition. |
 | R29 | Filter the character's spells by preparation, school, ritual, concentration, and material cost. Show costly or consumed materials during casting. Preview supported target-count upcasts, link supported spell effects to their targets and concentration, and show turn reminders for tracked creatures in an area. |
 | R30 | Show attunement requirements and let the player record which items they have attuned to. Gate supported item activations on the saved selection. Restore charges from supported dawn formulas when the player advances to dawn. |
+| R31 | Keep party members distinct even when they use the same name. A player can resume their membership after a disconnect. Only an offer's sender and recipient see its mechanics and outcome. The recipient can claim and then accept or decline, or decline before claiming. Withdrawal, expiry, and room closure preserve an existing claim so its recipient can finish after a restart. |
+| R32 | Host a party from the Windows launcher on a selected IPv4 adapter, host a DM lobby without a character, or join a pasted invitation. Show member names, presence and reconnect status under Session → Party. Hosts can copy, replace or close invitations and end the room. Guests can leave. Resume a saved membership after a helper restart. Standalone sheets support solo play. |
 
 ## First playtest
 
