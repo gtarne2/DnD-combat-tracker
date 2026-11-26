@@ -34,7 +34,7 @@ cargo build --release --locked --bins
 .\launcher\build.cmd target\tracker-windows
 ```
 
-The launcher build and packaged rehearsals read the two release binaries from `target/release`. Set `CARGO_TARGET_DIR` for both Cargo and packaging to build separately while an existing helper is running. Rebuild `combat-sheet` after changing embedded sheet assets. Rebuild the release helpers or launcher package after changing their respective Rust code, native code, DM assets, or bundled data. Use Cargo's `--offline` when dependencies are already cached.
+The launcher build and packaged rehearsals read the two release binaries from `target/release`. While an existing helper is running, set `CARGO_TARGET_DIR` to `target\alt-build` for both Cargo and packaging, and package into `target\tracker-windows-alt`. Reuse those folders rather than creating new ones, as described in [AGENTS.md](../AGENTS.md#keep-target-tidy). Rebuild `combat-sheet` after changing embedded sheet assets. Rebuild the release helpers or launcher package after changing their respective Rust code, native code, DM assets, or bundled data. Use Cargo's `--offline` when dependencies are already cached.
 
 With the default Cargo target directory, run `.\launcher\build.cmd` without an output argument to update the repository shortcut's launcher in `target/release`. An open DM dashboard keeps its original helper. If Add to encounter rejects an unknown `license` or `schema_version` field, use **Exit refresh service** in the older launcher's tray menu, then choose **Party… → Resume DM room** in the current package. Protocol 2 requires updated helpers on all peers. Resume with the current package to reuse a saved binding.
 
