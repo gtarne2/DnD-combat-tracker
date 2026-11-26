@@ -7,51 +7,87 @@ function renderMonsterStatBlock(target, snapshot) {
   if (!snapshot) return;
   const {pack, monster} = snapshot;
   const s = monster.stats, d = s.defenses || {}, details = s.details || {};
-  const add = (tag, text) => {
+  let parent = target;
+  const add = (tag, text, className) => {
     const node = document.createElement(tag);
     node.textContent = text;
+    if (className) node.className = className;
+    parent.append(node);
+    return node;
+  };
+  const group = className => {
+    const node = document.createElement("div");
+    node.className = className;
     target.append(node);
+    parent = node;
+    return node;
   };
+  // Keep each line's text as "Label · value" so search, copy and the rehearsals read the same words.
   const field = (label, value) => {
-    if (value != null && value !== "") add("p", label + " · " + value);
+    if (value == null || value === "") return;
+    const line = document.createElement("p");
+    line.className = "sb-field";
+    const name = document.createElement("span");
+    name.className = "sb-label";
+    name.textContent = label;
+    const separator = document.createElement("span");
+    separator.className = "sb-sep";
+    separator.textContent = " · ";
+    line.append(name, separator, String(value));
+    parent.append(line);
   };
-  add("h3", monster.name);
-  add("p", [pack.edition, pack.source, pack.source_version].filter(Boolean).join(" · "));
-  add("p", pack.attribution);
-  field("License", monsterLicense(pack.license));
-  const source = monster.source_locator;
-  if (source) field("Source entry", [
-    source.entry_id, source.section, source.page != null && "Page " + source.page, source.source_version
-  ].filter(Boolean).join(" · "));
+  group("sb-head");
+  add("h3", monster.name, "sb-name");
   field("Creature", [s.size || details.sizes?.join(" or "), s.creature_type].filter(Boolean).join(" "));
   if (s.size && details.sizes?.length) field("Size choices", details.sizes.join(" or "));
   field("Alignment", details.alignment);
-  field("Challenge", s.challenge);
-  field("Challenge notes", details.challenge_notes);
-  field("XP", details.xp);
-  field("Proficiency bonus", details.proficiency_bonus != null ? signedStat(details.proficiency_bonus) : null);
+  group("sb-core");
+  field("Armor Class", [d.ac ?? "Unknown", d.armor].filter(v => v != null).join(" · "));
+  for (const armor of d.conditional_ac || [])
+    field("Conditional AC", [armor.ac,armor.qualifier].filter(v => v != null).join(" · "));
   const initiative = details.initiative;
   if (initiative) field("Initiative", [
     initiative.modifier != null ? signedStat(initiative.modifier) : null,
     initiative.score != null ? "(" + initiative.score + ")" : null,
     initiative.qualifier
   ].filter(Boolean).join(" "));
-  field("Armor Class", [d.ac ?? "Unknown", d.armor].filter(v => v != null).join(" · "));
-  for (const armor of d.conditional_ac || [])
-    field("Conditional AC", [armor.ac,armor.qualifier].filter(v => v != null).join(" · "));
   field("HP", (s.hp ?? "Unknown") + (s.hit_dice ? " (" + s.hit_dice + ")" : ""));
-  for (const [label, value] of [
-    ["Speed",s.speed], ["Senses",s.senses], ["Languages",s.languages], ["Gear",details.gear],
-    ["Vulnerabilities",d.vulnerabilities], ["Resistances",d.resistances],
-    ["Immunities",d.immunities], ["Condition immunities",d.condition_immunities]
-  ]) field(label, value);
-  for (const [label, values] of [["Abilities",s.abilities],["Saves",s.saves],["Skills",s.skills]]) {
-    field(label, Object.entries(values || {}).map(([name, value]) =>
-      name + " " + (label === "Abilities" ? value : signedStat(value))).join(", "));
+  field("Speed", s.speed);
+  const abilityOrder = ["str","dex","con","int","wis","cha"];
+  const rank = name => (abilityOrder.indexOf(name.slice(0, 3).toLowerCase()) + 7) % 7;
+  const abilities = Object.entries(s.abilities || {}).sort(([a], [b]) => rank(a) - rank(b));
+  if (abilities.length) {
+    const grid = document.createElement("dl");
+    grid.className = "sb-abilities";
+    for (const [name, value] of abilities) {
+      const cell = document.createElement("div");
+      const term = document.createElement("dt");
+      term.textContent = name.slice(0, 3).toUpperCase();
+      term.title = name;
+      const score = document.createElement("dd");
+      score.textContent = value + (Number.isFinite(value) ? " (" + signedStat(Math.floor((value - 10) / 2)) + ")" : "");
+      cell.append(term, score);
+      grid.append(cell);
+    }
+    target.append(grid);
+  }
+  group("sb-details");
+  for (const [label, values] of [["Saves",s.saves],["Skills",s.skills]]) {
+    field(label, Object.entries(values || {}).map(([name, value]) => name + " " + signedStat(value)).join(", "));
   }
   field("Save notes",details.saves_text);
   field("Skill notes",details.skills_text);
+  for (const [label, value] of [
+    ["Vulnerabilities",d.vulnerabilities], ["Resistances",d.resistances],
+    ["Immunities",d.immunities], ["Condition immunities",d.condition_immunities],
+    ["Senses",s.senses], ["Languages",s.languages], ["Gear",details.gear]
+  ]) field(label, value);
+  field("Challenge", s.challenge);
+  field("Challenge notes", details.challenge_notes);
+  field("XP", details.xp);
+  field("Proficiency bonus", details.proficiency_bonus != null ? signedStat(details.proficiency_bonus) : null);
   if (s.notes) add("p", s.notes);
+  parent = target;
   const names = new Map((s.actions || []).map(action => [action.id, action.name]));
   for (const [key,label] of [
     ["traits","Traits"],["actions","Actions"],["bonus_actions","Bonus actions"],
@@ -62,6 +98,10 @@ function renderMonsterStatBlock(target, snapshot) {
     add("h4",label);
     if (preamble) add("p",preamble);
     for (const a of s[key] || []) {
+      const entry = document.createElement("div");
+      entry.className = "sb-entry";
+      target.append(entry);
+      parent = entry;
       add("h5",a.name);
       add("p",a.text);
       const range = a.range_ft;
@@ -83,14 +123,23 @@ function renderMonsterStatBlock(target, snapshot) {
         a.resolution?.legendary_cost && "Legendary action cost " + a.resolution.legendary_cost,
         a.multiattack?.length && a.multiattack.map(id => names.get(id) || id).join(", ")
       ].filter(Boolean);
-      if (mechanics.length) add("p",mechanics.join(" · "));
-      if (a.resolution?.manual_note) add("p",a.resolution.manual_note);
+      if (mechanics.length) add("p",mechanics.join(" · "),"sb-mechanics");
+      if (a.resolution?.manual_note) add("p",a.resolution.manual_note,"sb-note");
+      parent = target;
     }
   }
   for (const section of details.sections || []) {
     add("h4",section.title);
     add("p",section.text);
   }
+  group("sb-credits");
+  add("p", [pack.edition, pack.source, pack.source_version].filter(Boolean).join(" · "));
+  add("p", pack.attribution);
+  field("License", monsterLicense(pack.license));
+  const source = monster.source_locator;
+  if (source) field("Source entry", [
+    source.entry_id, source.section, source.page != null && "Page " + source.page, source.source_version
+  ].filter(Boolean).join(" · "));
 }
 
 function compareChallenge(left, right) {
@@ -174,8 +223,9 @@ function setupMonsterLibrary(request, addToEncounter) {
       return tokens.every(token => name.includes(token))
         && filters.every(([field, values]) => !field.value || values(m.stats).includes(field.value));
     }).sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-    matches.replaceChildren(...visible.map(m => new Option(
-      [m.name,loaded.pack.info.edition,m.id].join(" · "),m.id)));
+    matches.replaceChildren(...visible.map(m => Object.assign(new Option(
+      [m.name,loaded.pack.info.edition,m.stats.challenge ? "CR " + m.stats.challenge : m.stats.creature_type || "Template"]
+        .filter(Boolean).join(" · "),m.id), {title:m.id})));
     matches.value = visible.some(m => m.id === selected) ? selected : visible[0]?.id ?? "";
     selection();
   }

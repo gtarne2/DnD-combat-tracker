@@ -111,10 +111,19 @@ function setupMonsterActions(el, change, selectRow) {
     el("dm-current-actions").hidden = !current?.enemy || row.id === current.id;
     el("dm-actions-actor").textContent = row.name + (row.id === current?.id ? " · Current turn" : "") + " · "
       + (mode.value === "assist" ? "Assist" : "Manual");
-    el("dm-action-budget").textContent = [
-      ...["action", "bonus", "reaction"].map(key => labels[key] + " " + (actions[key] ? "ready" : "spent")),
-      actions.legendary_max ? "Legendary " + actions.legendary_left + " / " + actions.legendary_max : ""
-    ].filter(Boolean).join(" · ");
+    const pills = ["action", "bonus", "reaction"].map(key => {
+      const pill = make("span", labels[key] + " " + (actions[key] ? "ready" : "spent"));
+      pill.className = "dm-pill";
+      pill.dataset.state = actions[key] ? "ready" : "spent";
+      return pill;
+    });
+    if (actions.legendary_max) {
+      const pill = make("span", "Legendary " + actions.legendary_left + " / " + actions.legendary_max);
+      pill.className = "dm-pill dm-pill-legendary";
+      pill.dataset.state = actions.legendary_left ? "ready" : "spent";
+      pills.push(pill);
+    }
+    el("dm-action-budget").replaceChildren(...pills);
     el("dm-add-rule").disabled = el("dm-correct-budget").disabled = busy;
     const prior = rowChanged ? "" : picker.value;
     const choices = actions.rules.map(r => new Option(r.name, r.id));
