@@ -1,6 +1,6 @@
 {
   "name": "Aurora Combat Tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "manifest_version": 1,
   "description": "Links an Owlbear Rodeo room to the Aurora Combat Tracker running on the DM's Windows PC.",
   "author": "Aurora Combat Tracker",
@@ -12,6 +12,6 @@
     "icon": "https://gtarne2.github.io/DnD-combat-tracker/icon.svg",
     "popover": "https://gtarne2.github.io/DnD-combat-tracker/popover.html",
     "width": 380,
-    "height": 520
+    "height": 600
   }
 }
