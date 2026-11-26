@@ -548,6 +548,38 @@ impl Fight {
         view
     }
 
+    /// Map-facing projection for a virtual tabletop link (Owlbear Rodeo). It carries only
+    /// what every player may see: row IDs, kinds, revealed names and the turn pointer.
+    /// Unrevealed enemies keep their row ID so the DM can place a hidden token, but no name.
+    pub fn table_view(&self) -> Value {
+        let rows: Vec<Value> = self
+            .position
+            .rows
+            .iter()
+            .map(|row| match &row.actor {
+                Participant::Enemy(enemy) => json!({
+                    "id": row.id,
+                    "kind": "enemy",
+                    "revealed": enemy.revealed,
+                    "name": enemy.revealed.then_some(&enemy.alias),
+                }),
+                Participant::Player { member, name, .. } => json!({
+                    "id": row.id, "kind": "player", "member_id": member, "name": name,
+                }),
+                Participant::Companion {
+                    member,
+                    local_id,
+                    name,
+                } => json!({
+                    "id": row.id, "kind": "companion", "member_id": member,
+                    "local_id": local_id, "name": name,
+                }),
+            })
+            .collect();
+        json!({"id":self.id,"revision":self.revision,"running":self.running,
+            "round":self.position.round,"current":self.position.current,"rows":rows})
+    }
+
     fn members(&self) -> BTreeSet<Uuid> {
         self.position.rows.iter().filter_map(Row::member).collect()
     }

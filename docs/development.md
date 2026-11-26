@@ -58,6 +58,7 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | DM save and reaction questions | `node tests/party-launcher.cjs --strike-windows` and the same command with `--fallback-writer`. |
 | DM Assist and damage suggestions | `node tests/party-launcher.cjs --monster-assist`. Add `--assist` to the strike-window and damage suites to exercise their flows in Assist. |
 | Monster library or encounter snapshots | `node tests/party-launcher.cjs --monsters`. |
+| Owlbear Rodeo link | `cargo test --locked --test owlbear_link`, then `node tests/owlbear-bridge.cjs` with `AURORA_PARTY` pointing at the built helper. The helper runtime is Windows-only, so off Windows this needs a local preview build of the helper. |
 | Encounter export and import | `cargo test --locked --test encounter_portability`, then `node tests/party-launcher.cjs --encounters`. |
 | Bundled pack or notices | Use the reproducibility and source audits for [SRD 5.1](srd51-pack.md#reproduce-and-audit) or [SRD 5.2.1](srd521-pack.md#reproduce-and-audit), then run the packaged suite with `--srd51` or `--srd521`. |
 

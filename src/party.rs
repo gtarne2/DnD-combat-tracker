@@ -238,6 +238,21 @@ impl RoomService {
         })
     }
 
+    /// DM-only, player-safe projection of the current encounter for a virtual tabletop link.
+    /// See `initiative::Fight::table_view`.
+    pub fn table_view(
+        &self,
+        principal: Principal,
+        room_id: Uuid,
+    ) -> Result<serde_json::Value, PartyError> {
+        let room = store::load(&self.db, room_id)?.ok_or(Rejection::UnknownRoom)?;
+        room.active(principal)?;
+        if principal != Principal::LocalHost || room.mode != HostMode::Dm {
+            return Err(Rejection::Forbidden.into());
+        }
+        Ok(serde_json::json!({"room_id": room_id, "encounter": room.fight.table_view()}))
+    }
+
     /// DM-only portable copy of the current encounter position. See `initiative::PortableEncounter`.
     pub fn export_encounter(
         &self,
