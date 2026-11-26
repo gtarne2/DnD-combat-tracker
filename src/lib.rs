@@ -4,6 +4,7 @@ pub mod companion;
 pub mod concentration;
 pub mod effects;
 pub mod encounter;
+pub mod fivetools;
 pub mod inventory;
 pub mod monsters;
 pub mod party;

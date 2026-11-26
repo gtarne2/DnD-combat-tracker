@@ -131,6 +131,7 @@
           <button type="button" id="monster-export">Export pack JSON</button>
           <label class="dm-file">Import pack JSON <input id="monster-import" type="file" accept=".json,application/json"></label>
           <button type="button" id="monster-aurora">Import Aurora folder</button>
+          <button type="button" id="monster-fivetools">Import 5etools JSON</button>
           <button type="button" id="monster-new-pack">Create pack</button>
         </div>
         <details id="monster-pack-credits" hidden>
@@ -154,6 +155,7 @@
   <form class="dm-library-body" id="monster-confirm"><h2 id="monster-import-title">Review pack import</h2>
     <p id="monster-import-description"></p>
     <p id="monster-import-credits" class="monster-credits"></p>
+    <details id="monster-import-warnings" hidden><summary></summary><ul></ul></details>
     <div class="dm-dialog-actions"><button id="monster-confirm-save" class="dm-primary">Import pack</button>
     <button type="button" data-close>Cancel</button></div>
     <p role="status"></p>
@@ -171,6 +173,7 @@
       <label>License <input name="license" maxlength="120"></label>
       <label>License URL <input name="license_url" type="url" maxlength="2048"></label>
       <label id="monster-xml-label" hidden>Local XML folder <input name="folder" type="file" webkitdirectory multiple></label>
+      <label id="monster-fivetools-label" hidden>5etools bestiary JSON <input name="bestiary" type="file" accept=".json,application/json"></label>
     </div>
     <div class="dm-dialog-actions"><button class="dm-primary">Continue</button><button type="button" data-close>Cancel</button></div>
     <p role="status"></p>

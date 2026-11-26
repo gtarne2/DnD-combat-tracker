@@ -165,7 +165,7 @@ function setupMonsterLibrary(request, addToEncounter) {
   const packForm = el("monster-pack-form");
   const templateForm = el("monster-template-form");
   const add = el("monster-add");
-  const loadControls = [packChoice,el("monster-import"),el("monster-aurora"),el("monster-new-pack")];
+  const loadControls = [packChoice,el("monster-import"),el("monster-aurora"),el("monster-fivetools"),el("monster-new-pack")];
   const filters = [
     [el("monster-type"), s => [s.creature_type]],
     [el("monster-size"), s => s.details?.sizes?.length ? s.details.sizes : [s.size]],
@@ -261,8 +261,16 @@ function setupMonsterLibrary(request, addToEncounter) {
   for (const [field] of filters) field.onchange = () => populateMatches();
   matches.onchange = selection;
 
-  async function reviewImport(pack) {
+  async function reviewImport(pack, warnings = []) {
     const before = await api("validate",pack);
+    const notes = el("monster-import-warnings");
+    notes.hidden = !warnings.length;
+    notes.querySelector("summary").textContent = warnings.length + " not imported or incomplete";
+    notes.querySelector("ul").replaceChildren(...warnings.map(text => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      return item;
+    }));
     pendingImport = {pack,expected_revision:before?.revision ?? null};
     const after = monsterPackLabel(pack.info) + " · " + pack.monsters.length + " templates.";
     el("monster-import-description").textContent = before
@@ -282,7 +290,10 @@ function setupMonsterLibrary(request, addToEncounter) {
     if (!file) return;
     run(status, async () => {
       if (file.size > 16 * 1024 * 1024) throw new Error("Monster packs are limited to 16 MiB.");
-      await reviewImport(JSON.parse(await file.text()));
+      const pack = JSON.parse(await file.text());
+      if (pack && pack.schema_version == null && Array.isArray(pack.monster))
+        throw new Error("This looks like a 5etools bestiary. Use Import 5etools JSON instead.");
+      await reviewImport(pack);
     });
   };
 
@@ -309,17 +320,21 @@ function setupMonsterLibrary(request, addToEncounter) {
     packMode = mode;
     packForm.reset();
     const fields = packForm.elements;
-    const aurora = mode === "aurora";
-    fields.id.value = aurora ? "aurora-local" : "homebrew-" + crypto.randomUUID();
+    const aurora = mode === "aurora", fivetools = mode === "fivetools";
+    fields.id.value = aurora ? "aurora-local" : fivetools ? "5etools-local" : "homebrew-" + crypto.randomUUID();
     fields.edition.value = "2014";
-    fields.source.value = aurora ? "Local Aurora companions" : "Local homebrew";
-    fields.attribution.value = aurora ? "Imported from local Aurora XML." : "Private homebrew.";
+    fields.source.value = aurora ? "Local Aurora companions" : fivetools ? "Local 5etools bestiary" : "Local homebrew";
+    fields.attribution.value = aurora ? "Imported from local Aurora XML."
+      : fivetools ? "Imported from a local 5etools bestiary file." : "Private homebrew.";
     fields.folder.required = aurora;
+    fields.bestiary.required = fivetools;
     el("monster-xml-label").hidden = !aurora;
+    el("monster-fivetools-label").hidden = !fivetools;
     packForm.querySelector("[role=status]").textContent = "";
     packForm.closest("dialog").showModal();
   }
   el("monster-aurora").onclick = () => openPackForm("aurora");
+  el("monster-fivetools").onclick = () => openPackForm("fivetools");
   el("monster-new-pack").onclick = () => openPackForm("create");
 
   submit(packForm, async () => {
@@ -336,6 +351,13 @@ function setupMonsterLibrary(request, addToEncounter) {
       if (xml.reduce((size,file) => size + file.size,0) > 24 * 1024 * 1024)
         throw new Error("Choose an Aurora folder with up to 24 MiB of XML.");
       await reviewImport(await api("aurora",{info,files:await Promise.all(xml.map(file => file.text()))}));
+      packForm.closest("dialog").close();
+    } else if (packMode === "fivetools") {
+      const file = f.bestiary.files[0];
+      if (!file) throw new Error("Choose a 5etools bestiary JSON file.");
+      if (file.size > 16 * 1024 * 1024) throw new Error("5etools files are limited to 16 MiB.");
+      const {pack, warnings} = await api("fivetools",{info,json:await file.text()});
+      await reviewImport(pack, warnings);
       packForm.closest("dialog").close();
     } else {
       packForm.closest("dialog").close();
