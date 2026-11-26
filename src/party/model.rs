@@ -1,6 +1,9 @@
 use super::Principal;
 use super::initiative::{Edit, FightEdit};
-use super::monster_actions::DamageDecision;
+use super::interruptions::{
+    Answer, Question, QuestionView, Resolution, Window, WindowEdit, WindowRef,
+};
+use super::monster_actions::{DamageDecision, DamageRoll, Outcome};
 use super::wire::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -21,6 +24,12 @@ pub(super) struct Room {
     offers: BTreeMap<Uuid, Offer>,
     #[serde(default)]
     damage: BTreeMap<Uuid, DamageResolution>,
+    #[serde(default)]
+    damage_rolls: BTreeMap<Uuid, DamageRoll>,
+    #[serde(default)]
+    windows: BTreeMap<Uuid, Window>,
+    #[serde(default)]
+    pub announcements: Vec<String>,
     #[serde(default)]
     ended_grants: std::collections::BTreeSet<(Uuid, Uuid)>,
     pub encounter: Option<SharedRound>,
@@ -86,6 +95,11 @@ impl Change {
             ));
         }
     }
+
+    fn window_changed(&mut self, dm: Uuid, recipient: Uuid) {
+        self.deliveries
+            .extend([dm, recipient].map(|id| (id, Event::WindowsChanged)));
+    }
 }
 
 fn valid_label(value: &str) -> bool {
@@ -100,6 +114,9 @@ impl Room {
             members: BTreeMap::new(),
             offers: BTreeMap::new(),
             damage: BTreeMap::new(),
+            damage_rolls: BTreeMap::new(),
+            windows: BTreeMap::new(),
+            announcements: vec![],
             encounter: None,
             fight: super::initiative::Fight::new(),
             ended_grants: Default::default(),
@@ -139,8 +156,34 @@ impl Room {
         let mut combat = self.fight.view(id, dm);
         if dm {
             combat["damage"] = serde_json::json!(&self.damage);
+            combat["damage_rolls"] = serde_json::json!(&self.damage_rolls);
+            combat["windows"] = serde_json::json!(&self.windows);
         }
         combat
+    }
+
+    pub(super) fn questions(&self, player: Uuid) -> Vec<QuestionView> {
+        self.windows
+            .values()
+            .filter(|w| w.recipient == player && matches!(w.resolution, Resolution::Pending))
+            .map(Window::question_view)
+            .collect()
+    }
+
+    pub(super) fn check_window(
+        &self,
+        actor: Uuid,
+        reference: WindowRef,
+    ) -> Result<QuestionView, Rejection> {
+        self.windows
+            .values()
+            .find(|w| {
+                w.reference == reference
+                    && w.recipient == actor
+                    && matches!(w.resolution, Resolution::Pending)
+            })
+            .map(Window::question_view)
+            .ok_or(Rejection::StaleWindow)
     }
 
     fn broadcast(&self, change: &mut Change, event: Event) {
@@ -189,6 +232,9 @@ impl Room {
             return self.admit(principal, name);
         }
         let id = self.identity(principal)?;
+        if let WindowReply { window, .. } = op {
+            self.check_window(id, *window)?;
+        }
         // An authenticated recipient retains exactly the right to finish its own
         // claim after close/leave. Lost final acknowledgments are replayable too.
         if let Claim { offer_id } = op
@@ -230,6 +276,7 @@ impl Room {
                 change.deliveries.extend(self.fight.leave(id));
                 self.members.get_mut(&id).unwrap().active = false;
                 self.expire_pending(Some(id), &mut change);
+                self.stale_windows(false, false, Some(id), &mut change)?;
                 change.connection = ConnectionChange::Leave(id);
                 self.broadcast(&mut change, Event::RosterChanged);
             }
@@ -237,6 +284,7 @@ impl Room {
                 change.deliveries.extend(self.fight.close());
                 self.closed = true;
                 self.expire_pending(None, &mut change);
+                self.stale_windows(true, false, None, &mut change)?;
                 for member in self.members.values_mut() {
                     member.active = false;
                 }
@@ -295,6 +343,55 @@ impl Room {
             }
             Initiative(cmd) if self.mode == HostMode::Dm => {
                 let dm = principal == Principal::LocalHost;
+                match &cmd.edit {
+                    Edit::ReviewStrike {
+                        action_id,
+                        strike_id,
+                        review,
+                    } => {
+                        if !dm {
+                            return Err(Rejection::Forbidden);
+                        }
+                        self.fight.check_revision(cmd)?;
+                        if self.damage.contains_key(strike_id)
+                            || self.windows.contains_key(strike_id)
+                            || self.damage_rolls.contains_key(strike_id)
+                        {
+                            return Err(Rejection::InvalidTransition);
+                        }
+                        self.fight.review_strike(*action_id, *strike_id, review)?;
+                        return Ok(change);
+                    }
+                    Edit::StoreDamageRoll {
+                        action_id,
+                        strike_id,
+                        roll,
+                    } => {
+                        if !dm {
+                            return Err(Rejection::Forbidden);
+                        }
+                        self.fight.check_revision(cmd)?;
+                        self.damage_target(*action_id, *strike_id)?;
+                        if !roll.valid() || self.damage_rolls.contains_key(strike_id) {
+                            return Err(Rejection::InvalidInput);
+                        }
+                        self.damage_rolls.insert(*strike_id, *roll);
+                        self.fight.revised();
+                        return Ok(change);
+                    }
+                    _ => {}
+                }
+                if let Edit::StrikeWindow {
+                    action_id,
+                    strike_id,
+                    ref edit,
+                } = cmd.edit
+                {
+                    if !dm {
+                        return Err(Rejection::Forbidden);
+                    }
+                    return self.edit_window(id, cmd, action_id, strike_id, edit);
+                }
                 if let Edit::FinalizeDamage {
                     action_id,
                     strike_id,
@@ -324,6 +421,27 @@ impl Room {
                     cmd,
                     &players,
                 )?);
+                self.stale_windows(
+                    matches!(cmd.edit, Edit::End | Edit::Load { .. } | Edit::New),
+                    matches!(cmd.edit, Edit::Next | Edit::Start),
+                    None,
+                    &mut change,
+                )?;
+            }
+            WindowReply { window, reply } => {
+                let dm = self.identity(Principal::LocalHost)?;
+                let current = self
+                    .windows
+                    .values_mut()
+                    .find(|w| w.reference == *window && w.recipient == id)
+                    .ok_or(Rejection::StaleWindow)?;
+                if !current.question.accepts(reply.answer, reply.reacted) {
+                    return Err(Rejection::InvalidInput);
+                }
+                current.reply = Some(*reply);
+                current.resolution = Resolution::Answered;
+                change.window_changed(dm, id);
+                self.fight.revised();
             }
             SetRound {
                 encounter_id,
@@ -337,6 +455,163 @@ impl Room {
         Ok(change)
     }
 
+    fn stale_windows(
+        &mut self,
+        all: bool,
+        boundary: bool,
+        leaving: Option<Uuid>,
+        change: &mut Change,
+    ) -> Result<(), Rejection> {
+        if self.windows.is_empty() {
+            return Ok(());
+        }
+        let dm = self.identity(Principal::LocalHost)?;
+        for (&strike, window) in &mut self.windows {
+            if !matches!(
+                window.resolution,
+                Resolution::Pending | Resolution::Answered
+            ) {
+                continue;
+            }
+            let loses_trigger = boundary
+                && window.question != Question::Save
+                && matches!(window.resolution, Resolution::Pending);
+            if all
+                || loses_trigger
+                || leaving == Some(window.recipient)
+                || self.fight.recorded_strike(window.action, strike).is_err()
+                || window.target != window.recipient && !self.fight.has_row(window.target)
+            {
+                window.resolution = Resolution::Stale;
+                change.window_changed(dm, window.recipient);
+            }
+        }
+        Ok(())
+    }
+
+    fn edit_window(
+        &mut self,
+        dm: Uuid,
+        cmd: &FightEdit,
+        action: Uuid,
+        strike: Uuid,
+        edit: &WindowEdit,
+    ) -> Result<Change, Rejection> {
+        self.fight.check_revision(cmd)?;
+        if self.damage.contains_key(&strike) {
+            return Err(Rejection::InvalidTransition);
+        }
+        let (_, recipient, target) = self.fight.recorded_strike(action, strike)?;
+        let mut change = Change::new(Receipt::Done);
+        if let WindowEdit::Open {
+            id,
+            question,
+            announcement,
+        } = edit
+        {
+            let recipient = recipient
+                .filter(|r| self.members.get(r).is_some_and(|member| member.active))
+                .ok_or(Rejection::InvalidInput)?;
+            let target = target
+                .filter(|&id| id == recipient || self.fight.has_row(id))
+                .ok_or(Rejection::InvalidInput)?;
+            if id.is_nil()
+                || self.windows.values().any(|w| w.reference.id == *id)
+                || !announcement.is_empty() && !valid_label(announcement)
+            {
+                return Err(Rejection::InvalidInput);
+            }
+            let prior = self.windows.get(&strike);
+            if prior.is_some_and(|w| {
+                w.action != action
+                    || !matches!(w.resolution, Resolution::Canceled | Resolution::Stale)
+            }) {
+                return Err(Rejection::InvalidTransition);
+            }
+            let version = prior
+                .map_or(Some(1), |w| w.reference.version.checked_add(1))
+                .ok_or(Rejection::InvalidInput)?;
+            self.windows.insert(
+                strike,
+                Window {
+                    reference: WindowRef { id: *id, version },
+                    question: *question,
+                    action,
+                    recipient,
+                    target,
+                    resolution: Resolution::Pending,
+                    reply: None,
+                },
+            );
+            change.window_changed(dm, recipient);
+            if !announcement.is_empty() {
+                self.announcements.push(announcement.clone());
+                if self.announcements.len() > 20 {
+                    self.announcements.remove(0);
+                }
+                self.broadcast(&mut change, Event::WindowsChanged);
+            }
+        } else {
+            let current = self
+                .windows
+                .get_mut(&strike)
+                .filter(|w| w.action == action)
+                .ok_or(Rejection::StaleWindow)?;
+            let (reference, resolution) = match edit {
+                WindowEdit::Cancel { window }
+                    if matches!(
+                        current.resolution,
+                        Resolution::Pending | Resolution::Answered
+                    ) =>
+                {
+                    (*window, Resolution::Canceled)
+                }
+                WindowEdit::Resume { window }
+                    if matches!(current.resolution, Resolution::Answered) =>
+                {
+                    let outcome = match current.reply.map(|reply| reply.answer) {
+                        Some(Answer::Hit) => Outcome::Hit,
+                        Some(Answer::Miss) => Outcome::Miss,
+                        Some(Answer::SaveSuccess) => Outcome::SaveSuccess,
+                        Some(Answer::SaveFailure) => Outcome::SaveFailure,
+                        _ => return Err(Rejection::InvalidTransition),
+                    };
+                    (
+                        *window,
+                        Resolution::Final {
+                            outcome,
+                            override_note: None,
+                        },
+                    )
+                }
+                WindowEdit::Override {
+                    window,
+                    outcome,
+                    note,
+                } if !matches!(current.resolution, Resolution::Final { .. })
+                    && !note.trim().is_empty()
+                    && note.len() <= 4000 =>
+                {
+                    (
+                        *window,
+                        Resolution::Final {
+                            outcome: *outcome,
+                            override_note: Some(note.clone()),
+                        },
+                    )
+                }
+                _ => return Err(Rejection::InvalidTransition),
+            };
+            if current.reference != reference {
+                return Err(Rejection::StaleWindow);
+            }
+            current.resolution = resolution;
+            change.window_changed(dm, current.recipient);
+        }
+        self.fight.revised();
+        Ok(change)
+    }
+
     fn finalize_damage(
         &mut self,
         dm: Uuid,
@@ -346,10 +621,7 @@ impl Room {
         decision: DamageDecision,
     ) -> Result<Change, Rejection> {
         self.fight.check_revision(cmd)?;
-        if self.damage.contains_key(&strike_id) {
-            return Err(Rejection::InvalidTransition);
-        }
-        let recipient = self.fight.damage_recipient(action_id, strike_id)?;
+        let recipient = self.damage_target(action_id, strike_id)?;
         let mut change = Change::new(Receipt::Done);
         let result = match decision {
             DamageDecision::Handled => DamageResult::Handled,
@@ -370,8 +642,27 @@ impl Room {
         };
         self.damage
             .insert(strike_id, DamageResolution { action_id, result });
-        self.fight.damage_committed();
+        self.fight.revised();
         Ok(change)
+    }
+
+    fn damage_target(&self, action_id: Uuid, strike_id: Uuid) -> Result<Option<Uuid>, Rejection> {
+        if self.damage.contains_key(&strike_id) {
+            return Err(Rejection::InvalidTransition);
+        }
+        let (mut outcome, recipient, _) = self.fight.recorded_strike(action_id, strike_id)?;
+        if let Some(window) = self.windows.get(&strike_id) {
+            match window.resolution {
+                Resolution::Final {
+                    outcome: ruling, ..
+                } if window.action == action_id => outcome = ruling,
+                _ => return Err(Rejection::InvalidTransition),
+            }
+        }
+        if matches!(outcome, Outcome::Miss) {
+            return Err(Rejection::InvalidTransition);
+        }
+        Ok(recipient)
     }
 
     fn send(

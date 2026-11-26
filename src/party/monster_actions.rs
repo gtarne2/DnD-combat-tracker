@@ -143,9 +143,50 @@ pub struct Strike {
     pub target_note: String,
     pub total: Option<i32>,
     pub outcome: Outcome,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attack_roll: Option<AttackRoll>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub assist_damage: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AttackRoll {
+    pub natural: u8,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub digital: bool,
+    pub digital_total: Option<i32>,
+}
+
+impl AttackRoll {
+    fn valid(self) -> bool {
+        (1..=20).contains(&self.natural) && (self.digital || self.digital_total.is_none())
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StrikeReview {
+    pub total: Option<i32>,
+    pub outcome: Outcome,
+    pub attack_roll: Option<AttackRoll>,
+    pub assist_damage: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DamageRoll {
+    pub normal: u32,
+    pub critical: u32,
+}
+
+impl DamageRoll {
+    pub(super) fn valid(self) -> bool {
+        self.normal <= self.critical && self.critical <= 3_360_000
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {
     Hit,
@@ -183,6 +224,7 @@ struct Rule<'a> {
     text: &'a str,
     policy: Policy,
     strikes: &'a [String],
+    mechanics: Option<&'a Action>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -218,6 +260,38 @@ impl Default for Actions {
 }
 
 impl Actions {
+    pub(super) fn review(
+        &mut self,
+        action: Uuid,
+        strike: Uuid,
+        review: &StrikeReview,
+    ) -> Result<bool, Rejection> {
+        let Some(entry) = self
+            .history
+            .iter_mut()
+            .find(|entry| entry.input.id == action)
+        else {
+            return Ok(false);
+        };
+        let strike = entry
+            .input
+            .strikes
+            .iter_mut()
+            .find(|s| s.id == strike)
+            .ok_or(Rejection::InvalidInput)?;
+        if review.attack_roll.is_some_and(|roll| !roll.valid())
+            || strike
+                .attack_roll
+                .is_some_and(|roll| roll.digital && Some(roll) != review.attack_roll)
+        {
+            return Err(Rejection::InvalidInput);
+        }
+        strike.total = review.total;
+        strike.outcome = review.outcome;
+        strike.attack_roll = review.attack_roll;
+        strike.assist_damage = review.assist_damage;
+        Ok(true)
+    }
     pub(super) fn strike(
         &self,
         action: Uuid,
@@ -249,6 +323,7 @@ impl Actions {
                         name: &a.name,
                         text: &a.text,
                         strikes: &a.multiattack,
+                        mechanics: Some(a),
                     }
                 }));
             }
@@ -267,6 +342,7 @@ impl Actions {
                 name: &a.name,
                 text: &a.text,
                 strikes: &[],
+                mechanics: None,
             }
         }));
         rules
@@ -299,6 +375,11 @@ impl Actions {
             "rules": rules.iter().map(|rule| json!({
                 "id":rule.id, "name":rule.name, "text":rule.text, "policy":rule.policy,
                 "counter":self.counter(rule), "strikes":Self::strikes(rule, &rules),
+                "mechanics":rule.mechanics.map(|action| json!({
+                    "attack_bonus":action.attack_bonus, "damage":action.damage,
+                    "save_dc":action.save_dc, "save":action.resolution.as_ref().and_then(|r| r.save.as_ref()),
+                    "manual_note":action.resolution.as_ref().and_then(|r| r.manual_note.as_ref()),
+                })),
             })).collect::<Vec<_>>(),
             "action":self.action, "bonus":self.bonus, "reaction":self.reaction,
             "legendary_max":self.legendary_max, "legendary_left":self.legendary_left,
@@ -454,6 +535,7 @@ impl Actions {
                 (if manual { &rule.id } else { &strikes[i] }) != &strike.rule
                     || strike.id.is_nil()
                     || !ids.insert(strike.id)
+                    || strike.attack_roll.is_some_and(|roll| !roll.valid())
                     || strike.target_note.len() > 480
                     || strike.target.is_some_and(|id| !targets.contains_key(&id))
             })

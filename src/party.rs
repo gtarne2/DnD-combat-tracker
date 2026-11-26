@@ -1,5 +1,6 @@
 //! Host-side room authority shared by the native party helper and protocol tests.
 pub mod initiative;
+pub mod interruptions;
 mod model;
 mod monster_actions;
 mod store;
@@ -101,7 +102,10 @@ impl RoomService {
             Err(Rejection::Disconnected)
                 if matches!(
                     cmd.command,
-                    Operation::Send { .. } | Operation::EndGrant { .. } | Operation::Initiative(_)
+                    Operation::Send { .. }
+                        | Operation::EndGrant { .. }
+                        | Operation::Initiative(_)
+                        | Operation::WindowReply { .. }
                 ) =>
             {
                 return Err(Rejection::Disconnected.into());
@@ -227,9 +231,21 @@ impl RoomService {
             combat: (room.mode == HostMode::Dm).then(|| room.combat(id, dm)),
             encounter: room.encounter,
             offers: room.addressed_offers(id),
+            questions: room.questions(id),
+            announcements: room.announcements,
             events,
             cursor,
         })
+    }
+
+    pub fn check_window(
+        &self,
+        principal: Principal,
+        room_id: Uuid,
+        window: interruptions::WindowRef,
+    ) -> Result<interruptions::QuestionView, PartyError> {
+        let room = store::load(&self.db, room_id)?.ok_or(Rejection::UnknownRoom)?;
+        Ok(room.check_window(room.identity(principal)?, window)?)
     }
 
     pub fn clock_page(

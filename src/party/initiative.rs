@@ -1,4 +1,7 @@
-use super::monster_actions::{ActionEdit, Actions, DamageDecision, Outcome, Reset};
+use super::interruptions::WindowEdit;
+use super::monster_actions::{
+    ActionEdit, Actions, DamageDecision, DamageRoll, Outcome, Reset, StrikeReview,
+};
 use super::wire::{Event, Rejection};
 use crate::monsters::Snapshot;
 use serde::{Deserialize, Serialize};
@@ -58,6 +61,21 @@ pub enum Edit {
         action_id: Uuid,
         strike_id: Uuid,
         decision: DamageDecision,
+    },
+    StrikeWindow {
+        action_id: Uuid,
+        strike_id: Uuid,
+        edit: WindowEdit,
+    },
+    ReviewStrike {
+        action_id: Uuid,
+        strike_id: Uuid,
+        review: StrikeReview,
+    },
+    StoreDamageRoll {
+        action_id: Uuid,
+        strike_id: Uuid,
+        roll: DamageRoll,
     },
     Remove {
         id: Uuid,
@@ -341,30 +359,47 @@ impl Fight {
         Ok(())
     }
 
-    pub(super) fn damage_recipient(
+    pub(super) fn recorded_strike(
         &self,
         action: Uuid,
         strike: Uuid,
-    ) -> Result<Option<Uuid>, Rejection> {
+    ) -> Result<(Outcome, Option<Uuid>, Option<Uuid>), Rejection> {
         let (strike, recorded) = self
             .position
             .rows
             .iter()
             .find_map(|row| row.actions.strike(action, strike))
             .ok_or(Rejection::InvalidInput)?;
-        if matches!(strike.outcome, Outcome::Miss) {
-            return Err(Rejection::InvalidTransition);
-        }
-        Ok(match recorded {
+        let recipient = match recorded {
             Some(recipients) => recipients.get(&strike.id).copied(),
             None => strike
                 .target
                 .and_then(|id| self.position.rows.iter().find(|r| r.id == id)?.player()),
-        })
+        };
+        Ok((strike.outcome, recipient, strike.target))
     }
 
-    pub(super) fn damage_committed(&mut self) {
+    pub(super) fn revised(&mut self) {
         self.revision += 1;
+    }
+
+    pub(super) fn review_strike(
+        &mut self,
+        action: Uuid,
+        strike: Uuid,
+        review: &StrikeReview,
+    ) -> Result<(), Rejection> {
+        for row in &mut self.position.rows {
+            if row.actions.review(action, strike, review)? {
+                self.revised();
+                return Ok(());
+            }
+        }
+        Err(Rejection::InvalidInput)
+    }
+
+    pub(super) fn has_row(&self, id: Uuid) -> bool {
+        self.position.rows.iter().any(|row| row.id == id)
     }
 
     pub fn edit(

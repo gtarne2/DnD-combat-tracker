@@ -2,19 +2,19 @@
 
 ## Product baseline
 
-- The Windows launcher, player sheet, LAN room service, and DM dashboard are implemented through P09B. The DM can record manual monster actions and offer final per-strike damage for the target's owner to accept. [P09B results and exact checks](local-multiplayer-plan.md#2026-11-25--p09b--deliver-manually-agreed-damage)
-- Bundled monster actions retain their full rules for table adjudication. Interruptions, Assist and the full packaging rehearsal remain in the plan. [Remaining phases](local-multiplayer-plan.md#implementation-phases)
+- The Windows launcher, player sheet, LAN room service, and DM dashboard are implemented through P09D. The DM can select Assist for individual strikes while using the same roll records, reaction windows and damage delivery. [P09D results and exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist)
+- Bundled monster actions retain their full rules for table adjudication. P10 covers encounter portability and the full packaging rehearsal. [Remaining phases](local-multiplayer-plan.md#implementation-phases)
 - Physical two-PC Wi-Fi and firewall behavior, physical adapter disconnection, manual Windows picker interaction, and the real clipboard remain unverified in the recorded rehearsals. [Validation and scope of the harness](development.md#validation-matrix)
 
 ## Latest handoff
 
 | Field | Record |
 | --- | --- |
-| Date and checkout | 2026-11-25 on `dev`, HEAD `9de778d`, with the existing implementation work in the working tree. |
-| Completed | P09B final damage delivery from Host as DM to the target's Session → Party offers. The package is in `target/p09b-windows`. The running package was left in place. |
-| Modified components | Rust room and initiative persistence, DM recorded-action controls, player party offers and shared damage handler, synthetic launcher rehearsal, and multiplayer docs. |
-| Validation | The full Rust suite, release build, Windows package, damage acceptance in both browser writer modes and packaged refresh, party offer and P09A regressions passed. Physical two-PC Wi-Fi, firewall behavior and manual WinForms interaction remain unverified. [Exact checks](local-multiplayer-plan.md#2026-11-25--p09b--deliver-manually-agreed-damage) |
-| Next action | When assigned P09C, extend the recorded strike path with addressed save and reaction windows before damage finalization. [P09C acceptance](local-multiplayer-plan.md#p09c--pause-for-a-save-or-reaction-before-final-damage) |
+| Date and checkout | 2026-11-25 on `dev`, HEAD `e8493a7`, with P09C and P09D in the working tree. |
+| Completed | P09D Assist through Host as DM → Monster actions. The package is in `target/p09d-windows`. The running package was left in place. |
+| Modified components | DM action and damage dialogs, roll calculations, room and strike storage, launcher assets, synthetic Windows rehearsals, and multiplayer docs. |
+| Validation | The Rust suite, Windows package, Assist rehearsal, Shield and duplicate damage in Assist, and Manual, player attack, casting and Protector regressions passed. Physical two-PC Wi-Fi, firewall behavior and manual WinForms interaction remain unverified. [Exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist) |
+| Next action | When assigned P10, implement portable encounter export and import before the full packaging rehearsal. [P10 acceptance](local-multiplayer-plan.md#p10--package-and-rehearse-a-full-session) |
 
 ## Handoff procedure
 

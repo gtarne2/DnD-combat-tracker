@@ -2,6 +2,7 @@ mod lan;
 mod monster_library;
 mod vault;
 use aurora_combat_tracker::party::initiative::FightEdit;
+use aurora_combat_tracker::party::interruptions::{Reply, WindowRef};
 use aurora_combat_tracker::party::{PartyError, Principal, RoomService, wire::*};
 use axum::{
     Json, Router,
@@ -123,6 +124,14 @@ struct LocalInitiative {
     command: FightEdit,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LocalWindow {
+    room_id: Uuid,
+    command_id: Uuid,
+    command: lan::WindowCommand,
+}
+
 async fn local(
     State(s): State<Local>,
     Path((cap, action)): Path<(String, String)>,
@@ -198,6 +207,23 @@ async fn local_action(s: &Local, action: &str, body: &[u8]) -> Result<Value, Err
                 edit.command_id,
                 Operation::Initiative(edit.command)
             )?)),
+        };
+    }
+    if action == "window" {
+        let window: LocalWindow = serde_json::from_slice(body)?;
+        if window.room_id != s.room {
+            return Err("Party room changed".into());
+        }
+        return match &s.side {
+            Side::Guest(peer) => Ok(peer
+                .call(
+                    window.command_id,
+                    lan::Request::Window {
+                        command: window.command,
+                    },
+                )
+                .await?),
+            Side::Host(_) => Err("Player operation unavailable".into()),
         };
     }
     if action == "offer" {
@@ -277,7 +303,7 @@ async fn local_action(s: &Local, action: &str, body: &[u8]) -> Result<Value, Err
                         Err(err) => return Err(err.into()),
                     };
                     return Ok(
-                        json!({"role":h.saved.role,"state":"Hosting","members":view.members,"self_id":view.self_id,"open":h.saved.invites_open,"room_id":s.room,"combat":view.combat,"offers":view.offers}),
+                        json!({"role":h.saved.role,"state":"Hosting","members":view.members,"self_id":view.self_id,"open":h.saved.invites_open,"room_id":s.room,"combat":view.combat,"offers":view.offers,"announcements":view.announcements}),
                     );
                 }
                 "invite" if h.saved.invites_open => {
@@ -367,7 +393,7 @@ async fn guest(
                     let members: Vec<_> = view.members.into_iter().map(|member| json!({
                         "member_id": member.member_id, "name": member.name, "online": member.online
                     })).collect();
-                    *state = json!({"role":"guest","state":"Joined","members":members,"self_id":view.self_id,"dm_id":view.dm_id,"publication_session":view.publication_session,"combat":view.combat,"room_id":view.room_id,"offers":view.offers});
+                    *state = json!({"role":"guest","state":"Joined","members":members,"self_id":view.self_id,"dm_id":view.dm_id,"publication_session":view.publication_session,"combat":view.combat,"room_id":view.room_id,"offers":view.offers,"questions":view.questions,"announcements":view.announcements});
                 }
                 Err(e) => {
                     if e == "Room closed" || e == "Membership unavailable" {
@@ -408,7 +434,7 @@ pub async fn serve() -> Result<(), Error> {
             .join("Aurora Combat Tracker");
     std::fs::create_dir_all(&directory)?;
     let vault = Vault::new(&directory, cfg.profile)?;
-    let (saved, new) = match cfg.mode.as_str() {
+    let (mut saved, new) = match cfg.mode.as_str() {
         "resume" => (
             vault
                 .load(None)?
@@ -468,6 +494,7 @@ pub async fn serve() -> Result<(), Error> {
         }
         _ => return Err("Unknown party mode".into()),
     };
+    saved.invite.version = VERSION;
     let room = saved.invite.room;
     let binding = saved.join_id;
     let role = saved.role.clone();

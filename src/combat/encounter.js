@@ -161,7 +161,7 @@ const previewEncounter = (() => {
     });
   }
 
-  function commit(update, { undo = true, label = "", rebase = null, receipt = null, clock = null, boundary = false } = {}) {
+  function commit(update, { undo = true, label = "", rebase = null, receipt = null, clock = null, boundary = false, windowReply = null } = {}) {
     const draft = structuredClone(state);
     const result = update(draft);
     if (!result && !receipt && !clock) return "unchanged";
@@ -174,6 +174,7 @@ const previewEncounter = (() => {
     if (shared && !writerReady) throw new Error("Party actions require durable storage and a single writer.");
     if (clock) ledger = {...ledger, clocks: {...ledger.clocks, [clock.key]: clock.cursor}};
     if (receipt) ledger = {...ledger, receipts: {...ledger.receipts, [receipt]: true}};
+    if (windowReply) ledger = {...ledger, windowReplies: {...ledger.windowReplies, [receipt]: windowReply}};
     const changed = Boolean(result) && JSON.stringify(draft) !== JSON.stringify(state);
     if (!changed && !receipt && !shared && !clock) return "unchanged";
     if (changed) {
@@ -267,6 +268,19 @@ const previewEncounter = (() => {
     restoreEpoch: () => delivery.restoreEpoch,
     received: (id) => Object.hasOwn(delivery.receipts, id),
     receive: (id, update, options) => commit(update, {...options, receipt: id}),
+    finishWindowReply: (id, stale) => locked(() => {
+      const reply = delivery.windowReplies?.[id];
+      if (!reply) return;
+      const next = {...delivery, windowReplies: {...delivery.windowReplies}};
+      delete next.windowReplies[id];
+      if (stale && reply.command.reply.reacted) {
+        next.staleWindowReactions = {...next.staleWindowReactions, [id]: reply.room_id};
+      }
+      const retained = write(state, history, next);
+      if (!retained) throw new Error("Could not save the reaction reply status.");
+      history = retained;
+      delivery = next;
+    }, true),
     canUndo: () => history.length > 0, undoLabel: () => history.at(-1)?.label || "",
     reconcile: (callback) => reconciliations.push(callback) };
 })();

@@ -52,6 +52,8 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | Shared initiative or clock | `node tests/party-launcher.cjs --initiative`. |
 | Manual monster actions and recovery | `node tests/party-launcher.cjs --monster-actions`. |
 | Finalized DM damage and owner receipts | `node tests/party-launcher.cjs --monster-damage` and the same command with `--fallback-writer`. |
+| DM save and reaction questions | `node tests/party-launcher.cjs --strike-windows` and the same command with `--fallback-writer`. |
+| DM Assist and damage suggestions | `node tests/party-launcher.cjs --monster-assist`. Add `--assist` to the strike-window and damage suites to exercise their flows in Assist. |
 | Monster library or encounter snapshots | `node tests/party-launcher.cjs --monsters`. |
 | Bundled pack or notices | Use the reproducibility and source audits for [SRD 5.1](srd51-pack.md#reproduce-and-audit) or [SRD 5.2.1](srd521-pack.md#reproduce-and-audit), then run the packaged suite with `--srd51` or `--srd521`. |
 

@@ -195,6 +195,33 @@ const concentrationControls = (() => {
       && (state.progress?.used[pool.key] || 0) < pool.capacity);
   }
 
+  function spellName(row) {
+    return (row.querySelector(".option-title") || row.querySelector("h3")).textContent.trim();
+  }
+
+  function interruptionReactions(state, question) {
+    const trigger = {attack:"attack", magic_missile:"missile"}[question];
+    if (!trigger || actionEconomy.reason(state, "owner", "reaction", true)) return [];
+    return reactionChoices.flatMap(({tools, cast}) => {
+      const row = tools.closest("article");
+      const key = row?.dataset.pin;
+      if (tools.dataset.spellEffect !== "shield" || !tools.dataset.incomingEvents.split(" ").includes(trigger)
+          || !key || !playbook.isPrepared(key, state)) return [];
+      const name = spellName(row);
+      return availableSlots(state, Number(cast.dataset.castLevel)).map(pool =>
+        ({key, name, pool:pool.key, label:name + " · " + pool.name}));
+    });
+  }
+
+  function applyInterruptionReaction(state, question, key, pool) {
+    const reaction = interruptionReactions(state, question).find(option => option.key === key && option.pool === pool);
+    if (!reaction || !actionEconomy.spend(state, "owner", "reaction", true) || !encounterTracker.spendResource(state, pool)) return false;
+    const source = "option:" + key;
+    effectControls.recordShield(state, reaction.name, source);
+    previewEncounter.log(state, "cast", "Cast " + reaction.name + " · spell slot", source);
+    return true;
+  }
+
   function spellRoll(proposal, method, pool) {
     return proposal.previews[slotLevel(proposal, method, pool) - 1] || "";
   }
@@ -256,7 +283,7 @@ const concentrationControls = (() => {
     const tools = row.querySelector(".option-execute");
     const firearmEligible = tools.hasAttribute("data-firearm-eligible");
     const firearm = firearmEligible && attackModifiers.firearmEnabled(state);
-    const proposal = {name: focus?.name || (row.querySelector(".option-title") || row.querySelector("h3")).textContent.trim(),
+    const proposal = {name: focus?.name || spellName(row),
       focus, activeId: active?.id ?? null, key: row.dataset.pin, level, ritual, firearm, timing,
       previews: control.dataset.castPreviews?.split("|") || [], effect: tools.dataset.spellEffect,
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
@@ -507,5 +534,5 @@ const concentrationControls = (() => {
 
   document.addEventListener("preview-encounter-change", render);
   render();
-  return { availableSlots, cast, applyDamage };
+  return { availableSlots, cast, applyDamage, interruptionReactions, applyInterruptionReaction };
 })();

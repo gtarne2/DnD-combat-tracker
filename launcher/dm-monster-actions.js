@@ -1,6 +1,7 @@
 function setupMonsterActions(el, change, selectRow) {
   const panel = el("dm-monster-actions");
   const picker = el("dm-action-rule");
+  const mode = el("dm-action-mode");
   const dialog = el("dm-action-dialog");
   const form = el("dm-action-form");
   const fields = el("dm-action-fields");
@@ -10,6 +11,7 @@ function setupMonsterActions(el, change, selectRow) {
   const labels = {action:"Action", bonus:"Bonus action", reaction:"Reaction", legendary:"Legendary", manual:"No action slot"};
   const resetLabels = {manual:"Manual / rest", start:"Start of own turn", end:"End of own turn", round:"Round advance"};
   const outcomes = {table:"Table ruling", hit:"Hit", miss:"Miss", save_success:"Save succeeded", save_failure:"Save failed"};
+  const questions = {attack:"Attack hit or reaction", save:"Saving throw", magic_missile:"Magic Missile reaction"};
   const history = el("dm-action-history");
   let room, row, currentId, busy, draft;
   const rule = () => row?.actions?.rules.find(r => r.id === picker.value);
@@ -49,6 +51,11 @@ function setupMonsterActions(el, change, selectRow) {
   }
   const toggle = checked => Object.assign(make("input"), {type:"checkbox", checked});
   const read = input => input.value === "" ? null : input.valueAsNumber;
+  const controlButton = (label, onclick) => Object.assign(make("button", label), {type:"button", onclick});
+
+  function modeField(box, label, initial = mode.value) {
+    return field(box, label, select({manual:"Manual", assist:"Assist"}, initial));
+  }
 
   function renderRule() {
     const power = rule(), state = row?.actions;
@@ -102,7 +109,8 @@ function setupMonsterActions(el, change, selectRow) {
     if (newEncounter && dialog.open) dialog.close();
     if (!actions) return;
     el("dm-current-actions").hidden = !current?.enemy || row.id === current.id;
-    el("dm-actions-actor").textContent = row.name + (row.id === current?.id ? " · Current turn" : "") + " · Manual";
+    el("dm-actions-actor").textContent = row.name + (row.id === current?.id ? " · Current turn" : "") + " · "
+      + (mode.value === "assist" ? "Assist" : "Manual");
     el("dm-action-budget").textContent = [
       ...["action", "bonus", "reaction"].map(key => labels[key] + " " + (actions[key] ? "ready" : "spent")),
       actions.legendary_max ? "Legendary " + actions.legendary_left + " / " + actions.legendary_max : ""
@@ -124,13 +132,52 @@ function setupMonsterActions(el, change, selectRow) {
       item.append(make("strong", entry.name + " · Round " + entry.round + " · " + labels[cost]
         + (cost === "legendary" ? " × " + entry.source.legendary : "")));
       entry.input.strikes.forEach((strike, index) => {
+        const power = actions.rules.find(rule => rule.id === strike.rule);
+        const number = index + 1;
         const target = strike.target_note || targetName(state, strike.target) || (strike.target ? "Removed target" : "No specific target");
+        const recipient = entry.recipients == null
+          ? board.rows.find(r => r.id === strike.target)?.damage_recipient : entry.recipients[strike.id];
+        const member = state.members?.find(m => m.member_id === recipient);
+        const actionId = entry.input.id;
+        const window = board.windows?.[strike.id];
+        const phase = window?.resolution.kind;
+        const ruling = phase === "final" ? window.resolution.outcome : strike.outcome;
         const line = make("p", [
-          "Strike " + (index + 1), target,
-          strike.total === null ? "" : "Total " + strike.total, outcomes[strike.outcome]
+          "Strike " + number, target,
+          strike.attack_roll == null ? "" : "Natural " + strike.attack_roll.natural,
+          strike.attack_roll?.digital_total == null ? "" : "Digital total " + strike.attack_roll.digital_total,
+          strike.total === null ? "" : "Total " + strike.total, outcomes[ruling]
         ].filter(Boolean).join(" · "));
+        function control(label, handler) {
+          const button = Object.assign(make("button", label), {type:"button", disabled:busy});
+          button.onclick = handler;
+          line.append(" ", button);
+        }
+        const windowEdit = edit => ({kind:"strike_window", action_id:actionId, strike_id:strike.id, edit});
+        if (window) {
+          const description = {
+            pending:"Waiting for reply", answered:"Reply received", stale:"Trigger stale · resolve at the table",
+            canceled:"Question canceled", final:"Ruling finalized"
+          }[phase];
+          line.append(" · " + description);
+          if (window.reply) line.append(" · " + (outcomes[window.reply.answer] || "Passed")
+            + (window.reply.reacted ? " · Reaction used" : ""));
+          if (window.resolution.override_note) line.append(" · " + window.resolution.override_note);
+        }
         const result = board.damage?.[strike.id]?.result;
-        if (strike.outcome === "miss" || result?.kind === "no_damage") {
+        if (phase && phase !== "final") {
+          if (phase === "answered" && window.reply.answer !== "pass") {
+            control("Use reply on strike " + number, () => change(windowEdit({kind:"resume", window:window.reference})));
+          }
+          if (["pending","answered"].includes(phase)) {
+            control("Cancel question on strike " + number, () => change(windowEdit({kind:"cancel", window:window.reference})));
+          }
+          control("Record spoken ruling for strike " + number, () => open("Spoken ruling · " + target, "Save override", box => {
+            const outcome = field(box, "Final ruling", select(outcomes, ruling));
+            const note = field(box, "Private override reason", text(1000,true,true));
+            return () => windowEdit({kind:"override", window:window.reference, outcome:outcome.value, note:note.value.trim()});
+          }, true));
+        } else if (ruling === "miss" || result?.kind === "no_damage") {
           line.append(" · No damage");
         } else if (result?.kind === "handled") {
           line.append(" · Handled at table");
@@ -138,21 +185,33 @@ function setupMonsterActions(el, change, selectRow) {
           const offer = state.offers?.find(o => o.offer_id === result.offer_id);
           if (offer) line.append(" · " + offer.effect.amount + " damage · " + offer.status);
         } else {
-          const button = Object.assign(make("button", "Resolve damage for strike " + (index + 1)), {type:"button", disabled:busy});
-          const recipient = entry.recipients == null
-            ? board.rows.find(r => r.id === strike.target)?.damage_recipient : entry.recipients[strike.id];
-          const member = state.members?.find(m => m.member_id === recipient);
-          button.onclick = () => resolveDamage(entry.input.id, strike.id, member, target);
-          line.append(" ", button);
+          control("Resolve damage for strike " + number, () => resolveDamage(entry, strike, power, ruling, member, target));
+        }
+        if (!phase && !result && !board.damage_rolls?.[strike.id]
+            && (mode.value === "assist" || strike.attack_roll || strike.assist_damage)) {
+          control("Review strike " + number, () => reviewStrike(entry, strike, power, target));
+        }
+        if (!result && member && (!phase || ["stale","canceled"].includes(phase))
+            && (strike.target === member.member_id || board.rows.some(r => r.id === strike.target))) {
+          control((phase ? "Ask again for strike " : "Ask player for strike ") + number,
+            () => open("Ask player · " + member.name, "Send question", box => {
+              const id = crypto.randomUUID();
+              const question = field(box, "Question", select(questions,
+                ruling.startsWith("save_") || power?.mechanics?.save ? "save" : "attack"));
+              const announcement = field(box, "Optional announcement to everyone", text(120));
+              return () => windowEdit({kind:"open", id, question:question.value, announcement:announcement.value.trim()});
+            }, true));
         }
         item.append(line);
       });
       if (entry.input.note) item.append(make("p", entry.input.note));
       return item;
     }));
+    draft?.read.refresh?.();
   }
   el("dm-current-actions").onclick = () => selectRow(currentId);
   picker.onchange = () => { recharge.reset(); renderRule(); };
+  mode.onchange = () => render(room, row, busy);
 
   function open(title, button, build, initiativeEdit = false) {
     if (!row || busy || dialog.open) return;
@@ -182,22 +241,204 @@ function setupMonsterActions(el, change, selectRow) {
       if (!pending.initiativeEdit && action.kind === "record") history.open = true;
       if (draft === pending) dialog.close();
     } else if (draft === pending) {
+      if (edit.action?.kind === "record" && room?.combat.id === pending.base.combat.id
+          && room.combat.current === pending.base.combat.current && room.combat.round === pending.base.combat.round) {
+        pending.base = room;
+      }
       status.textContent = el("dm-initiative-status").textContent + " Retry the same entry, or reopen it to review the latest state.";
     }
   };
 
-  function resolveDamage(actionId, strikeId, member, target) {
+  function resolveDamage(entry, strike, power, ruling, member, target) {
+    const actionId = entry.input.id, strikeId = strike.id;
     open("Resolve damage · " + (member?.name || target), "Confirm damage result", box => {
       const decision = field(box, "Damage result", select({final:"Enter final amount", handled:"Handled at table"}));
       const amount = field(box, member ? "Final damage amount" : "Zero damage (no player sheet target)",
         number(member ? null : 0, 0, member ? 4294967295 : 0));
       amount.required = true;
-      decision.onchange = () => {
+      const assist = modeField(box, "Damage mode", strike.assist_damage ? "assist" : "manual");
+      const guide = make("div");
+      box.append(guide);
+      const mechanics = power?.mechanics;
+      const components = mechanics?.damage || [];
+      const save = mechanics?.save;
+      const branch = !save && mechanics?.save_dc != null ? null : monsterAssist.branch(save, ruling);
+      const terms = monsterAssist.damageTerms(components);
+      const naturalCritical = ruling === "hit" && !save && strike.attack_roll?.natural === 20;
+      const averages = components.length && components.every(component => Number.isInteger(component.average))
+        ? components.reduce((total, component) => total + component.average, 0) : null;
+      const matching = save ? entry.input.strikes.filter(other => other.rule === strike.rule).map(other => other.id) : [strikeId];
+      const saved = () => matching.map(id => room?.combat.damage_rolls?.[id]).find(Boolean);
+      if (power) {
+        const rules = make("p", power.text);
+        rules.className = "dm-rule-text";
+        guide.append(rules);
+      }
+      appendMechanics(guide, mechanics);
+      if (components.length) guide.append(make("p", components.map(component =>
+        [component.damage_type, component.dice, component.average == null ? "" : "printed average " + component.average]
+          .filter(Boolean).join(" · ")).join(" / ")));
+      const confirmed = field(guide, "I checked resistance, other modifiers and conditional riders", toggle(false));
+      const critical = field(guide, "Apply critical dice", toggle(naturalCritical));
+      critical.closest("label").hidden = !naturalCritical;
+      const feedback = make("p");
+      guide.append(feedback);
+      const controls = make("div");
+      controls.className = "dm-controls";
+      guide.append(controls);
+      let rolled, rolling = false, selectedAmount;
+      const rollButton = controlButton("Roll damage", async () => {
+        if (!terms || busy || rolling || saved()) return;
+        rolled ||= monsterAssist.rollDamage(terms, naturalCritical);
+        const pending = draft;
+        rolling = true;
+        update();
+        const stored = await change({kind:"store_damage_roll", action_id:actionId, strike_id:strikeId, roll:rolled}, pending.base);
+        rolling = false;
+        if (draft !== pending) return;
+        if (room?.combat.id === pending.base.combat.id) pending.base = room;
+        if (stored || saved()) {
+          status.textContent = "";
+        } else {
+          status.textContent = el("dm-initiative-status").textContent + " Retry to keep the same damage dice.";
+        }
+        update();
+      });
+      const pickAmount = value => {
+        if (value == null || value > Number(amount.max)) return;
+        selectedAmount = value;
+        amount.value = value;
+      };
+      const criticalAverage = () => !critical.checked ? averages : terms && averages != null
+        ? terms.reduce((sum, term) => sum + Math.max(0, Math.floor(term.count * (term.sides + 1) + term.modifier)), 0) : null;
+      const rolledAmount = () => {
+        const roll = saved();
+        return roll ? monsterAssist.amount(critical.checked ? roll.critical : roll.normal, branch) : null;
+      };
+      const averageAmount = () => monsterAssist.amount(criticalAverage(), branch);
+      const useRoll = controlButton("Use rolled damage", () => pickAmount(rolledAmount()));
+      const useAverage = controlButton("Use printed average", () => pickAmount(averageAmount()));
+      controls.append(rollButton, useRoll, useAverage);
+      amount.oninput = () => { selectedAmount = undefined; };
+      function update() {
         amount.disabled = decision.value === "handled";
         amount.closest("label").hidden = amount.disabled;
+        guide.hidden = amount.disabled || assist.value !== "assist";
+        if (!confirmed.checked && selectedAmount !== undefined) {
+          amount.value = "";
+          selectedAmount = undefined;
+        }
+        const roll = saved();
+        rollButton.textContent = rolled && !roll ? "Retry storing damage roll" : "Roll damage";
+        rollButton.disabled = busy || rolling || !terms || !branch || branch === "none" || !!roll || !member;
+        useRoll.disabled = !member || !confirmed.checked || rolledAmount() == null;
+        useAverage.textContent = critical.checked ? "Use critical average" : "Use printed average";
+        useAverage.disabled = !member || !confirmed.checked || averageAmount() == null;
+        feedback.textContent = [
+          branch ? "Damage branch: " + branch : "Enter the final amount from the table ruling.",
+          rolledAmount() == null ? "" : "Rolled suggestion " + rolledAmount(),
+          averageAmount() == null ? "" : "Average suggestion " + averageAmount()
+        ].filter(Boolean).join(" · ");
+      }
+      critical.onchange = () => {
+        if (selectedAmount !== undefined) amount.value = "";
+        selectedAmount = undefined;
+        update();
       };
-      return () => ({kind:"finalize_damage", action_id:actionId, strike_id:strikeId,
+      for (const input of [decision, assist, confirmed]) input.onchange = update;
+      update();
+      const readDecision = () => ({kind:"finalize_damage", action_id:actionId, strike_id:strikeId,
         decision:amount.disabled ? {kind:"handled"} : {kind:"final", amount:read(amount)}});
+      readDecision.refresh = update;
+      return readDecision;
+    }, true);
+  }
+
+  function appendMechanics(host, mechanics) {
+    const save = mechanics?.save;
+    if (save) host.append(make("p", save.ability + " save DC " + save.dc
+      + " · Success: " + save.on_success + " damage · Failure: " + save.on_failure + " damage"));
+    else if (mechanics?.save_dc != null) host.append(make("p", "Save DC " + mechanics.save_dc + " · Resolve the branches at the table."));
+    if (mechanics?.manual_note) host.append(make("p", mechanics.manual_note));
+  }
+
+  function strikeFields(host, power, target, total, outcome, localMode, prior = {}) {
+    const guide = make("div");
+    host.append(guide);
+    const mechanics = power?.mechanics;
+    appendMechanics(guide, mechanics);
+    const digital = field(guide, "Enable digital attack roll", toggle(false));
+    const compare = field(guide, "Compare with available AC", toggle(false));
+    const suggest = field(guide, "Suggest damage after ruling", toggle(Boolean(prior.assist_damage)));
+    const natural = field(guide, "Natural d20", number(prior.attack_roll?.natural, 1, 20));
+    const printed = mechanics?.attack_bonus;
+    const adjustment = field(guide, "Situational attack adjustment", number(0, -1000, 1000));
+    const useBonus = field(guide, "Confirm printed attack bonus and adjustment", toggle(false));
+    const printedText = make("p", Number.isInteger(printed) ? "Printed attack bonus " + (printed >= 0 ? "+" : "") + printed : "Use your table total if an attack modifier is unavailable.");
+    guide.append(printedText);
+    let roll = prior.attack_roll?.digital ? prior.attack_roll : null, derived;
+    const rollButton = controlButton("Roll d20", () => {
+      if (roll || !digital.checked || !adjustment.reportValidity()) return;
+      const die = monsterAssist.die(20);
+      const sum = useBonus.checked && Number.isInteger(printed) ? die + printed + (read(adjustment) || 0) : null;
+      const digitalTotal = sum != null && sum >= -2147483648 && sum <= 2147483647 ? sum : null;
+      roll = {natural:die, digital:true, digital_total:digitalTotal};
+      natural.value = die;
+      if (digitalTotal != null) total.value = digitalTotal;
+      update();
+    });
+    const advice = make("p");
+    const suggestion = () => compare.checked ? monsterAssist.compare(read(natural), read(total), monsterAssist.armor(room, target())) : null;
+    const choose = controlButton("Use suggested outcome", () => {
+      derived = suggestion();
+      if (derived) outcome.value = derived;
+    });
+    guide.append(rollButton, advice, choose);
+    if (mechanics?.save) {
+      for (const field of [digital,compare,natural,adjustment,useBonus]) field.closest("label").hidden = true;
+      printedText.hidden = rollButton.hidden = true;
+    }
+    function update() {
+      guide.hidden = localMode.value !== "assist";
+      natural.readOnly = !!roll;
+      rollButton.disabled = !digital.checked || !!roll;
+      adjustment.disabled = !digital.checked || !!roll || !Number.isInteger(printed);
+      useBonus.disabled = adjustment.disabled;
+      const proposed = suggestion();
+      if (derived && derived !== proposed) {
+        outcome.value = "table";
+        derived = null;
+      }
+      choose.hidden = !proposed;
+      const die = read(natural);
+      advice.textContent = [
+        die === 20 ? "Natural 20 · critical hit candidate" : die === 1 ? "Natural 1 · automatic miss candidate" : "",
+        roll?.digital_total == null ? "" : "Digital total " + roll.digital_total,
+        compare.checked ? proposed ? "Suggested " + proposed + " using available armor class."
+          : "No permitted armor class or comparable roll. Use a table ruling." : ""
+      ].filter(Boolean).join(" · ");
+    }
+    outcome.onchange = () => { derived = null; };
+    for (const input of [digital,compare,natural,total]) input.addEventListener("input",update);
+    update();
+    return {update, read:() => {
+      update();
+      const actual = roll || (natural.value === "" ? null : {natural:read(natural), digital:false, digital_total:null});
+      return {total:read(total), outcome:outcome.value, attack_roll:actual, assist_damage:suggest.checked};
+    }};
+  }
+
+  function reviewStrike(entry, strike, power, target) {
+    open("Review strike · " + target, "Save strike ruling", box => {
+      const localMode = modeField(box, "Resolution mode", strike.attack_roll || strike.assist_damage ? "assist" : mode.value);
+      if (power) box.append(make("p", power.text));
+      const total = field(box, "Physical roll total", number(strike.total, -2147483648, 2147483647));
+      const outcome = field(box, "Table outcome", select(outcomes, strike.outcome));
+      const assist = strikeFields(box, power, () => strike.target, total, outcome, localMode, strike);
+      localMode.onchange = assist.update;
+      const readReview = () => ({kind:"review_strike", action_id:entry.input.id, strike_id:strike.id, review:assist.read()});
+      readReview.refresh = assist.update;
+      return readReview;
     }, true);
   }
 
@@ -269,8 +510,9 @@ function setupMonsterActions(el, change, selectRow) {
   el("dm-preview-action").onclick = () => {
     const power = rule();
     if (!power) return;
-    open("Manual · " + power.name, "Record action", (box, actor) => {
+    open((mode.value === "assist" ? "Assist · " : "Manual · ") + power.name, "Record action", (box, actor) => {
       const id = crypto.randomUUID();
+      const localMode = modeField(box, "Resolution mode");
       const strikeBox = make("div");
       const entries = [];
       const freeform = power.strikes.length === 1 && power.strikes[0] === power.id;
@@ -296,10 +538,12 @@ function setupMonsterActions(el, change, selectRow) {
         const targetNote = field(group, "Private target detail", text(120));
         const total = field(group, "Physical roll total", number(null, -2147483648, 2147483647));
         const outcome = field(group, "Table outcome", select(outcomes));
+        const assist = strikeFields(group, rule, () => target.value, total, outcome, localMode);
+        target.onchange = assist.update;
         strikeBox.append(group);
-        entries.push({group, read:() => ({
+        entries.push({group, update:assist.update, read:() => ({
           id:strikeId, rule:ruleId, target:target.value || null,
-          target_note:targetNote.value.trim(), total:read(total), outcome:outcome.value
+          target_note:targetNote.value.trim(), ...assist.read()
         })});
         add.disabled = entries.length >= 32;
         remove.disabled = entries.length <= 1;
@@ -321,9 +565,13 @@ function setupMonsterActions(el, change, selectRow) {
         box.append(controls);
       }
       const note = field(box, "Private note or ruling override", text(1000, true));
-      return () => ({kind:"record", action:{
+      const update = () => entries.forEach(strike => strike.update());
+      localMode.onchange = update;
+      const readAction = () => ({kind:"record", action:{
         id, rule:power.id, strikes:entries.map(strike => strike.read()), note:note.value.trim()
       }});
+      readAction.refresh = update;
+      return readAction;
     });
   };
   return render;

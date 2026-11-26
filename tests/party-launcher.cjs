@@ -16,7 +16,7 @@ const distribution=fs.readdirSync(pkg).sort();
 const csc=path.join(process.env.SystemRoot,"Microsoft.NET","Framework64","v4.0.30319","csc.exe");
 const harness=path.join(pkg,"PartyHarness.exe");
 const dmAssets=["html","js","css"].map(ext=>"/resource:"+path.join(root,"launcher","dm-dashboard."+ext)+",dm-dashboard."+ext);
-for (const file of ["dm-initiative.js","dm-monsters.js","dm-monster-actions.js"]) dmAssets.push("/resource:"+path.join(root,"launcher",file)+","+file);
+for (const file of ["dm-initiative.js","dm-monsters.js","dm-monster-assist.js","dm-monster-actions.js"]) dmAssets.push("/resource:"+path.join(root,"launcher",file)+","+file);
 execFileSync(csc,["/nologo","/main:PartyHarness","/out:"+harness,"/reference:System.Windows.Forms.dll","/reference:System.Drawing.dll","/reference:System.Web.Extensions.dll","/resource:"+path.join(root,"src","combat","party.js")+",party.js",...dmAssets,...["tests/PartyHarness.cs","launcher/TrackerLauncher.cs","launcher/RefreshBridge.cs","launcher/PartySession.cs"].map(f=>path.join(root,f))],{cwd:root});
 const processes=new Set(), profiles=[];
 async function launch(profile,mode,invite="") {
@@ -27,7 +27,7 @@ async function launch(profile,mode,invite="") {
   if(!isDm && !fs.existsSync(save)){
     let fixture = "combat-sheet";
     if (process.argv.includes("--actions")) fixture = profile === "host" ? "progression" : "infusion-attacks";
-    if (process.argv.includes("--initiative") && profile === "guest") fixture = "combat-options";
+    if ((process.argv.includes("--initiative") || process.argv.includes("--strike-windows")) && profile === "guest") fixture = "combat-options";
     fs.copyFileSync(path.join(__dirname,"fixtures",fixture+".dnd5e"),save);
     fs.copyFileSync(path.join(__dirname,"fixtures",fixture+".xml"),xml);
     if (process.argv.includes("--monster-damage") && profile === "observer") {
@@ -264,6 +264,14 @@ function lanPath(invite,route,body){
 }
 
 async function main(){
+  if (process.argv.includes("--monster-assist")) {
+    await require("./monster-assist.cjs")({launch,pageFor,api});
+    return;
+  }
+  if (process.argv.includes("--strike-windows")) {
+    await require("./strike-windows.cjs")({launch,pageFor,open,api,lanPath});
+    return;
+  }
   if (process.argv.includes("--monster-damage")) {
     await require("./monster-damage.cjs")({launch,pageFor,open,api});
     return;
@@ -355,7 +363,7 @@ async function main(){
   await dmPage.getByText("Hosting as DM",{exact:true}).waitFor();
   const different=JSON.parse(Buffer.from((await (await api(dm,"invite")).json()).invite.split(".")[1],"base64url"));
   const id=()=>require("node:crypto").randomUUID();
-  const hostCommand={version:1,room:different.room,command_id:id(),credential:id(),request:{kind:"create",mode:"dm"}};
+  const hostCommand={version:different.version,room:different.room,command_id:id(),credential:id(),request:{kind:"create",mode:"dm"}};
   assert.equal(await lanPath(different,"/v1/party",hostCommand),422);
   await assert.rejects(launch("guest","join",encode({...different,room:parsed.room})),/identity changed/i);
   await assert.rejects(launch("fresh","join",encode({...parsed,endpoint:different.endpoint})),/identity/i);

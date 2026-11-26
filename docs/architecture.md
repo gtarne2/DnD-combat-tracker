@@ -120,6 +120,22 @@ The addressed offer reuses `Effect::Damage` and carries a generic DM label, the 
 
 The player claims damage through the same writer and receipt path as healing. The local damage form and party acceptance share `concentrationControls.applyDamage`: temporary HP absorbs damage first, the original final amount drives the concentration DC under the owner's saved rules, reaching zero ends concentration, and the damage log commits with the receipt. Missing HP blocks application and leaves the offer available. Undo restores HP, concentration and log state while retaining the receipt. An already claimed offer stays recoverable after browser or room closure.
 
+#### Save and reaction questions
+
+`src/party/interruptions.rs` defines the question, opaque window ID, generation and reply. The room stores the current generation and ruling per strike outside roster saves. Host edits use the initiative revision and reject damage finalization while a question still needs a ruling. Accepted replies and their overrides leave an auditable command record. A replay of an acknowledged command returns its original receipt. New replies to a closed or replaced generation leave its ruling intact. A real turn advance makes unanswered attack and Magic Missile triggers stale. Save questions can span turns and disconnects. Source or target removal and encounter replacement require table adjudication. Tie edits and pointer corrections preserve viable questions.
+
+The owner checks the authoritative window and their pending clock deliveries before spending. Under the sheet writer, `party-windows.js` revalidates the prepared Shield reaction and slot, then saves its spend, effect, receipt and reply outbox in one write. Shield uses the existing owner-start effect boundary. The player chooses the outcome at the table. If the window closes while a saved reply is in transit, the host rejects the late reply and the sheet explains how to undo or manually correct the spend. Other reactions with unresolved mechanics use table adjudication.
+
+The recipient projection carries the window ID, generation and question kind. The reply carries a ruling and whether a reaction was used. Addressed replay events carry only a change marker. Raw rolls, private labels, saves, defenses, slot choices and spell names are outside these exchanges. The public announcement list contains only text entered explicitly by the DM. LAN packets require protocol 2. Resuming a saved room with the updated package preserves its certificate, port, members and data. Version 1 helpers or invitations receive an incompatibility error.
+
+#### Bounded Assist
+
+Manual and Assist use the same DM preview, strike records, reaction windows and final damage offers. The preview holds the natural die and any approved digital total separately from the entered table total. The host stores them with the strike and its parent cost. Reviewing an unfinalized strike preserves its identity and any saved digital roll, including while a different strike waits for a reply. A natural 20 is a critical candidate. A natural 1 is a miss candidate. An entered total alone has no natural-die meaning.
+
+The dashboard uses only an online player's currently shared effective AC or the DM's known unqualified enemy AC. A withdrawal of sharing or changed comparison removes an unconfirmed ruling suggestion. No defense value goes into the strike record. Typed save branches select the full, half or zero amount after the DM confirms the outcome. Unsupported damage terms and unresolved riders stay table calls. Suggestions for final damage require confirmation of resistance and other modifiers, and the DM can enter a custom final number.
+
+`launcher/dm-monster-assist.js` contains the bounded browser calculations. The room stores the normal and critical raw damage totals before the final amount is sent. Strikes for the same typed save in one action can reuse a saved raw roll and apply different branches. The room links each final offer to its original strike and leaves player HP, saves and reactions with their owners. Text-only packs retain their rules for manual adjudication.
+
 ## Aurora content import
 
 The Rust importer reads a UTF-8 character save and local content XML files. It resolves equipment, spells, build selections, and companions by the exact Aurora content ID. Each saved reference retains its ID and label with an optional definition. A missing definition leaves the reference available for display or later correction. File read errors and malformed XML fail the import.

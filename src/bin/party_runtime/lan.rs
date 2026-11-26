@@ -25,11 +25,21 @@ pub enum Request {
     Initiative {
         command: FightEdit,
     },
+    Window {
+        command: WindowCommand,
+    },
     Publish {
         session: Uuid,
         revision: u64,
         publication: Publication,
     },
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WindowCommand {
+    Check { window: WindowRef },
+    Reply { window: WindowRef, reply: Reply },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -150,6 +160,7 @@ fn message(err: PartyError) -> &'static str {
         }
         PartyError::Rejected(Rejection::Disconnected) => "Resume required",
         PartyError::Rejected(Rejection::Forbidden) => "Membership unavailable",
+        PartyError::Rejected(Rejection::StaleWindow) => "Window no longer open",
         PartyError::Rejected(_) => "Party request rejected",
         _ => "Room storage unavailable",
     }
@@ -236,6 +247,20 @@ async fn party(State(state): State<Shared>, Json(p): Json<Packet>) -> Result<Jso
                     .map_err(failed)?
             )));
         }
+        Request::Window { command } => {
+            host.service.reconcile(who, p.room).map_err(failed)?;
+            return Ok(Json(match command {
+                WindowCommand::Check { window } => json!(
+                    host.service
+                        .check_window(who, p.room, window)
+                        .map_err(failed)?
+                ),
+                WindowCommand::Reply { window, reply } => json!(
+                    host.command(who, p.command_id, Operation::WindowReply { window, reply })
+                        .map_err(failed)?
+                ),
+            }));
+        }
         Request::Reconcile => {
             let offers = host.service.reconcile(who, p.room).map_err(failed)?;
             let self_id = host.service.member_id(who, p.room).map_err(failed)?;
@@ -256,6 +281,7 @@ pub async fn start(
     let listener = std::net::TcpListener::bind((bind, saved.invite.endpoint.port()))?;
     listener.set_nonblocking(true)?;
     saved.invite.endpoint = listener.local_addr()?;
+    saved.invite.version = VERSION;
     let tls = axum_server::tls_rustls::RustlsConfig::from_der(
         vec![saved.invite.der()?],
         B64.decode(saved.key.as_ref().ok_or("Missing host key")?)?,
@@ -381,6 +407,7 @@ impl Peer {
                 | "Room unavailable"
                 | "Membership unavailable"
                 | "Incompatible party version"
+                | "Window no longer open"
                 | "Invitation closed or replaced"
                 | "Resume required" => text,
                 _ => "Party request failed".into(),

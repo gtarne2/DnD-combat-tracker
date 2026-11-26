@@ -311,3 +311,29 @@ Acceptance reuses local damage mechanics and the claim/receipt writer. The owner
 - `cargo test --locked --offline --quiet` passed all 48 tests. `cargo build --locked --offline --release --bins` and `launcher\build.cmd target\p09b-windows` built the Windows package in isolation. Targeted Rust formatting, JavaScript syntax and `git diff --check` passed.
 
 Physical two-PC Wi-Fi, firewall behavior and manual WinForms interaction remain unverified. The existing running package was left in place. The next phase is P09C when assigned.
+
+### 2026-11-25 · P09C · Save and reaction questions
+
+The DM can ask the target of a recorded strike about a hit, save or reaction. Each question has a versioned window. The player can answer or pass at name-only sharing and can spend a prepared Shield reaction with a spell slot. The damage offer still requires a finalized ruling. The DM can use the reply, cancel the question, or enter a spoken ruling and private override reason. A real turn advance makes pending reaction triggers stale. Save questions can remain open across turns and reconnects. A late reply leaves the ruling intact and the owner retains control of any local reaction correction.
+
+The recipient sees only the question kind and window reference. Replies include the ruling and a reaction-used flag. Public announcements contain only the DM's explicit text. Protocol 2 rejects version 1 helpers and invitations. The replacement package can resume persisted rooms using their existing identities.
+
+- `node tests/party-launcher.cjs --strike-windows` and the same command with `--fallback-writer` passed. The synthetic rehearsal covered Shield turning a hit into a miss, single slot and reaction spend, owner-start expiry, duplicated tabs and a lost response, tie and pointer edits, stale and canceled replies, replacement generations, participant removal, an offline save across restart, sharing downgrade, owner Undo and privacy in projections and stored exchanges.
+- `cargo test --locked --offline --quiet` passed all 48 Rust tests. `cargo build --locked --offline --release --bins` and `launcher\build.cmd target\p09c-windows` built the isolated package. Targeted Rust formatting, JavaScript syntax and `git diff --check` passed.
+- Packaged regressions passed with `node tests/party-launcher.cjs --monster-damage`, `--initiative`, and `--review-refresh`. These covered finalized damage, the shared clock, launcher and TLS, and the player's solo combat controls.
+- The isolated `node target/p09c-version-upgrade.cjs` check created a version 1 DM room and guest binding with the P09B package, then resumed both with P09C. The resumed session retained the same host certificate, endpoint, room, member and encounter.
+
+Physical two-PC Wi-Fi, firewall behavior and manual WinForms interaction remain unverified. The running package was left in place. The next phase is P09D when assigned.
+
+### 2026-11-25 · P09D · Bounded Assist
+
+Host as DM → Monster actions opens in Manual. Assist makes digital attack dice, AC comparisons and damage suggestions independent per strike. The DM confirms printed attack bonuses, situational adjustments and any riders or damage modifiers. A natural die is stored separately from the entered total. Missing or withdrawn AC leaves the outcome to the table.
+
+The DM can review another strike while a reply is pending. Each strike retains its identity, the parent action spends once, and a recorded digital roll stays fixed. Damage can use a stored roll, printed average or custom amount. Multiple targets using the same typed save can reuse its raw roll and apply different save branches. The DM confirms the final amount through the existing P09B offer. Bundled text-only rules remain available for manual adjudication.
+
+- `cargo test --locked --offline --quiet` passed all 48 Rust tests. `cargo build --offline --locked --release --bins` and `launcher\build.cmd target\p09d-windows` built the isolated Windows package. Targeted Rust formatting, JavaScript syntax and `git diff --check` passed.
+- `node tests/party-launcher.cjs --monster-assist` passed natural 20, natural 1, a total of 20 without a natural die, missing and withdrawn AC, an interrupted multiattack, a lost roll and offer response, mode changes, and full and half branches from the same area roll. It exercised printed-average and custom damage and required confirmation before using a damage suggestion with an unresolved resistance.
+- `node tests/party-launcher.cjs --strike-windows --assist` passed name-only Shield, late replies and owner corrections with Web Locks. `node tests/party-launcher.cjs --monster-damage --assist --fallback-writer` passed duplicate delivery, receipt recovery and Undo with IndexedDB.
+- `node tests/party-launcher.cjs --monster-actions`, `--review-refresh` and `--actions` passed the manual monster action, player attack, casting and Quick Actions Protector regressions.
+
+Physical two-PC Wi-Fi, firewall behavior and manual WinForms interaction remain unverified. The running package was left in place. The next phase is P10 when assigned.

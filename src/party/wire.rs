@@ -1,9 +1,10 @@
-//! Version 1 of the party protocol. Only explicitly shareable fields belong here.
+//! Party protocol. Only explicitly shareable fields belong here.
+use super::interruptions::{QuestionView, Reply, WindowRef};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, num::NonZeroU32};
 use uuid::Uuid;
 
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 2;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -61,6 +62,10 @@ pub enum Operation {
         offer_id: Uuid,
     },
     Initiative(super::initiative::FightEdit),
+    WindowReply {
+        window: WindowRef,
+        reply: Reply,
+    },
     SetRound {
         encounter_id: Uuid,
         expected_revision: u64,
@@ -175,6 +180,7 @@ pub enum Rejection {
     RevisionConflict,
     InvalidTransition,
     InvalidInput,
+    StaleWindow,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,6 +188,7 @@ pub enum Rejection {
 pub enum Event {
     Clock { tick: super::initiative::Clock },
     RosterChanged,
+    WindowsChanged,
     OfferChanged { offer: Offer },
     EncounterChanged { encounter: SharedRound },
 }
@@ -262,6 +269,10 @@ pub struct RoomView {
     pub publication_session: Option<Uuid>,
     pub encounter: Option<SharedRound>,
     pub offers: Vec<Offer>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub questions: Vec<QuestionView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub announcements: Vec<String>,
     pub events: Vec<Delivery>,
     /// Pass this cursor back after processing the returned events in order.
     pub cursor: u64,

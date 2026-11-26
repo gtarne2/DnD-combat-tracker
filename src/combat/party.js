@@ -51,6 +51,11 @@ function initiativeWriter(request) {
   }
   const hasSheet = document.body.dataset.partyLobby !== "true";
   const restoreEpoch = hasSheet ? previewEncounter.restoreEpoch() : null;
+  const announcements = document.createElement("ul");
+  announcements.setAttribute("aria-label", "DM announcements");
+  announcements.hidden = true;
+  panel.append(announcements);
+  const windows = hasSheet ? setupPartyWindows(panel, request, refresh, restoreEpoch) : null;
   const offers = document.createElement("section");
   const send = document.createElement("form");
   send.hidden = true;
@@ -322,7 +327,15 @@ function initiativeWriter(request) {
         return item;
       }));
       await initiative(state).catch(error => { feedback.textContent = error.message; });
+      announcements.hidden = !state.announcements?.length;
+      announcements.replaceChildren(...(state.announcements || []).map(text => {
+        const item = document.createElement("li");
+        item.textContent = text;
+        return item;
+      }));
+      windows?.render(state);
       renderOffers(state);
+      if (windows) await windows.sync(state).catch(error => { feedback.textContent = error.message; });
       if (hasSheet) await syncActions(state).catch(error => { feedback.textContent = error.message; });
       const key = JSON.stringify([state.role,state.ended,state.open]);
       if (key === last) return;
@@ -337,6 +350,8 @@ function initiativeWriter(request) {
       }
     } catch {
       view = null;
+      windows?.render(null);
+      announcements.hidden = true;
       await initiative(null);
       if (hasSheet) share(null);
       else renderDmParty(null);

@@ -111,7 +111,7 @@ function setupDmInitiative(request, refresh) {
     const board = room.combat;
     const next = JSON.stringify([room.room_id,board.id,board.revision]);
     const damageNext = JSON.stringify([
-      room.members?.map(m => [m.member_id, m.name]),
+      room.members?.map(m => [m.member_id, m.name, m.online, m.inspection?.vitals?.effective_ac]),
       room.offers?.filter(offer => offer.effect.kind === "damage")
     ]);
     if (signature === next) {

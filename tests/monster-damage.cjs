@@ -94,6 +94,7 @@ module.exports = async function monsterDamage({launch,pageFor,open,api}) {
   await button("Add action").click();
   await dialog.waitFor({state:"hidden"});
   await button("Start / resume encounter").click();
+  if (process.argv.includes("--assist")) await dashboard.getByLabel("Action mode").selectOption("assist");
   await button("Preview action").click();
 
   const cases = [
@@ -104,6 +105,11 @@ module.exports = async function monsterDamage({launch,pageFor,open,api}) {
     if (i) await dialog.getByRole("button",{name:"Add strike or target"}).click();
     const strike = dialog.locator("fieldset").nth(i);
     await strike.getByLabel("Target",{exact:true}).selectOption(test.target || playerId);
+    if (!i && process.argv.includes("--assist")) {
+      await strike.getByLabel("Suggest damage after ruling").check();
+      await strike.getByLabel("Enable digital attack roll").check();
+      await strike.getByRole("button",{name:"Roll d20",exact:true}).click();
+    }
     await strike.getByLabel("Physical roll total").fill("68311");
     await strike.getByLabel("Table outcome").selectOption(test.miss?"miss":"hit");
   }

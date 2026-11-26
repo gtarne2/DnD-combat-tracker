@@ -17,25 +17,26 @@ const actionEconomy = (() => {
     return Boolean(kind && state.progress?.economyOverrides?.[actor]?.[kind]);
   }
 
-  function reason(state, actor, kind) {
-    if (!Object.hasOwn(names, kind) || state.progress?.active === false || !state.progress?.economyEnabled?.[actor] || override(state, actor, kind)) return "";
-    const current = state.progress.current || encounterTracker.turns(state)[0]?.key;
+  function reason(state, actor, kind, force = false) {
+    if (!Object.hasOwn(names, kind) || !force && (state.progress?.active === false || !state.progress?.economyEnabled?.[actor]) || override(state, actor, kind)) return "";
+    const current = state.progress?.current || encounterTracker.turns(state)[0]?.key;
     if (kind !== "reaction" && turnKey(state, actor) !== current) return `${names[kind]} is available on this participant's turn.`;
-    return state.progress.economyUsed?.[actor]?.[kind] ? `${names[kind]} already used.` : "";
+    return state.progress?.economyUsed?.[actor]?.[kind] ? `${names[kind]} already used.` : "";
   }
 
-  function spend(state, actor, kind) {
-    if (!Object.hasOwn(names, kind) || state.progress?.active === false) return true;
-    if (reason(state, actor, kind)) {
-      document.getElementById("encounter-status").textContent = reason(state, actor, kind);
+  function spend(state, actor, kind, force = false) {
+    if (!Object.hasOwn(names, kind) || !force && state.progress?.active === false) return true;
+    const unavailable = reason(state, actor, kind, force);
+    if (unavailable) {
+      document.getElementById("encounter-status").textContent = unavailable;
       return false;
     }
-    const progress = state.progress;
+    const progress = force ? (state.progress ||= previewEncounter.emptyProgress()) : state.progress;
     if (override(state, actor, kind)) {
       delete progress.economyOverrides[actor][kind];
       previewEncounter.log(state, "override", `Table override used · ${names[kind]}`);
     }
-    if (progress?.economyEnabled?.[actor]) {
+    if (force || progress?.economyEnabled?.[actor]) {
       progress.economyUsed ||= {};
       progress.economyUsed[actor] ||= {};
       progress.economyUsed[actor][kind] = true;
