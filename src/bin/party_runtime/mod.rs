@@ -306,6 +306,11 @@ async fn local_action(s: &Local, action: &str, body: &[u8]) -> Result<Value, Err
                         json!({"role":h.saved.role,"state":"Hosting","members":view.members,"self_id":view.self_id,"open":h.saved.invites_open,"room_id":s.room,"combat":view.combat,"offers":view.offers,"announcements":view.announcements}),
                     );
                 }
+                "export_encounter" => {
+                    return Ok(json!(
+                        h.service.export_encounter(Principal::LocalHost, s.room)?
+                    ));
+                }
                 "invite" if h.saved.invites_open => {
                     return Ok(json!({"invite":h.saved.invite.encode()}));
                 }

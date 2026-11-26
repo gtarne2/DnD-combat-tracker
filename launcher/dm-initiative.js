@@ -156,6 +156,8 @@ function setupDmInitiative(request, refresh) {
       edit:enemy, duplicate:enemy, reveal:enemy, remove:enemy, group:enemy, add:true,
       load:!board.running && board.saves.length, new:!board.running};
     for (const b of panel.querySelectorAll("[data-edit]")) b.disabled = busy || !allowed[b.dataset.edit];
+    el("dm-export-encounter").disabled = busy || !board.rows.length;
+    el("dm-import-encounter").disabled = busy || board.running;
     const statBlock = el("dm-instance-stat-block");
     statBlock.hidden = !enemy?.template;
     renderMonsterStatBlock(statBlock.querySelector("div"), enemy?.template);
@@ -238,6 +240,82 @@ function setupDmInitiative(request, refresh) {
     event.preventDefault();
     change({kind:"save",name:event.target.elements.name.value.trim()});
   };
+  // P10 portable encounters. The host owns the file; seats are re-paired explicitly on import.
+  const importDialog = el("dm-encounter-import"), importForm = el("dm-encounter-import-form");
+  let pendingEncounter;
+  el("dm-export-encounter").onclick = async () => {
+    try {
+      const file = await request("export_encounter");
+      const blob = new Blob([JSON.stringify(file, null, 1) + "\n"], {type:"application/json"});
+      const url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url;
+      a.download = "encounter-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      status.textContent = "Exported the encounter without player identities, recorded strikes or pending exchanges.";
+    } catch (error) { status.textContent = error.message; }
+  };
+  el("dm-import-encounter").onchange = async event => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      // The local helper accepts request bodies up to 1 MiB.
+      if (file.size > 1000 * 1000) throw new Error("Encounter files are limited to 1 MB.");
+      const encounter = JSON.parse(await file.text());
+      if (encounter?.format !== "aurora-encounter" || !Array.isArray(encounter.rows))
+        throw new Error("This file is not an exported encounter.");
+      await refresh();
+      if (!room?.combat || room.combat.running) throw new Error("End the current encounter before importing.");
+      pendingEncounter = {encounter, room};
+      const rows = encounter.rows, seats = rows.filter(r => r.actor?.kind === "player");
+      const enemies = rows.filter(r => r.actor?.kind === "enemy").length;
+      const current = rows.find(r => r.id === encounter.current);
+      const currentName = current && (current.actor.enemy?.name ?? current.actor.name);
+      el("dm-encounter-import-summary").textContent = [
+        enemies + (enemies === 1 ? " enemy" : " enemies"), seats.length + (seats.length === 1 ? " player seat" : " player seats"),
+        "round " + encounter.round, currentName ? "turn pointer on " + currentName : "no turn pointer",
+        encounter.running ? "exported while running (resume with Start)" : "exported while stopped"
+      ].join(" · ") + ".";
+      const players = (room.members || []).filter(m => m.member_id !== room.self_id);
+      const box = el("dm-encounter-seats");
+      box.replaceChildren(...seats.map(seat => {
+        const label = document.createElement("label");
+        const companions = seat.actor.companions.map(c => c.name);
+        label.textContent = seat.actor.name + (companions.length ? " (with " + companions.join(", ") + ")" : "") + " ";
+        const select = document.createElement("select");
+        select.dataset.seat = seat.id;
+        select.append(new Option("Leave out", ""), ...players.map(m => new Option(
+          m.name + (players.some(o => o !== m && o.name === m.name) ? " · " + m.member_id.slice(0, 8) : ""), m.member_id)));
+        // Guess: prefill only an unambiguous same-name player. The DM still confirms every seat.
+        const same = players.filter(m => m.name === seat.actor.name);
+        if (same.length === 1) select.value = same[0].member_id;
+        label.append(select);
+        return label;
+      }));
+      importForm.querySelector("[role=status]").textContent = "";
+      importDialog.showModal();
+    } catch (error) { status.textContent = error.message; }
+  };
+  el("dm-encounter-import-cancel").onclick = () => importDialog.close();
+  importForm.onsubmit = async event => {
+    event.preventDefault();
+    const seats = {}, chosen = new Set();
+    for (const select of el("dm-encounter-seats").querySelectorAll("select")) {
+      if (!select.value) continue;
+      if (chosen.has(select.value)) {
+        importForm.querySelector("[role=status]").textContent = "Pair each player with at most one seat.";
+        return;
+      }
+      chosen.add(select.value);
+      seats[select.dataset.seat] = select.value;
+    }
+    if (await change({kind:"import", encounter:pendingEncounter.encounter, seats}, room)) {
+      importDialog.close();
+      status.textContent = "Imported the encounter. Review the order, then Start / resume encounter.";
+    } else importForm.querySelector("[role=status]").textContent = status.textContent;
+  };
+
   return async state => {
     room = state;
     panel.hidden = !room?.combat || room.ended;

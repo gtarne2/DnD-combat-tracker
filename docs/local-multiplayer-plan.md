@@ -337,3 +337,14 @@ The DM can review another strike while a reply is pending. Each strike retains i
 - `node tests/party-launcher.cjs --monster-actions`, `--review-refresh` and `--actions` passed the manual monster action, player attack, casting and Quick Actions Protector regressions.
 
 Physical two-PC Wi-Fi, firewall behavior and manual WinForms interaction remain unverified. The running package was left in place. The next phase is P10 when assigned.
+
+### 2026-11-26 · P10 (first part) · Portable encounter export and import
+
+Implemented on Linux in a cloud session, so the Windows package and packaged rehearsals were not run. Host as DM → Initiative now has **Export encounter** and **Import encounter**. The room service exports the current position as an `aurora-encounter` v1 file and imports it as a DM-only, stopped-encounter edit with explicit seat pairing. [Design](architecture.md#shared-initiative-and-turn-boundaries) · [R54](requirements.md)
+
+- `cargo test --locked --quiet` passed all 49 Rust tests, including the new `tests/encounter_portability.rs`. It covers two players sharing a name, a separate and a shared companion, two SRD 5.1 wolves with one damaged and one recorded strike, export privacy (no member IDs, empty history), a JSON round trip, rejection of guest import, foreign or duplicate pairing, a non-seat key, version 2, HP above max and unknown fields, a fresh-room import with one seat paired, pointer and enemy state retained, a clock delivery only to the paired player, rejection while running, and pointer movement when all seats are left out.
+- `cargo build --release --locked --bins` built both helpers on Linux. `cargo check --locked --target x86_64-pc-windows-gnu --bins` type-checked the Windows-only runtime, including the new `export_encounter` loopback action.
+- A Playwright smoke of the assembled DM lobby page with stubbed helper responses passed the import preview, same-name prefill only when unambiguous, duplicate-pairing rejection and the submitted `import` edit at 1920×1080.
+- `node --check` passed for the changed JavaScript. `rustfmt --edition 2024 --check` passed for the changed Rust files.
+
+Not run: `launcher\build.cmd`, `node tests/party-launcher.cjs --encounters` (new, unrun), the other packaged regressions, the full session rehearsal, 2560×1440 and 125% scaling, offline package inspection, and physical two-PC Wi-Fi/firewall. The rest of P10 (full packaging rehearsal and session documentation review) remains.

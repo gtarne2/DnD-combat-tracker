@@ -238,6 +238,20 @@ impl RoomService {
         })
     }
 
+    /// DM-only portable copy of the current encounter position. See `initiative::PortableEncounter`.
+    pub fn export_encounter(
+        &self,
+        principal: Principal,
+        room_id: Uuid,
+    ) -> Result<initiative::PortableEncounter, PartyError> {
+        let room = store::load(&self.db, room_id)?.ok_or(Rejection::UnknownRoom)?;
+        room.active(principal)?;
+        if principal != Principal::LocalHost || room.mode != HostMode::Dm {
+            return Err(Rejection::Forbidden.into());
+        }
+        Ok(room.fight.export())
+    }
+
     pub fn check_window(
         &self,
         principal: Principal,

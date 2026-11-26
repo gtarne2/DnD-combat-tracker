@@ -52,6 +52,10 @@
           <div class="dm-controls"><label>Saved roster <select id="dm-saves"></select></label>
             <button data-edit="load"><svg class="icon" aria-hidden="true"><use href="#gi-load"/></svg><span>Load roster</span></button><button data-edit="new">New encounter</button></div>
         </div>
+        <div class="dm-tool"><span class="dm-tool-title">Portable encounter</span>
+          <button type="button" id="dm-export-encounter">Export encounter</button>
+          <label>Import encounter <input id="dm-import-encounter" type="file" accept=".json,application/json"></label>
+        </div>
       </div>
     </div>
     <div class="dm-focus">
@@ -204,6 +208,18 @@
     </details>
     <label>Additional stats and actions (JSON) <textarea name="details" rows="12" spellcheck="false"></textarea></label>
     <div class="dm-dialog-actions"><button class="dm-primary">Save template</button><button type="button" data-close>Cancel</button></div>
+    <p role="status"></p>
+  </form>
+</dialog>
+<dialog id="dm-encounter-import" aria-labelledby="dm-encounter-import-title">
+  <form id="dm-encounter-import-form" class="dm-library-body">
+    <h2 id="dm-encounter-import-title">Review encounter import</h2>
+    <p id="dm-encounter-import-summary"></p>
+    <p>Pair each exported player seat with a player in this room, or leave it out. A left-out seat and its companions leave the turn order. Players keep their own sheets and backups.</p>
+    <div id="dm-encounter-seats"></div>
+    <div class="dm-controls">
+      <button id="dm-encounter-import-confirm">Replace current encounter</button><button type="button" id="dm-encounter-import-cancel">Cancel</button>
+    </div>
     <p role="status"></p>
   </form>
 </dialog>

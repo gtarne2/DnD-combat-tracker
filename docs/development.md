@@ -57,6 +57,7 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | DM save and reaction questions | `node tests/party-launcher.cjs --strike-windows` and the same command with `--fallback-writer`. |
 | DM Assist and damage suggestions | `node tests/party-launcher.cjs --monster-assist`. Add `--assist` to the strike-window and damage suites to exercise their flows in Assist. |
 | Monster library or encounter snapshots | `node tests/party-launcher.cjs --monsters`. |
+| Encounter export and import | `cargo test --locked --test encounter_portability`, then `node tests/party-launcher.cjs --encounters`. |
 | Bundled pack or notices | Use the reproducibility and source audits for [SRD 5.1](srd51-pack.md#reproduce-and-audit) or [SRD 5.2.1](srd521-pack.md#reproduce-and-audit), then run the packaged suite with `--srd51` or `--srd521`. |
 
 For storage or receipt changes, repeat the applicable player-writer scenario with `--fallback-writer` to exercise the guest's IndexedDB writer. Useful cases include `--offers`, `--initiative`, `--monster-damage` and `--strike-windows`. The browser suites cover different profiles and loopback connectivity. Record physical two-PC Wi-Fi, firewall, Windows picker, and real clipboard checks separately. The clipboard assertion in the launcher harness captures the value passed by **Copy invite**.

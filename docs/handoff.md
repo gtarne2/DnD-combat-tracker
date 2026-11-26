@@ -3,7 +3,7 @@
 ## Product baseline
 
 - The Windows launcher, player sheet, LAN room service, and DM dashboard are implemented through P09D. The DM can select Assist for individual strikes while using the same roll records, reaction windows and damage delivery. [P09D results and exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist)
-- Bundled monster actions retain their full rules for table adjudication. P10 covers encounter portability and the full packaging rehearsal. [Remaining phases](local-multiplayer-plan.md#implementation-phases)
+- Bundled monster actions retain their full rules for table adjudication. Encounter export/import from P10 is implemented and Rust-tested. The full Windows packaging rehearsal remains. [P10 first part](local-multiplayer-plan.md#2026-11-26--p10-first-part--portable-encounter-export-and-import)
 - For multiplayer UI work, start with the [UI handoff](multiplayer-ui.md) for the shipped entry points, state boundaries and targeted browser checks.
 - Physical two-PC Wi-Fi and firewall behavior, physical adapter disconnection, manual Windows picker interaction, and the real clipboard remain unverified in the recorded rehearsals. [Validation and scope of the harness](development.md#validation-matrix)
 
@@ -16,6 +16,16 @@
 | Modified components | `src/combat/sheet.css` and `src/combat/character-sheet.css` (appended "Visual refresh" blocks), `src/combat/html.rs` (an `aria-hidden` `.hp-meter` span in the HP card), `src/combat/turns.js` (`paintKeyHp` sets `data-band` and `--hp-fill`), `docs/requirements.md` (R55), `docs/third-party-assets.md`. No new asset files. |
 | Validation | `cargo test` passed (48). `AURORA_TEST_IMPORTER=$PWD/target/debug/combat-sheet node tests/browser-review.cjs` passed; one earlier run hit the divider-width assertion `542 !== 518`, which also fails intermittently on the unchanged `dev` checkout. On the Linux harness: `--dashboard`, `--initiative`, `--monster-damage`, `--strike-windows`, `--actions`, `--monster-actions` and `--monsters` passed. Before the status-line fix, `--initiative` and `--actions` failed because the new tab icons squeezed a long party status message into a one-character column that pushed the page down. Not run: Windows package build, `--offers` past its Aurora refresh step, physical Wi-Fi, 125% scaling. |
 | Next action | Build the Windows package and check the main screen at 1366×768 and 1920×1080 with 125% scaling, then gather playtest feedback on the HP meter and tab icons. |
+
+## Encounter portability branch handoff
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-26 on `claude/project-thread-p9jla2`, branched from `origin/dev` at `3747dbd`. |
+| Completed | First part of P10: host-owned encounter export/import with explicit player re-pairing, plus the DM dashboard controls. |
+| Modified components | `src/party/initiative.rs` (portable format, `Edit::Import`), `src/party/monster_actions.rs` (portable counters and import validation), `src/party/model.rs`, `src/party.rs` (`export_encounter`), `src/bin/party_runtime/mod.rs` (loopback action), `launcher/dm-dashboard.html`, `launcher/dm-initiative.js`, `tests/encounter_portability.rs`, `tests/encounter-portability.cjs`, `tests/party-launcher.cjs --encounters`, docs. |
+| Validation | 49 Rust tests, Linux release build, Windows target type-check and a stubbed browser smoke passed on Linux. No Windows package or packaged rehearsal was run. [Exact checks](local-multiplayer-plan.md#2026-11-26--p10-first-part--portable-encounter-export-and-import) |
+| Next action | On Windows, build the package with `cargo build --release --locked --bins` and `launcher\build.cmd target\p10-windows`, run `node tests/party-launcher.cjs --encounters` (new and unrun, so expect small fixes), then continue with the full P10 session rehearsal. |
 
 ## Handoff procedure
 
