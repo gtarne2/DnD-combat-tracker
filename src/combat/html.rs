@@ -842,7 +842,7 @@ fn render_stats(html: &mut String, stats: &KeyStats) {
         );
         html.push_str("</p>");
         if key == "hp" {
-            html.push_str("<span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"health-actions\"><button type=\"button\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-dialog=\"heal-owner\">Heal</button><button type=\"button\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-dialog=\"rest-picker\">Rest</button></div>");
+            html.push_str("<span class=\"hp-meter\" aria-hidden=\"true\"><span></span></span><span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"health-actions\"><button type=\"button\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-dialog=\"heal-owner\">Heal</button><button type=\"button\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-dialog=\"rest-picker\">Rest</button></div>");
             html.push_str("<form class=\"quick-temp-hp\" data-quick-temp-hp><label>Temp HP <input type=\"number\" name=\"temporary\" min=\"1\" max=\"4294967295\" inputmode=\"numeric\" required></label><button type=\"submit\" title=\"Keep the higher temporary HP amount\">Gain</button></form>");
         }
         pin_button(html, label);

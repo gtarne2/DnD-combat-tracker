@@ -11,6 +11,8 @@ License: [Creative Commons Attribution 3.0](https://creativecommons.org/licenses
 | [Lorc](https://lorcblog.blogspot.com) | crossed-swords, dragon-head, heart-organ, checked-shield, magic-swirl, hourglass, scroll-unfurled, eyeball, skull-crossed-bones, envelope, padlock, magnifying-glass, quill-ink, conversation, wolf-head |
 | [Delapouite](https://delapouite.com) | dice-twenty-faces-twenty, tabletop-players, invisible, padlock-open, exit-door, next-button, sword-brandish, save, load, files, stop-sign, rolling-dices, wizard-face |
 
+The player sheet also draws icons with CSS masks from data URIs defined as `--gi-*` custom properties near the end of `src/combat/sheet.css`: heart-organ, checked-shield, magic-swirl, crossed-swords, scroll-unfurled, quill-ink, hourglass and magnifying-glass (Lorc); boots, wolf-howl, knapsack, bleeding-wound, heart-bottle, campfire, fairy-wand and star-swirl (Lorc); character, sword-brandish, next-button and dice-twenty-faces-twenty (Delapouite). The comment above those properties carries the credit.
+
 The dashboard footer shows the credit. Keep this table and the footer in step when adding icons.
 
 ## Design references

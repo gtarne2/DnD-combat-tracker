@@ -94,6 +94,12 @@ const encounterTracker = (() => {
     const hp = progress.hp || initialHp();
     const text = hp ? displayHp(hp) : hpBaseline;
     for (const node of document.querySelectorAll("[data-stat=hp]")) node.textContent = text;
+    // Colour band and meter for the HP card; unknown maximums hide the meter.
+    const ratio = hp?.max > 0 ? Math.max(0, Math.min(1, hp.current / hp.max)) : null;
+    for (const card of document.querySelectorAll(".hp-card")) {
+      card.dataset.band = ratio == null ? "unknown" : hp.current === 0 ? "down" : ratio <= .25 ? "low" : ratio <= .5 ? "hurt" : "healthy";
+      card.style.setProperty("--hp-fill", ratio == null ? "0%" : (ratio * 100).toFixed(1) + "%");
+    }
     for (const node of document.querySelectorAll("[data-temp-hp]")) {
       node.hidden = false;
       node.textContent = hp?.temporary > 0 ? `+${hp.temporary} temp HP` : "0 temp HP";

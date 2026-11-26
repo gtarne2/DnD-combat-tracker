@@ -128,3 +128,16 @@
   .feature-availability { text-align: left; }
   .command-bar { flex-wrap: wrap; }
 }
+
+/* Visual refresh (2026-11): reference pages share the dashboard's card look. */
+.sheet-heading h2, .reference-card h3 { font-family: var(--serif); letter-spacing: .2px; }
+.reference-card { border-radius: 10px; background: linear-gradient(180deg, #172435, var(--well) 120px); box-shadow: 0 4px 14px rgb(0 0 0 / .18); }
+:is(.glance-skills, .glance-saves, .glance-passives) button { transition: border-color .12s, background-color .12s; }
+:is(.glance-skills, .glance-saves, .glance-passives) button:hover:not(:disabled) { border-color: #8d6f45; background: #2a2620; }
+.ability-score-list button { padding: 8px 4px; border-radius: 8px; background: linear-gradient(180deg, #1a2638, var(--well)); }
+.ability-score-list button:hover:not(:disabled) { border-color: #8d6f45; }
+.ability-score-list b { font-family: var(--serif); font-size: 22px; }
+.feature-list > * { border-left: 3px solid #8d6f45 !important; transition: border-color .12s; }
+.feature-list > *:hover { border-color: #b48d55 !important; }
+.journal-columns > div { border-radius: 10px; background: linear-gradient(180deg, #172435, var(--well) 120px); }
+@media (prefers-reduced-motion: reduce) { .feature-list > *, .ability-score-list button { transition: none; } }
