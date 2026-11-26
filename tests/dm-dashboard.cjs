@@ -32,7 +32,7 @@ module.exports = async function reviewDashboard({launch, pageFor, open, api}) {
   const state = async helper => (await api(helper,"state")).json();
   const id = (await state(guest)).self_id;
   const otherId = (await state(other)).self_id;
-  const row = member => dmPage.locator('tr[data-member="' + member + '"]');
+  const row = member => dmPage.locator('#dm-party-list [data-member="' + member + '"]');
   const inspect = member => row(member).getByRole("button",{name:/Inspect/});
   const dialog = dmPage.locator("#dm-inspector");
   const role = page => page.getByLabel("Share with this DM");

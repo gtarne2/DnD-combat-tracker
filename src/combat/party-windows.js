@@ -1,6 +1,7 @@
 function setupPartyWindows(panel, request, refresh, restoreEpoch) {
   const section = document.createElement("section");
   section.setAttribute("aria-label", "DM questions");
+  section.className = "party-questions";
   const status = document.createElement("p");
   status.setAttribute("role", "status");
   const correction = document.createElement("p");
@@ -39,7 +40,7 @@ function setupPartyWindows(panel, request, refresh, restoreEpoch) {
     signature = next;
     forms.replaceChildren(...entries.map(({window, question, received, reactions}) => {
       const form = document.createElement("form");
-      form.className = "focus-form";
+      form.className = "focus-form party-card party-question";
       form.dataset.windowId = window.id;
       const heading = document.createElement("strong");
       heading.textContent = headings[question];

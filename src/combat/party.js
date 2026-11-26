@@ -19,14 +19,31 @@ function initiativeWriter(request) {
   if (!root) return;
   const url = document.body.dataset.partyUrl;
   const panel = document.createElement("details");
+  panel.className = "party-panel";
   const title = document.createElement("summary");
   title.textContent = "Party";
   panel.append(title);
   root.append(panel);
   const status = document.createElement("p");
+  status.className = "party-status";
   status.setAttribute("role", "status");
   panel.append(status);
+  // Connection summary for styling and the sheet's header chip: online, pending, closed or offline.
+  function connection(value, waiting = 0) {
+    root.dataset.connection = value;
+    const chip = document.getElementById("party-chip");
+    if (!chip) return;
+    chip.hidden = false;
+    chip.dataset.connection = value;
+    chip.querySelector(".party-chip-text").textContent = {online:"Party", pending:"Connecting", closed:"Party closed", offline:"Party offline", solo:"Solo"}[value];
+    const badge = chip.querySelector(".party-chip-count");
+    badge.hidden = !waiting;
+    badge.textContent = String(waiting);
+    chip.setAttribute("aria-label", "Party · " + chip.querySelector(".party-chip-text").textContent
+      + (waiting ? " · " + waiting + (waiting === 1 ? " item needs" : " items need") + " your answer" : ""));
+  }
   if (!url) {
+    root.dataset.connection = "solo";
     status.textContent = "Playing solo. Use Party in the Windows launcher to host or join.";
     if (previewEncounter.current().progress?.partyClock) {
       const solo = document.getElementById("resume-solo-initiative");
@@ -38,9 +55,14 @@ function initiativeWriter(request) {
     return;
   }
   panel.open = document.body.dataset.partyLobby === "true";
+  document.getElementById("party-chip")?.addEventListener("click", () => { panel.open = true; });
   const roster = document.createElement("ul");
+  roster.className = "party-roster";
+  roster.setAttribute("aria-label", "Party members");
   const actions = document.createElement("div");
+  actions.className = "party-actions";
   const feedback = document.createElement("p");
+  feedback.className = "party-feedback";
   feedback.setAttribute("role", "status");
   panel.append(roster, actions, feedback);
   async function request(action, payload) {
@@ -52,15 +74,17 @@ function initiativeWriter(request) {
   const hasSheet = document.body.dataset.partyLobby !== "true";
   const restoreEpoch = hasSheet ? previewEncounter.restoreEpoch() : null;
   const announcements = document.createElement("ul");
+  announcements.className = "party-announcements";
   announcements.setAttribute("aria-label", "DM announcements");
   announcements.hidden = true;
   panel.append(announcements);
   const windows = hasSheet ? setupPartyWindows(panel, request, refresh, restoreEpoch) : null;
   const offers = document.createElement("section");
+  offers.className = "party-offers";
   const send = document.createElement("form");
   send.hidden = true;
   if (hasSheet) {
-    send.className = "focus-form";
+    send.className = "focus-form party-send";
     send.innerHTML = `<label>Party member <select name="recipient" required></select></label>
       <label>Offer <select name="kind"><option value="healing">Healing</option><option value="temporary_hp">Temporary HP</option></select></label>
       <label>Amount <input name="amount" type="number" min="1" max="4294967295" required></label>
@@ -193,6 +217,10 @@ function initiativeWriter(request) {
         const row = document.createElement("article");
         row.dataset.offerId = offer.offer_id;
         const incoming = offer.recipient === state.self_id;
+        row.className = "party-card";
+        row.dataset.kind = offer.effect.kind;
+        row.dataset.status = offer.status;
+        row.dataset.direction = incoming ? "incoming" : "outgoing";
         const other = members.find(member => member.member_id === (incoming ? offer.sender : offer.recipient));
         const effect = {healing: "healing", temporary_hp: "temporary HP", damage: "damage"}[offer.effect.kind];
         const displayName = other && (hasSheet ? partyActions.memberLabel(other)
@@ -324,8 +352,13 @@ function initiativeWriter(request) {
       roster.replaceChildren(...(state.members || []).map(member => {
         const item = document.createElement("li");
         item.textContent = member.name + (member.member_id === state.self_id ? " (you)" : "") + (member.online ? "" : " · Offline");
+        item.dataset.presence = member.online ? "online" : "offline";
+        if (member.member_id === state.dm_id) item.dataset.role = "dm";
         return item;
       }));
+      const waiting = (state.questions || []).length + (state.offers || []).filter(offer => offer.recipient === state.self_id
+        && (offer.status === "pending" || offer.status === "claimed")).length;
+      connection(state.ended ? "closed" : /^(Connecting|Reconnecting)/.test(state.state) ? "pending" : "online", hasSheet ? waiting : 0);
       await initiative(state).catch(error => { feedback.textContent = error.message; });
       announcements.hidden = !state.announcements?.length;
       announcements.replaceChildren(...(state.announcements || []).map(text => {
@@ -358,6 +391,7 @@ function initiativeWriter(request) {
       if (hasSheet) partyActions.setRoom(null);
       renderOffers({ended: true});
       status.textContent = "Party helper disconnected. Resume from the launcher.";
+      connection("offline");
       roster.replaceChildren(); actions.replaceChildren(); last = "";
     }
   }

@@ -8,6 +8,141 @@ function setupDmInitiative(request, refresh) {
   const send = initiativeWriter(request);
   let room, editing, busy = false, signature, damageSignature, currentEnemy;
   const selected = () => room?.combat?.rows.find(row => row.id === order.value);
+  const make = (tag, text, className) => {
+    const node = document.createElement(tag);
+    if (text != null) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  };
+  const icon = name => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "icon");
+    svg.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", "#gi-" + name);
+    svg.append(use);
+    return svg;
+  };
+  function meter(current, max) {
+    const track = make("span", null, "dm-hp-meter");
+    const fill = make("span", null, "dm-hp-fill");
+    const ratio = max > 0 && current != null ? Math.max(0, Math.min(1, current / max)) : 0;
+    fill.style.width = (ratio * 100).toFixed(1) + "%";
+    track.dataset.band = current == null || !max ? "unknown" : current === 0 ? "down" : ratio <= .25 ? "low" : ratio <= .5 ? "hurt" : "healthy";
+    track.append(fill);
+    return track;
+  }
+  // Pointer shortcut for the turn order. The labelled select stays the keyboard and assistive control.
+  const turns = el("dm-turns");
+  turns.addEventListener("click", event => {
+    const item = event.target.closest("[data-row]");
+    if (!item || order.value === item.dataset.row) return;
+    order.value = item.dataset.row;
+    order.dispatchEvent(new Event("change"));
+  });
+  let turnsKey;
+  function renderTurns() {
+    const board = room?.combat;
+    const rows = board?.rows || [];
+    const key = JSON.stringify([rows, board?.running, board?.current, order.value,
+      room?.members?.map(m => [m.member_id, m.inspection?.vitals?.current_hp, m.inspection?.vitals?.max_hp])]);
+    if (key === turnsKey) return;
+    turnsKey = key;
+    el("dm-turns-empty").hidden = rows.length > 0;
+    turns.replaceChildren(...rows.map(row => {
+      const item = make("li", null, "dm-turn");
+      item.dataset.row = row.id;
+      const enemy = row.enemy;
+      item.dataset.kind = enemy ? "enemy" : row.damage_recipient ? "player" : "companion";
+      if (board.running && row.id === board.current) item.dataset.current = "true";
+      if (row.id === order.value) item.dataset.selected = "true";
+      const score = make("span", row.score == null ? "—" : String(row.score), "dm-turn-score");
+      const body = make("span", null, "dm-turn-body");
+      const title = make("span", null, "dm-turn-name");
+      title.append(make("span", row.name));
+      if (enemy) title.append(icon(enemy.revealed ? "eyeball" : "invisible"));
+      body.append(title);
+      const sub = [];
+      if (board.running && row.id === board.current) sub.push("Current turn");
+      if (enemy) sub.push(enemy.revealed ? "Shown as " + enemy.alias : "Hidden from players");
+      if (enemy?.template?.pack.edition) sub.push(enemy.template.pack.edition);
+      if (row.shared?.length) sub.push("with " + row.shared.join(", "));
+      if (enemy?.conditions) sub.push(enemy.conditions);
+      body.append(make("span", sub.join(" · "), "dm-turn-sub"));
+      let hp = enemy ? {current:enemy.hp, max:enemy.max_hp} : null;
+      if (!enemy && row.damage_recipient) {
+        const vitals = room.members?.find(m => m.member_id === row.damage_recipient)?.inspection?.vitals;
+        if (vitals) hp = {current:vitals.current_hp, max:vitals.max_hp};
+      }
+      item.append(score, body);
+      if (hp) {
+        const side = make("span", null, "dm-turn-hp");
+        side.append(make("span", (hp.current ?? "—") + " / " + (hp.max ?? "—")), meter(hp.current, hp.max));
+        item.append(side);
+      }
+      return item;
+    }));
+  }
+  function renderEnemyCard(row) {
+    const card = el("dm-enemy-detail");
+    const enemy = row?.enemy;
+    el("dm-focus-empty").hidden = Boolean(row);
+    card.hidden = !row;
+    card.replaceChildren();
+    if (!row) return;
+    const head = make("div", null, "dm-enemy-head");
+    const title = make("h3", row.name);
+    head.append(title);
+    const board = room.combat;
+    if (board.running && row.id === board.current) head.append(make("span", "Current turn", "dm-badge dm-badge-current"));
+    if (enemy) {
+      const badge = make("span", null, "dm-badge " + (enemy.revealed ? "dm-badge-shown" : "dm-badge-hidden"));
+      badge.append(icon(enemy.revealed ? "eyeball" : "invisible"), make("span", enemy.revealed ? "Revealed as " + enemy.alias : "Hidden from players"));
+      head.append(badge);
+    }
+    card.append(head);
+    if (!enemy) {
+      const vitals = row.damage_recipient && room.members?.find(m => m.member_id === row.damage_recipient)?.inspection?.vitals;
+      if (vitals) {
+        const stats = make("div", null, "dm-enemy-stats");
+        const hp = make("div", null, "dm-enemy-hp");
+        const label = make("span", null, "dm-hp-text");
+        label.append(icon("heart-organ"), make("span", "HP " + (vitals.current_hp ?? "—") + " / " + (vitals.max_hp ?? "—")));
+        if (vitals.temporary_hp) label.append(make("span", "+" + vitals.temporary_hp + " temp", "dm-temp"));
+        hp.append(label, meter(vitals.current_hp, vitals.max_hp));
+        stats.append(hp);
+        if (vitals.effective_ac != null) {
+          const armor = make("span", null, "dm-stat dm-ac");
+          armor.append(icon("checked-shield"), make("span", "AC", "dm-stat-label"), make("strong", String(vitals.effective_ac)));
+          stats.append(armor);
+        }
+        card.append(stats);
+        const tags = make("div", null, "dm-tags");
+        for (const condition of vitals.conditions || []) tags.append(make("span", condition, "dm-tag dm-condition"));
+        if (vitals.concentration) tags.append(make("span", "Concentrating · " + vitals.concentration, "dm-tag dm-concentration"));
+        if (tags.childElementCount) card.append(tags);
+      }
+      card.append(make("p", "Players run their own turns from their sheet. Select an enemy to use its stat block and actions.", "dm-muted"));
+      return;
+    }
+    const stats = make("div", null, "dm-enemy-stats");
+    const hp = make("div", null, "dm-enemy-hp");
+    const label = make("span", null, "dm-hp-text");
+    label.append(icon("heart-organ"), make("span", "HP " + (enemy.hp ?? "—") + " / " + (enemy.max_hp ?? "—")));
+    hp.append(label, meter(enemy.hp, enemy.max_hp));
+    const armor = make("span", null, "dm-stat dm-ac");
+    armor.append(icon("checked-shield"), make("span", "AC", "dm-stat-label"), make("strong", String(enemy.ac ?? "—")));
+    const init = make("span", null, "dm-stat");
+    init.append(icon("dice-twenty-faces-twenty"), make("span", "Init", "dm-stat-label"), make("strong", String(row.score)));
+    stats.append(hp, armor, init);
+    card.append(stats);
+    if (enemy.conditions) {
+      const tags = make("div", null, "dm-tags");
+      for (const condition of enemy.conditions.split(/\s*,\s*/).filter(Boolean)) tags.append(make("span", condition, "dm-tag dm-condition"));
+      card.append(tags);
+    }
+    if (enemy.notes) card.append(make("p", enemy.notes, "dm-enemy-notes"));
+  }
   const renderActions = setupMonsterActions(el, change, id => { order.value = id; controls(); });
 
   function controls() {
@@ -24,13 +159,13 @@ function setupDmInitiative(request, refresh) {
     const statBlock = el("dm-instance-stat-block");
     statBlock.hidden = !enemy?.template;
     renderMonsterStatBlock(statBlock.querySelector("div"), enemy?.template);
-    panel.querySelector("[data-edit=reveal]").textContent = enemy?.revealed ? "Hide" : "Reveal";
+    const reveal = panel.querySelector("[data-edit=reveal]");
+    reveal.querySelector(".dm-label").textContent = enemy?.revealed ? "Hide" : "Reveal";
+    reveal.querySelector("use").setAttribute("href", enemy?.revealed ? "#gi-invisible" : "#gi-eyeball");
     el("dm-advance").querySelector("button").disabled = busy || !board.running;
     el("dm-save").querySelector("button").disabled = busy;
-    el("dm-enemy-detail").textContent = enemy ? [
-      enemy.revealed ? "Revealed as " + enemy.alias : "Hidden from players", "HP " + (enemy.hp ?? "—") + " / " + (enemy.max_hp ?? "—"),
-      "AC " + (enemy.ac ?? "—"), enemy.conditions, enemy.notes
-    ].filter(Boolean).join(" · ") : "";
+    renderEnemyCard(row);
+    renderTurns();
   }
 
   async function change(edit, base = room) {
@@ -48,9 +183,15 @@ function setupDmInitiative(request, refresh) {
   }
 
   setupMonsterLibrary(request, change);
+  // Remember whether the DM keeps the selected enemy's stat block open.
+  const statBlockDetails = el("dm-instance-stat-block");
+  try { statBlockDetails.open = localStorage.getItem("aurora-dm-stat-block-open") === "true"; } catch {}
+  statBlockDetails.addEventListener("toggle", () => {
+    try { localStorage.setItem("aurora-dm-stat-block-open", String(statBlockDetails.open)); } catch {}
+  });
   order.onchange = controls;
   panel.addEventListener("click", async event => {
-    const kind = event.target.dataset.edit;
+    const kind = event.target.closest("[data-edit]")?.dataset.edit;
     if (!kind || busy) return;
     if (kind === "edit" || kind === "add") {
       await refresh();
@@ -115,6 +256,7 @@ function setupDmInitiative(request, refresh) {
       room.offers?.filter(offer => offer.effect.kind === "damage")
     ]);
     if (signature === next) {
+      renderTurns();
       if (damageSignature !== damageNext) renderActions(room, selected(), busy);
       damageSignature = damageNext;
       return;

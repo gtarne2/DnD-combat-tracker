@@ -713,3 +713,63 @@ body:not([data-session-page="combat"]) #encounter { display: none; }
   .companions-collapsed #companion-roster-home .rail-heading { justify-content: space-between; }
   .companions-collapsed #companion-roster-home h2 { display: block; }
 }
+
+/* Party: header chip, Session → Party panel, offers and DM questions */
+.icon { width: 1.1em; height: 1.1em; flex: none; fill: currentColor; }
+.party-chip { display: inline-flex; align-items: center; gap: 6px; }
+.party-chip .icon { color: var(--gold); width: 18px; height: 18px; }
+.party-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #8797ab; }
+.party-chip[data-connection=online]::before { background: #79d39a; box-shadow: 0 0 0 3px rgb(121 211 154 / .18); }
+.party-chip[data-connection=pending]::before { background: #f0b55a; }
+.party-chip[data-connection=closed]::before, .party-chip[data-connection=offline]::before { background: #ef7b70; }
+.party-chip-count {
+  min-width: 19px; padding: 0 5px; border-radius: 999px; background: #ef7b70; color: #1d0c0a;
+  font-size: 11.5px; font-weight: 700; text-align: center; animation: party-pulse 1.6s ease-in-out 3;
+}
+@keyframes party-pulse { 50% { box-shadow: 0 0 0 5px rgb(239 123 112 / .25); } }
+@media (prefers-reduced-motion: reduce) { .party-chip-count { animation: none; } }
+#party-controls .party-panel {
+  margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--round); background: var(--well);
+}
+#party-controls .party-panel > summary { color: var(--gold); font-weight: 650; }
+#party-controls .party-status {
+  display: inline-flex; align-items: center; gap: 7px; padding: 3px 11px 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel); font-weight: 600;
+}
+#party-controls .party-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #8797ab; }
+#party-controls[data-connection=online] .party-status::before { background: #79d39a; }
+#party-controls[data-connection=pending] .party-status::before { background: #f0b55a; }
+#party-controls[data-connection=closed] .party-status::before,
+#party-controls[data-connection=offline] .party-status::before { background: #ef7b70; }
+#party-controls .party-roster { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; padding: 0; list-style: none; }
+#party-controls .party-roster li {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel);
+}
+#party-controls .party-roster li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #79d39a; }
+#party-controls .party-roster li[data-presence=offline] { color: var(--muted); }
+#party-controls .party-roster li[data-presence=offline]::before { background: #8797ab; }
+#party-controls .party-roster li[data-role=dm] { border-color: #79603d; color: var(--gold); }
+#party-controls .party-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+#party-controls .party-feedback:empty, #party-controls .party-announcements:empty { display: none; }
+#party-controls .party-feedback { color: var(--teal); }
+#party-controls .party-announcements { margin: 8px 0; padding: 0; list-style: none; }
+#party-controls .party-announcements li { padding: 6px 10px; border-left: 3px solid var(--gold); background: var(--panel); border-radius: 4px; }
+#party-controls .party-send { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+#party-controls fieldset { border: 1px solid var(--line); border-radius: var(--round); margin: 10px 0; }
+#party-controls fieldset legend { color: var(--gold); padding: 0 5px; }
+.party-offers:not(:empty), .party-questions { display: grid; gap: 7px; margin: 10px 0; }
+.party-card {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 9px 11px; border-radius: 7px;
+  border: 1px solid var(--line); border-left: 4px solid var(--teal); background: var(--panel);
+}
+.party-card > p, .party-card > strong { flex: 1 1 100%; margin: 0; }
+.party-card[data-kind=damage] { border-left-color: #ef7b70; }
+.party-card[data-kind=grant] { border-left-color: var(--gold); }
+.party-card[data-direction=incoming][data-status=pending] { box-shadow: 0 0 0 1px #efc57655; background: #1d2433; }
+.party-card[data-status=accepted] { border-left-color: #79d39a; }
+.party-card[data-status=declined], .party-card[data-status=withdrawn] { opacity: .75; }
+.party-question { border-left-color: #b9a2f5; background: #1c1d33; box-shadow: 0 0 0 1px #b9a2f555; }
+.party-question > strong { color: #ddd0ff; font-size: 15px; }
+#party-initiative .focus-form { margin: 6px 0 8px; }
+#party-initiative > h3 { color: var(--gold); }

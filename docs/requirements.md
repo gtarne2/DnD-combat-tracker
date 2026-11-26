@@ -2,7 +2,7 @@
 
 A personal Windows app that uses an Aurora character and its content to show combat options and track the encounter.
 
-R31–R53 cover multiplayer. For implementation entry points and regression checks, see the [multiplayer UI handoff](multiplayer-ui.md).
+R31–R54 cover multiplayer. For implementation entry points and regression checks, see the [multiplayer UI handoff](multiplayer-ui.md).
 
 | ID | Requirement |
 | --- | --- |
@@ -59,6 +59,7 @@ R31–R53 cover multiplayer. For implementation entry points and regression chec
 | R51 | Continue initiative and other strikes while a question waits. Save questions can wait for a reconnect. A pending reaction trigger becomes stale on turn advance. The DM can use a reply, cancel or replace a question, or enter a spoken ruling with a private override reason before resolving damage. Late replies leave closed questions closed. The owner can correct a reaction spent before a late reply was rejected. |
 | R52 | Start monster action previews in Manual or opt into Assist. Choose digital attack rolls, armor class comparison and damage suggestions independently for each strike. Store a natural d20 separately from an entered or computed total. Use an online player's currently shared armor class or an unqualified enemy armor class for attack suggestions, and make the ruling at the table when it is unavailable. Switch modes or review an unresolved strike without paying the parent action cost again. |
 | R53 | Review printed save branches and conditional riders in Assist. Use rolled, printed-average or custom damage and confirm any resistance or other modifier before using a suggestion. Resolve each target separately and confirm the final amount through the existing damage offer. Saved rolls and replies carry forward through retries and mode switches. |
+| R54 | Show the DM dashboard as one screen at 1920×1080: room status and invitation controls in a top bar, a visual turn order with the current turn, HP bars and hidden or revealed state, the selected combatant with its actions and stat block, and party cards with HP, AC, conditions and concentration. Keep the labelled turn-order list for keyboard use. On the player sheet, show a Party chip in the header with the connection state and the number of DM questions and offers waiting for an answer. |
 
 ## First playtest
 
