@@ -14,14 +14,19 @@ internal class PartyHarness {
         using(var party=await PartySession.Start(options))
         {
             if (party.Role == "dm") {
-                Console.WriteLine(serializer.Serialize(new {url=party.Url,preview=party.WriteLobby(Environment.GetEnvironmentVariable("LOCALAPPDATA"))}));
-                Console.ReadLine();
+                var directory=Environment.GetEnvironmentVariable("LOCALAPPDATA");
+                using(var lobby=new RefreshBridge(directory,null)) {
+                    var preview=party.WriteLobby(directory,lobby.Url);
+                    lobby.TrackLobby(preview);
+                    Console.WriteLine(serializer.Serialize(new {url=party.Url,preview,refresh=lobby.Url}));
+                    Console.ReadLine();
+                }
                 return;
             }
             using(var bridge=new RefreshBridge(Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"),"Aurora Combat Tracker","Previews"),
                 directory=>TrackerLauncher.GeneratePreview(args,directory),party.Url)) {
                 var preview=await bridge.Open();
-                Console.WriteLine(serializer.Serialize(new {url=party.Url,preview=preview}));
+                Console.WriteLine(serializer.Serialize(new {url=party.Url,preview,refresh=bridge.Url}));
                 Console.ReadLine();
             }
         }

@@ -65,6 +65,7 @@ R31–R54 cover multiplayer. For implementation entry points and regression chec
 | R56 | On the DM dashboard, list connected players who are not yet in the turn order, and let the DM add one with the initiative they rolled at the table. Show the selected monster action with its cost, rules text and, for a multiattack, each strike with its count and own rules, and list all of the monster's actions grouped by cost for one-click selection. |
 | R57 | On a player sheet in a DM room, show the shared encounter in the combat rail whenever one exists: a Party encounter banner naming the other players, the turn order with revealed enemies and hidden "DM turn" rows, whose turn it is, a Join form until the player is in the order, and End Turn only on the player's own or companion's turn. Hide Next Turn, Start and End Encounter there. Leaving the encounter returns the sheet to solo turns. |
 | R58 | Show the same header on every page of the player sheet, with an optional character portrait kept only in this browser. The HP card has one number box whose value Damage, Heal, Set HP or Temp HP apply directly; with the box empty, each button opens its full form. |
+| R59 | Reopening the Windows shortcut shows the existing launcher for that user and Windows session. A hidden launcher exits and stops its Party helper after five minutes without a check-in from the current sheet or dashboard. An active hosted room stays available after its browser tabs close, and the tray can reopen the current session. |
 
 ## First playtest
 

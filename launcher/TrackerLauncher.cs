@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Security.Principal;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -30,19 +32,41 @@ internal sealed class TrackerLauncher : Form
     private string characterPath;
     private RefreshBridge bridge;
     private PartySession party;
+    private readonly Stopwatch lifecycleTick = Stopwatch.StartNew();
+    private readonly Stopwatch hostProbe = new Stopwatch();
+    private bool checkingHost;
     private readonly NotifyIcon tray = new NotifyIcon { Text = "Aurora Combat Tracker", Icon = SystemIcons.Application };
     private string SettingsPath { get { return Path.Combine(appData, "last-import.txt"); } }
 
     [STAThread]
     private static void Main()
     {
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-        using (var launcher = new TrackerLauncher())
-            Application.Run(launcher);
+        string name;
+        using (var user = WindowsIdentity.GetCurrent())
+            name = @"Local\AuroraCombatTracker-" + user.User.Value;
+        using (var activate = new EventWaitHandle(false, EventResetMode.AutoReset, name + "-activate"))
+        using (var instance = new Mutex(false, name))
+        {
+            bool ownsInstance;
+            try { ownsInstance = instance.WaitOne(0); }
+            catch (AbandonedMutexException) { ownsInstance = true; }
+            if (!ownsInstance)
+            {
+                activate.Set();
+                return;
+            }
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                using (var launcher = new TrackerLauncher(activate))
+                    Application.Run(launcher);
+            }
+            finally { instance.ReleaseMutex(); }
+        }
     }
 
-    private TrackerLauncher()
+    private TrackerLauncher(EventWaitHandle activate)
     {
         Text = "Aurora Combat Tracker";
         ClientSize = new Size(640, 367);
@@ -80,11 +104,22 @@ internal sealed class TrackerLauncher : Form
         partyButton.Click += delegate { partyMenu.Show(partyButton, 0, partyButton.Height); };
         AcceptButton = open;
         var trayMenu = new ContextMenuStrip();
-        trayMenu.Items.Add("Open launcher", null, delegate { Show(); Activate(); });
+        trayMenu.Items.Add("Open launcher", null, delegate { ShowLauncher(); });
+        trayMenu.Items.Add("Reopen current session", null, delegate {
+            if (bridge == null) return;
+            try { OpenBrowser(bridge.PreviewPath); bridge.KeepAlive(); }
+            catch (Exception error) {
+                MessageBox.Show(error.Message, "Could not reopen session", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        });
         trayMenu.Items.Add("Exit refresh service", null, delegate { Close(); });
         tray.ContextMenuStrip = trayMenu;
-        tray.DoubleClick += delegate { Show(); Activate(); };
+        tray.DoubleClick += delegate { ShowLauncher(); };
+        var lifecycle = new System.Windows.Forms.Timer { Interval = 1000 };
+        lifecycle.Tick += async delegate { await CheckLifecycle(activate); };
+        lifecycle.Start();
         FormClosed += delegate {
+            lifecycle.Dispose();
             if (bridge != null) bridge.Dispose();
             if (party != null) party.Dispose();
             partyMenu.Dispose();
@@ -112,6 +147,40 @@ internal sealed class TrackerLauncher : Form
         open.Click += async delegate { await OpenSheet(); };
         RestoreSelections();
         UpdateButtons();
+    }
+
+    private void ShowLauncher()
+    {
+        Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+    }
+
+    private async Task CheckLifecycle(EventWaitHandle activate)
+    {
+        // After sleep, let browsers renew their lease before evaluating idle shutdown.
+        if (lifecycleTick.Elapsed >= TimeSpan.FromSeconds(30) && bridge != null) bridge.KeepAlive();
+        lifecycleTick.Restart();
+        if (activate.WaitOne(0)) ShowLauncher();
+        if (Visible || !selection.Enabled || bridge == null || !bridge.IsIdle || checkingHost) return;
+
+        var currentBridge = bridge;
+        var currentParty = party;
+        if (currentParty != null && currentParty.IsHosting)
+        {
+            if (hostProbe.IsRunning && hostProbe.Elapsed < TimeSpan.FromSeconds(15)) return;
+            hostProbe.Restart();
+            checkingHost = true;
+            try { if (await currentParty.HasActiveRoom()) return; }
+            finally { checkingHost = false; }
+        }
+        if (!IsDisposed && !Visible && selection.Enabled && currentBridge == bridge &&
+            currentParty == party && currentBridge.IsIdle) Close();
+    }
+
+    private static void OpenBrowser(string path)
+    {
+        using (Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })) { }
     }
 
     private static void Place(Control parent, Control control, int x, int y, int width, int height)
@@ -240,6 +309,7 @@ internal sealed class TrackerLauncher : Form
     private async Task OpenParty(string mode)
     {
         PartySession candidate = null;
+        RefreshBridge lobbyBridge = null;
         try {
             var options = PartySession.Choose(this, mode, characterPath);
             if (options == null) return;
@@ -254,9 +324,14 @@ internal sealed class TrackerLauncher : Form
             candidate = await PartySession.Start(options);
             if (IsDisposed) return;
             if (candidate.Role == "dm") {
-                candidate.OpenLobby(Path.Combine(appData, "Previews"));
+                var previews = Path.Combine(appData, "Previews");
+                lobbyBridge = new RefreshBridge(previews, null);
+                var lobby = candidate.WriteLobby(previews, lobbyBridge.Url);
+                lobbyBridge.TrackLobby(lobby);
+                OpenBrowser(lobby);
                 if (bridge != null) bridge.Dispose();
-                bridge = null;
+                bridge = lobbyBridge;
+                lobbyBridge = null;
                 tray.Visible = true;
                 Hide();
             } else if (!await OpenSheet(candidate)) return;
@@ -266,6 +341,7 @@ internal sealed class TrackerLauncher : Form
         } catch (Exception error) {
             if (!IsDisposed) MessageBox.Show(this, error.Message, "Could not open party", MessageBoxButtons.OK, MessageBoxIcon.Error);
         } finally {
+            if (lobbyBridge != null) lobbyBridge.Dispose();
             if (candidate != null) candidate.Dispose();
             if (!IsDisposed) {
                 selection.Enabled = true;
@@ -288,7 +364,7 @@ internal sealed class TrackerLauncher : Form
             string preview = await candidate.Open();
             if (IsDisposed)
                 return false;
-            Process.Start(new ProcessStartInfo(preview) { UseShellExecute = true });
+            OpenBrowser(preview);
             if (bridge != null) bridge.Dispose();
             bridge = candidate;
             candidate = null;

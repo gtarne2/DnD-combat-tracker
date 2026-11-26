@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -13,11 +14,14 @@ internal sealed class RefreshBridge : IDisposable
     private readonly Func<string, Task<string>> generate;
     private readonly string previews;
     private readonly string partyUrl;
+    private readonly Stopwatch activity = Stopwatch.StartNew();
     private string preview;
     private string pending;
     private string stagedRevision;
     private bool stopped;
     public string Url { get; private set; }
+    internal string PreviewPath { get { return preview; } }
+    internal bool IsIdle { get { return activity.Elapsed >= TimeSpan.FromMinutes(5); } }
 
     internal RefreshBridge(string previews, Func<string, Task<string>> generate, string partyUrl = null)
     {
@@ -32,9 +36,19 @@ internal sealed class RefreshBridge : IDisposable
     {
         await Stage();
         Apply(stagedRevision);
+        KeepAlive();
         Listen();
         return preview;
     }
+
+    internal void TrackLobby(string path)
+    {
+        preview = path;
+        KeepAlive();
+        Listen();
+    }
+
+    internal void KeepAlive() { activity.Restart(); }
 
     private async Task<string> Stage()
     {
@@ -119,8 +133,18 @@ internal sealed class RefreshBridge : IDisposable
         try
         {
             if (route[0] == "OPTIONS") status = "204 No Content";
-            else if (route[0] == "POST" && action == "stage") body = await Stage();
-            else if (route[0] == "POST" && action.StartsWith("apply/", StringComparison.Ordinal)) Apply(action.Substring(6));
+            else if (route[0] == "POST" && action == "heartbeat") KeepAlive();
+            else if (route[0] == "POST" && generate != null && action == "stage")
+            {
+                KeepAlive();
+                try { body = await Stage(); }
+                finally { KeepAlive(); }
+            }
+            else if (route[0] == "POST" && generate != null && action.StartsWith("apply/", StringComparison.Ordinal))
+            {
+                KeepAlive();
+                Apply(action.Substring(6));
+            }
             else status = "404 Not Found";
         }
         catch (Exception error)

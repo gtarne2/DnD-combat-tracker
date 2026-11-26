@@ -1,3 +1,18 @@
+// The launcher shares one lease across all copies of the current sheet or dashboard.
+;(() => {
+  const url = document.body.dataset.refreshUrl;
+  if (!url) return;
+  function heartbeat() {
+    fetch(url + "/heartbeat", {method: "POST", cache: "no-store", referrerPolicy: "no-referrer"}).catch(() => {});
+  }
+  heartbeat();
+  setInterval(heartbeat, 30_000);
+  window.addEventListener("pageshow", heartbeat);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) heartbeat();
+  });
+})();
+
 function initiativeWriter(request) {
   let retry;
   return async (state, edit) => {

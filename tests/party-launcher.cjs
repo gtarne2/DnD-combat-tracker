@@ -10,7 +10,9 @@ const {randomUUID} = require("node:crypto");
 const {chromium} = require("playwright");
 
 const root = path.resolve(__dirname,"..");
-const pkg = fs.mkdtempSync(path.join(root,"target","p02-package-"));
+const scratch = path.join(root,"target","tmp");
+fs.mkdirSync(scratch,{recursive:true});
+const pkg = fs.mkdtempSync(path.join(scratch,"party-rehearsal-"));
 execFileSync("cmd.exe",["/d","/c","launcher\\build.cmd",path.relative(root,pkg)],{cwd:root});
 const distribution=fs.readdirSync(pkg).sort();
 const csc=path.join(process.env.SystemRoot,"Microsoft.NET","Framework64","v4.0.30319","csc.exe");
@@ -55,7 +57,7 @@ async function launch(profile,mode,invite="") {
 async function api(info,action,origin="null") {
   return fetch(info.url+"/"+action,{method:"POST",headers:{origin}});
 }
-async function pageFor(name,info,{localOnly=false}={}) {
+async function pageFor(name,info,{localOnly=false,waitForHeartbeat=false}={}) {
   const profile=await chromium.launchPersistentContext(path.join(pkg,name+"-chrome"),{executablePath:process.env.AURORA_TEST_CHROME});
   profiles.push(profile);
   if (localOnly) {
@@ -73,7 +75,10 @@ async function pageFor(name,info,{localOnly=false}={}) {
   const page=await profile.newPage();
   // Exercise the copy button without replacing the Windows user's clipboard.
   await page.addInitScript(()=>Object.defineProperty(navigator,"clipboard",{value:{writeText:async text=>{window.copiedInvitation=text;}}}));
-  await open(page,info);
+  await Promise.all([
+    waitForHeartbeat && page.waitForResponse(info.refresh+"/heartbeat").then(response=>assert.equal(response.status(),200)),
+    open(page,info)
+  ]);
   return page;
 }
 
@@ -264,6 +269,29 @@ function lanPath(invite,route,body){
 }
 
 async function main(){
+  if (process.argv.includes("--lifecycle")) {
+    for (const mode of ["host","dm"]) {
+      const session = await launch(mode,mode);
+      const page = await pageFor(mode,session,{waitForHeartbeat:true});
+      const secondTab = await page.context().newPage();
+      await Promise.all([
+        secondTab.waitForResponse(session.refresh+"/heartbeat").then(response=>assert.equal(response.status(),200)),
+        secondTab.goto(pathToFileURL(session.preview).href)
+      ]);
+      await page.close();
+      await Promise.all([
+        secondTab.waitForResponse(session.refresh+"/heartbeat").then(response=>assert.equal(response.status(),200)),
+        secondTab.reload()
+      ]);
+      const foreign = await api({url:session.refresh},"heartbeat","https://example.invalid").catch(()=>null);
+      assert.equal(foreign?.ok ?? false,false);
+      await secondTab.close();
+      assert.equal((await api(session,"state")).ok,true);
+      await session.stop();
+    }
+    console.log("Player and DM launcher heartbeats, tab reloads, and hosted room continuity passed.");
+    return;
+  }
   if (process.argv.includes("--monster-assist")) {
     await require("./monster-assist.cjs")({launch,pageFor,api});
     return;

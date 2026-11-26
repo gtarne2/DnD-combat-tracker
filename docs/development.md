@@ -50,6 +50,7 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | Player sheet, combat, or persistence | Select the relevant Rust suite such as `combat_sheet`, `encounter`, `effects`, or `companions`. Rebuild `combat-sheet` and run `node tests/browser-review.cjs` for the shipped sheet. |
 | Room commands, privacy, or restart | `cargo test --locked --test party_room`, plus the relevant packaged scenario below. |
 | Windows launcher, TLS, or Aurora refresh | `node tests/party-launcher.cjs --review-refresh` with current release binaries. |
+| Launcher browser activity | `node tests/party-launcher.cjs --lifecycle` with current release binaries. |
 | HP offers, grants, or sharing | Run `node tests/party-launcher.cjs` with `--offers`, `--actions`, or `--dashboard` for the affected flow. |
 | Shared initiative or clock | `node tests/party-launcher.cjs --initiative`. |
 | Manual monster actions and recovery | `node tests/party-launcher.cjs --monster-actions`. |

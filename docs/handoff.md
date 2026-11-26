@@ -11,6 +11,16 @@
 
 | Field | Record |
 | --- | --- |
+| Date and checkout | 2026-11-26 on `dev`, with local launcher lifecycle changes based on `5bf661b`. |
+| Completed | R59. The Windows shortcut reuses the launcher. The hidden launcher exits after five minutes without a browser check-in and keeps active hosted rooms open. The tray can reopen the current browser session. The launcher owns a kill-on-close job for its Party helper. |
+| Modified components | `launcher/TrackerLauncher.cs`, `launcher/RefreshBridge.cs`, `launcher/PartySession.cs`, `src/combat/party.js`, `tests/PartyHarness.cs`, and `tests/party-launcher.cjs`. |
+| Validation | Passed `cargo build --release --locked --offline --bins` with cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`, then `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows`. The shortcut resolves to the updated `target/release`. Passed `node --check src/combat/party.js`, `node --check tests/party-launcher.cjs`, and `git diff --check`. Passed `node tests/party-launcher.cjs --lifecycle` and `node tests/party-launcher.cjs --review-refresh` with Windows Chrome and current-user DPAPI. A packaged duplicate-launch smoke and a native fixture smoke also passed. The native smoke advanced the idle clock and checked wake grace, active host protection, shutdown after room end, and job cleanup while stdin was open. |
+| Next action | During the Windows playtest, close all Aurora tabs after solo or joined play and confirm the launcher exits after five minutes. Also check physical two-PC play with the host dashboard closed and reopened from the tray. |
+
+## Table-feedback UI handoff
+
+| Field | Record |
+| --- | --- |
 | Date and checkout | 2026-11-26 on `claude/project-thread-0dbc2v`, branched from `dev` at `1864d93`. |
 | Completed | Table-feedback UI round (R56–R58). DM: players without a row are listed under "Not in the order yet" and the DM can seat them with a table roll (`Edit::Seat`); the selected monster action shows its cost, rules and, for a multiattack, each strike with its count and rules (from the pack's strike list, or read from the text for v1 packs), plus an "All actions" list grouped by cost. Player: a Party encounter banner, the shared order (revealed enemies and "DM turn" rows) whether or not the player has joined, a Join form, and End Turn on their own turn (`Edit::EndTurn`); Next Turn, Start and End Encounter are hidden in DM rooms; leaving still returns to solo. The header is the same on every page and can show a character portrait kept in local storage. The HP card has one number box with Damage, Heal, Set HP and Temp HP; an empty box opens the full forms as before. |
 | Modified components | `src/party/initiative.rs`, `src/party/model.rs`, `tests/encounter_portability.rs` (seat and end-turn test), `launcher/dm-dashboard.{html,css}`, `launcher/dm-initiative.js`, `launcher/dm-monster-actions.js`, `src/combat/turns.{html,js}`, `src/combat/party-initiative.js`, `src/combat/portrait.{html,js}` (new, included by `html.rs`), `src/combat/html.rs`, `src/combat/sheet.css`, `tests/browser-review.cjs` (waits for the saved companion before damaging it; this step also failed intermittently on unchanged `dev`). |
@@ -22,6 +32,12 @@
 - Built dev commit `1864d93` with `cargo build --release --locked --offline --bins` using cached GNU Rust, w64devkit, `RUSTFLAGS=-C link-self-contained=yes`, and `CARGO_TARGET_DIR=target/dev-1864d93-build`. Packaged with `launcher\build.cmd target\dev-1864d93-windows`. Both commands passed.
 - Passed `aurora-party.exe init <scratch>/party.sqlite3` and `combat-sheet.exe --preview-dir <scratch> tests/fixtures/combat-sheet.dnd5e tests/fixtures/combat-sheet.xml` using the packaged executables. Both wrote their expected outputs under an isolated scratch directory.
 - The earlier package is at `target/dev-1864d93-windows/Aurora Combat Tracker.exe`. The packaged browser rehearsal and physical two-PC session remain pending. Build a fresh Windows package for the current dev checkout before rehearsing its changes.
+
+## Windows shortcut verification for 5bf661b
+
+- Updated `target/release` with `cargo build --release --locked --offline --bins` using cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`. Both `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows` passed.
+- Verified that `Open Aurora Combat Tracker.lnk` resolves to `target/release/Aurora Combat Tracker.exe` and that its embedded UI assets match the source files by SHA-256. `aurora-party.exe init <scratch>/party.sqlite3` and `combat-sheet.exe --preview-dir <scratch> tests/fixtures/combat-sheet.dnd5e tests/fixtures/combat-sheet.xml` passed. The generated preview contains the Party encounter UI.
+- Next, use the shortcut for the manual Windows UI and two-PC session rehearsal before merging into `main`.
 
 ## Handoff procedure
 
