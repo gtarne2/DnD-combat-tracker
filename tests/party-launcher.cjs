@@ -292,6 +292,10 @@ async function main(){
     await require("./monster-library.cjs")({launch,pageFor,open,api});
     return;
   }
+  if (process.argv.includes("--encounters")) {
+    await require("./encounter-portability.cjs")({launch,pageFor,api,pkg});
+    return;
+  }
   if (process.argv.includes("--initiative")) {
     await require("./shared-initiative.cjs")({launch,pageFor,open,api});
     return;

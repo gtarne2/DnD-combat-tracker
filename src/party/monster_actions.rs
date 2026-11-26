@@ -388,6 +388,57 @@ impl Actions {
         })
     }
 
+    /// Enemy state for a portable encounter. Recorded strikes refer to room-owned
+    /// reviews, windows and delivery ledgers, so the history stays with the room.
+    pub(super) fn portable(&self) -> Self {
+        Self {
+            history: vec![],
+            ..self.clone()
+        }
+    }
+
+    /// Validate imported enemy state against its own snapshot before it replaces a position.
+    pub(super) fn check_import(&self, snapshot: Option<&Snapshot>) -> Result<(), Rejection> {
+        let invalid = Rejection::InvalidInput;
+        let mut manual = BTreeSet::new();
+        if !self.history.is_empty()
+            || self.legendary_left > self.legendary_max
+            || self.manual.len() > 100
+            || self.manual.iter().any(|rule| {
+                rule.id.is_nil()
+                    || !manual.insert(rule.id)
+                    || !super::initiative::label(&rule.name)
+                    || rule.text.trim().is_empty()
+                    || rule.text.len() > 16000
+            })
+        {
+            return Err(invalid);
+        }
+        let rules = self.rules(snapshot, &self.manual);
+        let known = |id: &String| rules.iter().any(|rule| rule.id == *id);
+        if self
+            .policies
+            .iter()
+            .any(|(id, policy)| !known(id) || !policy.valid())
+        {
+            return Err(invalid);
+        }
+        for (id, counter) in &self.counters {
+            let rule = rules.iter().find(|rule| rule.id == *id).ok_or(invalid)?;
+            let die = rule.policy.recharge.as_ref().map(|r| r.die);
+            if counter
+                .remaining
+                .is_some_and(|left| rule.policy.uses.is_none_or(|max| left > max))
+                || counter.queued.is_some_and(|roll| {
+                    !counter.spent || die.is_none_or(|die| !(1..=die).contains(&roll))
+                })
+            {
+                return Err(invalid);
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn duplicate(&mut self) {
         self.history.clear();
         for counter in self.counters.values_mut() {

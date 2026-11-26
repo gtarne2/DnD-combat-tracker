@@ -3,7 +3,7 @@
 ## Product baseline
 
 - The Windows launcher, player sheet, LAN room service, and DM dashboard are implemented through P09D. The DM can select Assist for individual strikes while using the same roll records, reaction windows and damage delivery. [P09D results and exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist)
-- Bundled monster actions retain their full rules for table adjudication. P10 covers encounter portability and the full packaging rehearsal. [Remaining phases](local-multiplayer-plan.md#implementation-phases)
+- Bundled monster actions retain their full rules for table adjudication. Encounter export/import from P10 is implemented and Rust-tested. The full Windows packaging rehearsal remains. [P10 first part](local-multiplayer-plan.md#2026-11-26--p10-first-part--portable-encounter-export-and-import)
 - For multiplayer UI work, start with the [UI handoff](multiplayer-ui.md) for the shipped entry points, state boundaries and targeted browser checks.
 - Physical two-PC Wi-Fi and firewall behavior, physical adapter disconnection, manual Windows picker interaction, and the real clipboard remain unverified in the recorded rehearsals. [Validation and scope of the harness](development.md#validation-matrix)
 
@@ -11,11 +11,11 @@
 
 | Field | Record |
 | --- | --- |
-| Date and checkout | 2026-11-25 on `dev`. The P09D implementation baseline is `73b25d3` on `origin/dev`, including the earlier P01/P02 merge from `main`. |
-| Completed | Published P09C and P09D and prepared the multiplayer UI handoff. The isolated P09D package is in `target/p09d-windows` in the checkout that built it. The running package was left in place. |
-| Modified components | The implementation changed the DM action and damage dialogs, roll calculations, room and strike storage, launcher assets, and synthetic Windows rehearsals. The subsequent handoff updated documentation. |
-| Validation | The merge preserved the tested P09D file tree. The Rust suite, Windows package, Assist rehearsal, Shield and duplicate damage in Assist, and Manual, player attack, casting and Protector regressions passed for that baseline. The handoff review checked local Markdown links and heading references. [Exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist) |
-| Next action | For the UI rework, follow the [UI entry points and checks](multiplayer-ui.md). Keep portable encounter export/import and the full packaging rehearsal in [P10](local-multiplayer-plan.md#p10--package-and-rehearse-a-full-session). |
+| Date and checkout | 2026-11-26 on `claude/project-thread-p9jla2`, branched from `origin/dev` at `3747dbd`. |
+| Completed | First part of P10: host-owned encounter export/import with explicit player re-pairing, plus the DM dashboard controls. |
+| Modified components | `src/party/initiative.rs` (portable format, `Edit::Import`), `src/party/monster_actions.rs` (portable counters and import validation), `src/party/model.rs`, `src/party.rs` (`export_encounter`), `src/bin/party_runtime/mod.rs` (loopback action), `launcher/dm-dashboard.html`, `launcher/dm-initiative.js`, `tests/encounter_portability.rs`, `tests/encounter-portability.cjs`, `tests/party-launcher.cjs --encounters`, docs. |
+| Validation | 49 Rust tests, Linux release build, Windows target type-check and a stubbed browser smoke passed on Linux. No Windows package or packaged rehearsal was run. [Exact checks](local-multiplayer-plan.md#2026-11-26--p10-first-part--portable-encounter-export-and-import) |
+| Next action | On Windows, build the package with `cargo build --release --locked --bins` and `launcher\build.cmd target\p10-windows`, run `node tests/party-launcher.cjs --encounters` (new and unrun, so expect small fixes), then continue with the full P10 session rehearsal. |
 
 ## Handoff procedure
 

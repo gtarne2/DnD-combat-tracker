@@ -107,6 +107,189 @@ pub enum Edit {
         name: String,
     },
     New,
+    /// Replace the stopped position with a portable export. Each exported player
+    /// seat is kept only when the DM pairs it with a current member of this room.
+    Import {
+        encounter: Box<PortableEncounter>,
+        seats: BTreeMap<Uuid, Uuid>,
+    },
+}
+
+pub const ENCOUNTER_FORMAT: &str = "aurora-encounter";
+pub const ENCOUNTER_VERSION: u32 = 1;
+const MAX_IMPORT_ROWS: usize = 500;
+
+/// Host-owned encounter file. It carries enemy snapshots and counters, the
+/// roster shape and the turn pointer. It omits member identities, inspections,
+/// credentials, recorded strikes, delivery ledgers and pending exchanges.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PortableEncounter {
+    format: String,
+    version: u32,
+    running: bool,
+    round: u32,
+    current: Option<Uuid>,
+    rows: Vec<PortableRow>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct PortableRow {
+    id: Uuid,
+    score: i32,
+    actor: PortableActor,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum PortableActor {
+    Enemy {
+        enemy: Enemy,
+        #[serde(default)]
+        actions: Actions,
+    },
+    /// A player seat. Its row ID is the seat ID the DM pairs on import.
+    Player {
+        name: String,
+        companions: Vec<Companion>,
+    },
+    Companion {
+        seat: Uuid,
+        local_id: u32,
+        name: String,
+    },
+}
+
+fn valid_enemy(enemy: &Enemy) -> bool {
+    label(&enemy.name)
+        && (enemy.alias.is_empty() || label(&enemy.alias))
+        && (!enemy.revealed || label(&enemy.alias))
+        && enemy.notes.len() <= 16000
+        && enemy.conditions.len() <= 2000
+        && !enemy.hp.zip(enemy.max_hp).is_some_and(|(hp, max)| hp > max)
+}
+
+fn valid_companions(companions: &[Companion]) -> bool {
+    let ids: BTreeSet<_> = companions.iter().map(|c| c.local_id).collect();
+    ids.len() == companions.len()
+        && companions.len() <= 100
+        && companions.iter().all(|c| label(&c.name))
+}
+
+impl PortableEncounter {
+    fn position(
+        &self,
+        seats: &BTreeMap<Uuid, Uuid>,
+        players: &BTreeMap<Uuid, String>,
+    ) -> Result<Position, Rejection> {
+        let invalid = Rejection::InvalidInput;
+        if self.format != ENCOUNTER_FORMAT {
+            return Err(invalid);
+        }
+        if self.version != ENCOUNTER_VERSION {
+            return Err(Rejection::UnsupportedVersion);
+        }
+        let ids: BTreeSet<_> = self.rows.iter().map(|r| r.id).collect();
+        if self.round == 0
+            || self.rows.len() > MAX_IMPORT_ROWS
+            || ids.len() != self.rows.len()
+            || ids.contains(&Uuid::nil())
+            || self.current.is_some_and(|id| !ids.contains(&id))
+        {
+            return Err(invalid);
+        }
+        let seat_companions: BTreeMap<Uuid, &Vec<Companion>> = self
+            .rows
+            .iter()
+            .filter_map(|r| match &r.actor {
+                PortableActor::Player { companions, .. } => Some((r.id, companions)),
+                _ => None,
+            })
+            .collect();
+        let paired: BTreeSet<_> = seats.values().collect();
+        if paired.len() != seats.len()
+            || seats.keys().any(|seat| !seat_companions.contains_key(seat))
+            || seats.values().any(|member| !players.contains_key(member))
+        {
+            return Err(invalid);
+        }
+        let mut separate = BTreeSet::new();
+        let mut rows = vec![];
+        for row in &self.rows {
+            let actor = match &row.actor {
+                PortableActor::Enemy { enemy, actions } => {
+                    if !valid_enemy(enemy)
+                        || enemy
+                            .template
+                            .as_ref()
+                            .is_some_and(|t| t.validate().is_err())
+                    {
+                        return Err(invalid);
+                    }
+                    actions.check_import(enemy.template.as_deref())?;
+                    Some((Participant::Enemy(enemy.clone()), actions.clone()))
+                }
+                PortableActor::Player { name, companions } => {
+                    if !label(name) || !valid_companions(companions) {
+                        return Err(invalid);
+                    }
+                    seats.get(&row.id).map(|&member| {
+                        (
+                            Participant::Player {
+                                member,
+                                name: players[&member].clone(),
+                                companions: companions.clone(),
+                            },
+                            Actions::default(),
+                        )
+                    })
+                }
+                PortableActor::Companion {
+                    seat,
+                    local_id,
+                    name,
+                } => {
+                    let owner = seat_companions.get(seat).ok_or(invalid)?;
+                    if !label(name)
+                        || !separate.insert((*seat, *local_id))
+                        || !owner
+                            .iter()
+                            .any(|c| c.local_id == *local_id && c.initiative.is_some())
+                    {
+                        return Err(invalid);
+                    }
+                    seats.get(seat).map(|&member| {
+                        (
+                            Participant::Companion {
+                                member,
+                                local_id: *local_id,
+                                name: name.clone(),
+                            },
+                            Actions::default(),
+                        )
+                    })
+                }
+            };
+            rows.push(actor.map(|(actor, actions)| Row {
+                id: row.id,
+                score: row.score,
+                actor,
+                actions,
+            }));
+        }
+        // An unpaired seat leaves the order. A pointer on it moves to the next kept row.
+        let current = self.current.and_then(|id| {
+            let start = self.rows.iter().position(|r| r.id == id)?;
+            (0..rows.len())
+                .map(|offset| (start + offset) % rows.len())
+                .find_map(|i| rows[i].as_ref().map(|r| r.id))
+        });
+        Ok(Position {
+            rows: rows.into_iter().flatten().collect(),
+            round: self.round,
+            current,
+        })
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -291,10 +474,60 @@ impl Fight {
                 expected_revision: self.revision,
                 edit: Edit::End,
             },
-            &BTreeSet::new(),
+            &BTreeMap::new(),
         )
         .unwrap_or_default()
     }
+    pub fn export(&self) -> PortableEncounter {
+        let seat = |member: Uuid| {
+            self.position
+                .rows
+                .iter()
+                .find(|r| r.player() == Some(member))
+                .map(|r| r.id)
+        };
+        PortableEncounter {
+            format: ENCOUNTER_FORMAT.into(),
+            version: ENCOUNTER_VERSION,
+            running: self.running,
+            round: self.position.round,
+            current: self.position.current,
+            rows: self
+                .position
+                .rows
+                .iter()
+                .filter_map(|row| {
+                    let actor = match &row.actor {
+                        Participant::Enemy(enemy) => PortableActor::Enemy {
+                            enemy: enemy.clone(),
+                            actions: row.actions.portable(),
+                        },
+                        Participant::Player {
+                            name, companions, ..
+                        } => PortableActor::Player {
+                            name: name.clone(),
+                            companions: companions.clone(),
+                        },
+                        Participant::Companion {
+                            member,
+                            local_id,
+                            name,
+                        } => PortableActor::Companion {
+                            seat: seat(*member)?,
+                            local_id: *local_id,
+                            name: name.clone(),
+                        },
+                    };
+                    Some(PortableRow {
+                        id: row.id,
+                        score: row.score,
+                        actor,
+                    })
+                })
+                .collect(),
+        }
+    }
+
     pub fn view(&self, viewer: Uuid, dm: bool) -> Value {
         let mut view = json!({"id":self.id,"revision":self.revision,"running":self.running,"round":self.position.round,
             "current":self.position.current,"joined":self.members().contains(&viewer),
@@ -347,7 +580,7 @@ impl Fight {
                 expected_revision: self.revision,
                 edit: Edit::Leave,
             },
-            &BTreeSet::new(),
+            &BTreeMap::new(),
         )
         .unwrap_or_default()
     }
@@ -408,7 +641,7 @@ impl Fight {
         name: &str,
         dm: bool,
         cmd: &FightEdit,
-        players: &BTreeSet<Uuid>,
+        players: &BTreeMap<Uuid, String>,
     ) -> Result<Vec<(Uuid, Event)>, Rejection> {
         self.check_revision(cmd)?;
         if dm == matches!(cmd.edit, Edit::Submit { .. } | Edit::Leave) {
@@ -425,11 +658,7 @@ impl Fight {
         let rows = &mut self.position.rows;
         match &cmd.edit {
             Edit::Submit { score, companions } => {
-                let ids: BTreeSet<_> = companions.iter().map(|c| c.local_id).collect();
-                if ids.len() != companions.len()
-                    || companions.len() > 100
-                    || companions.iter().any(|c| !label(&c.name))
-                {
+                if !valid_companions(companions) {
                     return Err(Rejection::InvalidInput);
                 }
                 // Reuse row IDs across resubmission, including an active companion.
@@ -492,13 +721,7 @@ impl Fight {
                 }
             }
             Edit::Enemy { id, score, enemy } => {
-                if !label(&enemy.name)
-                    || (!enemy.alias.is_empty() && !label(&enemy.alias))
-                    || (enemy.revealed && !label(&enemy.alias))
-                    || enemy.notes.len() > 16000
-                    || enemy.conditions.len() > 2000
-                    || enemy.hp.zip(enemy.max_hp).is_some_and(|(hp, max)| hp > max)
-                {
+                if !valid_enemy(enemy) {
                     return Err(Rejection::InvalidInput);
                 }
                 if let Some(id) = id {
@@ -567,7 +790,7 @@ impl Fight {
                 let targets = rows
                     .iter()
                     .map(|row| (row.id, row.player()))
-                    .chain(players.iter().map(|&member| (member, Some(member))))
+                    .chain(players.keys().map(|&member| (member, Some(member))))
                     .collect();
                 let row = rows
                     .iter_mut()
@@ -688,6 +911,10 @@ impl Fight {
                     .get(name)
                     .cloned()
                     .ok_or(Rejection::InvalidInput)?;
+            }
+            Edit::Import { encounter, seats } if !self.running => {
+                self.position = encounter.position(seats, players)?;
+                self.id = Uuid::new_v4();
             }
             Edit::New if !self.running => {
                 self.id = Uuid::new_v4();
