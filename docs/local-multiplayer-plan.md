@@ -14,7 +14,7 @@ An artificer joins the host's invite from their usual tracker. When they use the
 
 The DM can host without an Aurora character. Their screen shows initiative, shared player vitals, and private enemy cards. Three wolves from one template each have their own HP, conditions, and attacks. The DM can open a consenting player's sheet details or reveal an enemy under a chosen name.
 
-In Manual play, the DM can roll physical dice, ask “Does a 16 hit?”, hear the player's answer, and record the result. In Assist, the DM can send the attack total, let the player use Shield, and confirm damage. Both flows reach the same HP, reaction, and concentration handlers.
+In Manual play, the DM can roll physical dice, ask “Does a 16 hit?”, hear the player's answer, and record the result. Manual and Assist can open an addressed question, let the player use Shield, and confirm damage. The DM can announce a total separately. Both modes reach the same HP, reaction, and concentration handlers. [UI rework guide](multiplayer-ui.md)
 
 ## Architecture decisions for all phases
 
@@ -91,9 +91,9 @@ Keep player projections in host memory. Publish a fresh projection on reconnect.
 
 **Pass.** Run two players, a companion, and three enemies through two rounds. Observe one reset at each owner's turn start and six elapsed seconds per round. Hide a monster and inspect player responses for its name, stats, and attack list. Disconnect a player for a round and verify timers catch up once. Restart the host mid-encounter. Reordering ties, correcting the pointer, or retrying Next Turn must preserve the expected timers. Leave the encounter and verify the local sheet can resume solo.
 
-### Proposed sequence after P06
+### Library and monster combat phases
 
-P01–P06 are the accepted baseline. P07 and P08 have implementation and qualification records below. For subsequent assignments, substitute the full phase ID (including its letter) in the task prompt, run its **Pass** checks and append its own dated handoff. P09 finishes when all its lettered assignments pass. Record adopted decisions in `docs/architecture.md` alongside the phase that implements them. [Research, source pins and approval decisions](external-resource-research.md)
+P01–P09D are implemented. The dated entries below record the checks and outstanding verification. P10 is the remaining implementation phase. For a UI-only assignment, preserve the shipped behavior and use the targeted [UI regression checklist](multiplayer-ui.md#test-the-rework). [Research, source pins and approval decisions](external-resource-research.md)
 
 ### P07A · Qualify the existing offline monster library
 

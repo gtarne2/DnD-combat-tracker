@@ -10,6 +10,7 @@ Read the relevant behavior in [requirements.md](docs/requirements.md) and the ow
 | --- | --- |
 | Resuming or locating the current baseline | [Current handoff](docs/handoff.md) |
 | Implementing a multiplayer phase | [Common decisions](docs/local-multiplayer-plan.md#architecture-decisions-for-all-phases), the assigned phase, and the prerequisite handoff it depends on |
+| Reworking the multiplayer UI | [UI entry points, state boundaries and regression checklist](docs/multiplayer-ui.md) |
 | Building or validating a change | [Development commands and check matrix](docs/development.md) |
 | Changing bundled SRD data | [2014 source audit](docs/srd51-pack.md) or [2024 source audit](docs/srd521-pack.md) |
 

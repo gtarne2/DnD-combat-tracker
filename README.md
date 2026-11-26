@@ -5,6 +5,7 @@ A personal Windows companion app for characters built in Aurora. It brings attac
 - [User requirements](docs/requirements.md)
 - [Architecture](docs/architecture.md)
 - [Windows development and workflow](docs/development.md)
+- [Multiplayer UI handoff](docs/multiplayer-ui.md)
 - [Shared agent instructions](AGENTS.md) · [Current development handoff](docs/handoff.md)
 
 ## Open the tracker on Windows
@@ -19,7 +20,11 @@ and `.\launcher\build.cmd`, then open the launcher in `target\release`.
 
 For multiplayer, open **Party…** in the launcher. Choose **Host Party** with a character or **Host as DM** for a lobby without a save. Select the host's Wi-Fi adapter. In **Session → Party** (or the DM lobby), click **Copy invite**. Each player selects their character, chooses **Party… → Join**, and pastes the invitation. Use **Resume party** or **Resume DM room** after restarting the launcher.
 
+Use the same current package on every computer. For an **Incompatible party version** message, update the helpers, resume the host room, and copy a current invitation if a player needs to join. The updated package can resume saved memberships.
+
 In **Host as DM**, open **Monster library** to search the bundled SRD packs offline. The library opens on **2014 (SRD 5.1)**. Choose **2024 (SRD 5.2.1)** from Pack to use the newer rules in the same encounter. Select a creature to preview its rules and add it to initiative. **Pack credits** shows the source and license. [2014 notices](content/monster-packs/SRD-5.1-NOTICES.txt) · [2024 notices](content/monster-packs/SRD-5.2.1-NOTICES.txt)
+
+Players submit their turn order in **Combat → Initiative**. In **Session → Party**, they choose **Party name only**, **Vitals**, or **Character details** and can answer DM questions and accept or decline offers at any sharing level. The DM starts and advances the encounter, records strikes under **Monster actions**, and uses **Recorded actions** to ask about a strike or confirm final damage. **Manual** is the default. **Assist** offers optional rolls, comparisons and damage suggestions from available rules and defenses. **Save current roster** saves the DM's roster and position in the same room.
 
 Supported cantrips show their dice at your character's level. Choose a slot in the cast dialog to
 preview supported damage, healing, or projectile counts. Class features can use imported counters

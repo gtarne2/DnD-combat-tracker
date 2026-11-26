@@ -1,6 +1,8 @@
 # Creature data and combat automation after P06
 
-**Decision brief · 25 November 2026 · Proposed for approval**
+**Historical decision brief · 25 November 2026**
+
+This brief records the P06-era proposal. See the [current handoff](handoff.md) and [architecture](architecture.md#home-wi-fi-multiplayer) for implemented behavior and remaining work.
 
 ## Executive summary
 

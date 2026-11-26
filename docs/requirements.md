@@ -2,6 +2,8 @@
 
 A personal Windows app that uses an Aurora character and its content to show combat options and track the encounter.
 
+R31–R53 cover multiplayer. For implementation entry points and regression checks, see the [multiplayer UI handoff](multiplayer-ui.md).
+
 | ID | Requirement |
 | --- | --- |
 | R1 | Import a `.dnd5e` save and resolve entries against the same Aurora content, including custom XML. Load available combat stats, attacks, spells, features, and inventory. Flag missing details and allow manual corrections. Treat source files as read-only. |
@@ -55,7 +57,7 @@ A personal Windows app that uses an Aurora character and its content to show com
 | R49 | Accept or decline DM damage in Session → Party, including at name-only sharing. Acceptance applies damage to your sheet once, uses temporary HP first, and handles concentration, zero HP and the activity log as local damage does. If HP is unavailable, set it before accepting. Undo or correct damage on your own sheet. After restoring a backup, reconcile outstanding claims by applying them, marking them already handled, or declining. |
 | R50 | Send an optional save or reaction question from a recorded strike in Host as DM. The target can answer hit, miss, save success, save failure, or pass in Session → Party at name-only sharing. Use an available Shield reaction and choose the table outcome in the same reply. Keep defenses, slots and spell details on the owner's sheet. Only text the DM explicitly enters as a public announcement appears to the party. |
 | R51 | Continue initiative and other strikes while a question waits. Save questions can wait for a reconnect. A pending reaction trigger becomes stale on turn advance. The DM can use a reply, cancel or replace a question, or enter a spoken ruling with a private override reason before resolving damage. Late replies leave closed questions closed. The owner can correct a reaction spent before a late reply was rejected. |
-| R52 | Start monster action previews in Manual or opt into Assist. Choose digital attack rolls, armor class comparison and damage suggestions independently for each strike. Store a natural d20 separately from an entered or computed total. Use the current shared armor class or an unqualified enemy armor class for attack suggestions, and make the ruling at the table when it is unavailable. Switch modes or review an unresolved strike without paying the parent action cost again. |
+| R52 | Start monster action previews in Manual or opt into Assist. Choose digital attack rolls, armor class comparison and damage suggestions independently for each strike. Store a natural d20 separately from an entered or computed total. Use an online player's currently shared armor class or an unqualified enemy armor class for attack suggestions, and make the ruling at the table when it is unavailable. Switch modes or review an unresolved strike without paying the parent action cost again. |
 | R53 | Review printed save branches and conditional riders in Assist. Use rolled, printed-average or custom damage and confirm any resistance or other modifier before using a suggestion. Resolve each target separately and confirm the final amount through the existing damage offer. Saved rolls and replies carry forward through retries and mode switches. |
 
 ## First playtest

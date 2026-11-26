@@ -6,6 +6,8 @@ Open the repository root. Codex discovers `AGENTS.md`. Claude Code uses the same
 
 For a continuation, read the [current handoff](handoff.md) and compare its checkout and validation state with yours. For a new task, specify the expected behavior and entry point. The [component map](architecture.md#shipped-component-map) gives the owning paths and links to their design decisions.
 
+For a multiplayer UI task, start with the [UI handoff](multiplayer-ui.md). It maps both browser surfaces and the native picker to their files, tests and state boundaries.
+
 ## Windows setup
 
 Use Git, Node.js LTS, stable Rust via rustup, and a C toolchain for bundled SQLite. For the MSVC Rust target, install Microsoft C++ Build Tools with **Desktop development with C++**. The launcher build uses the Windows .NET Framework C# compiler. Playwright and Chrome or Chromium are browser-test dependencies.
@@ -34,9 +36,9 @@ cargo build --release --locked --bins
 
 The launcher build and packaged rehearsals read the two release binaries from `target/release`. Set `CARGO_TARGET_DIR` for both Cargo and packaging to build separately while an existing helper is running. Rebuild `combat-sheet` after changing embedded sheet assets. Rebuild the release helpers or launcher package after changing their respective Rust code, native code, DM assets, or bundled data. Use Cargo's `--offline` when dependencies are already cached.
 
-Run `.\launcher\build.cmd` without an output argument to update the repository shortcut's launcher in `target/release`. An open DM dashboard keeps its original helper. If Add to encounter rejects an unknown `license` or `schema_version` field, use **Exit refresh service** in the older launcher's tray menu, then choose **Party… → Resume DM room** in the current package.
+With the default Cargo target directory, run `.\launcher\build.cmd` without an output argument to update the repository shortcut's launcher in `target/release`. An open DM dashboard keeps its original helper. If Add to encounter rejects an unknown `license` or `schema_version` field, use **Exit refresh service** in the older launcher's tray menu, then choose **Party… → Resume DM room** in the current package. Protocol 2 requires updated helpers on all peers. Resume with the current package to reuse a saved binding.
 
-The solo browser suite defaults to `target/debug/combat-sheet.exe`. Set `AURORA_TEST_IMPORTER` to use another built importer. The packaged suite uses synthetic fixtures, isolated app-data directories and separate Chrome profiles under `target/`. It needs current-user DPAPI and loopback sockets.
+The solo browser suite defaults to `target/debug/combat-sheet.exe`. Set `AURORA_TEST_IMPORTER` to use another built importer. The packaged suite uses synthetic fixtures, isolated app-data directories and separate Chrome profiles under `target/`. It builds a temporary launcher and compiles the harness from the current DM assets on each run. A DM markup, CSS or JavaScript change can be rehearsed against unchanged release binaries. A change to an embedded player asset requires rebuilding the release `combat-sheet` for this harness. The suite needs current-user DPAPI and loopback sockets.
 
 ## Validation matrix
 
@@ -57,7 +59,7 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | Monster library or encounter snapshots | `node tests/party-launcher.cjs --monsters`. |
 | Bundled pack or notices | Use the reproducibility and source audits for [SRD 5.1](srd51-pack.md#reproduce-and-audit) or [SRD 5.2.1](srd521-pack.md#reproduce-and-audit), then run the packaged suite with `--srd51` or `--srd521`. |
 
-For storage or receipt changes, repeat the applicable `--offers`, `--actions`, `--dashboard`, or `--initiative` rehearsal with `--fallback-writer` to exercise the guest's IndexedDB writer. The browser suites cover different profiles and loopback connectivity. Record physical two-PC Wi-Fi, firewall, Windows picker, and real clipboard checks separately. The clipboard assertion in the launcher harness captures the value passed by **Copy invite**.
+For storage or receipt changes, repeat the applicable player-writer scenario with `--fallback-writer` to exercise the guest's IndexedDB writer. Useful cases include `--offers`, `--initiative`, `--monster-damage` and `--strike-windows`. The browser suites cover different profiles and loopback connectivity. Record physical two-PC Wi-Fi, firewall, Windows picker, and real clipboard checks separately. The clipboard assertion in the launcher harness captures the value passed by **Copy invite**.
 
 To exercise refresh against a running launcher, use an isolated settings directory containing synthetic `review.dnd5e` and `review.xml` copies of the combat-sheet fixtures. Leave the service open and set `AURORA_TEST_LAUNCHER_WORKSPACE` to the parent of its `Aurora Combat Tracker` settings subdirectory. The suite restores the copies after modifying them.
 
