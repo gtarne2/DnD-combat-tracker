@@ -109,23 +109,56 @@ const encounterTracker = (() => {
   function render() {
     const state = previewEncounter.current();
     const progress = get(state);
-    const rows = turns(state);
+    const sharedBoard = partyInitiative.board();
+    // In a party room with a DM encounter the rail follows the shared order, joined or not.
+    const watching = Boolean(sharedBoard) && !progress.partyClock;
+    const rows = watching ? sharedBoard.rows.map((row) => ({...row, rank: 3})) : turns(state);
     const undoLabel = previewEncounter.undoLabel();
     const pinnedResources = layoutPreferences.pinnedResources();
-    const signature = JSON.stringify([progress, rows, hpBaseline, undoLabel, previewEncounter.canUndo(), previewEncounter.isPersisted(), pinnedResources]);
+    const signature = JSON.stringify([progress, rows, sharedBoard && [sharedBoard.running, sharedBoard.current, sharedBoard.round, sharedBoard.joined, partyInitiative.players()], byId("party-encounter-note").dataset.error, hpBaseline, undoLabel, previewEncounter.canUndo(), previewEncounter.isPersisted(), pinnedResources]);
     paintKeyHp(progress);
     if (signature === lastRender) return;
     lastRender = signature;
     const sharedClock = Boolean(progress.partyClock);
-    const running = progress.active !== false;
-    const active = running ? rows.find((row) => row.key === progress.current) || rows[0] : null;
-    byId("round-number").textContent = running ? `Round ${progress.round}` : "Encounter inactive";
-    byId("current-turn").textContent = !running ? "" : rows.length > 1 || sharedClock ? "Turn: " + active.name : "Solo turn";
+    const party = sharedClock || watching;
+    const running = watching ? sharedBoard.running : progress.active !== false;
+    const active = !running ? null : watching ? rows.find((row) => row.id === sharedBoard.current) || null
+      : rows.find((row) => row.key === progress.current) || rows[0];
+    const mine = (row) => row?.key === "owner" || Boolean(row?.key?.startsWith("companion:"));
+    const round = watching ? sharedBoard.round : progress.round;
+    byId("round-number").textContent = running ? `Round ${round}` : party ? "Waiting for the DM" : "Encounter inactive";
+    byId("current-turn").textContent = !running || !active ? "" : party
+      ? (active.key === "owner" ? "Your turn" : "Turn: " + active.name)
+      : rows.length > 1 ? "Turn: " + active.name : "Solo turn";
     byId("current-turn").hidden = !running;
-    byId("encounter-owner").hidden = byId("combatant-panel").hidden = sharedClock;
-    byId("end-encounter").hidden = !running || sharedClock;
-    byId("next-turn").hidden = !running || sharedClock;
-    byId("start-encounter").hidden = running;
+    byId("current-turn").classList.toggle("is-mine", party && mine(active));
+    byId("encounter-owner").hidden = byId("combatant-panel").hidden = party;
+    byId("end-encounter").hidden = !running || party;
+    byId("next-turn").hidden = !running || party;
+    byId("start-encounter").hidden = running || party;
+    // Party rooms: only the owner of the current row ends it; the DM runs everything else.
+    const endTurn = byId("end-my-turn");
+    endTurn.hidden = !(sharedClock && running && mine(active));
+    endTurn.dataset.row = endTurn.hidden ? "" : active.id;
+    endTurn.textContent = active?.key === "owner" ? "End Turn" : "End " + (active?.name || "") + "'s turn";
+    const banner = byId("party-encounter");
+    banner.hidden = !party;
+    if (party) {
+      const others = [...new Set([...partyInitiative.players(),
+        ...rows.filter((row) => Array.isArray(row.shared) && row.key !== "owner").map((row) => row.name)])];
+      byId("party-encounter-who").textContent = others.length ? " with " + others.join(", ") : "";
+      const joined = sharedClock || sharedBoard?.joined;
+      const join = byId("party-join-form");
+      join.hidden = Boolean(joined);
+      if (!joined && document.activeElement !== join.elements.score && join.elements.score.value === "")
+        join.elements.score.value = state.companions?.owner ?? "";
+      const note = byId("party-encounter-note");
+      if (!note.dataset.error) note.textContent = !joined ? "Roll initiative to join. The DM can also add you."
+        : !running ? "You're in. The DM starts the encounter."
+        : mine(active) ? "It's your turn. Press End Turn when you're done."
+        : "The DM runs the turn order.";
+    }
+    document.body.classList.toggle("party-encounter-active", party);
     const lastAttack = byId("last-attack");
     lastAttack.hidden = !progress.lastAttack;
     lastAttack.textContent = progress.lastAttack
@@ -164,6 +197,7 @@ const encounterTracker = (() => {
         item.append(hp);
       }
       if (row.key === active?.key) item.setAttribute("aria-current", "true");
+      if (party) item.dataset.side = mine(row) ? "you" : Array.isArray(row.shared) ? "ally" : "other";
       const compact = item.cloneNode(true);
       if (row.rank === 2) {
         const adjust = button("HP", row.name, "hp", row.id, row.hp == null);
@@ -185,7 +219,7 @@ const encounterTracker = (() => {
       }
       order.append(item);
     }
-    compactOrder.hidden = rows.length <= 1;
+    compactOrder.hidden = rows.length <= 1 && !party;
     const focused = document.activeElement;
     const focusList = allResources.contains(focused) ? allResources : resources.contains(focused) ? resources : null;
     resources.replaceChildren();
@@ -313,7 +347,7 @@ const encounterTracker = (() => {
 
   byId("next-turn").addEventListener("click", () => {
     update((progress, state) => {
-      if (progress.active === false || progress.partyClock) return false;
+      if (progress.active === false || progress.partyClock || partyInitiative.board()) return false;
       const rows = turns(state);
       const index = Math.max(0, rows.findIndex((row) => row.key === progress.current));
       const wrap = index === rows.length - 1;
@@ -589,29 +623,70 @@ const encounterTracker = (() => {
     if (remaining !== used) previewEncounter.log(state, "resource", `Recovered ${used - remaining} · ${pool.name}`);
     return true;
   }
-  document.addEventListener("submit", (event) => {
-    if (!event.target.matches("[data-quick-temp-hp]")) return;
-    event.preventDefault();
-    const field = event.target.elements.temporary;
+  // HP card quick box: type a number, then choose Damage, Heal, Set HP or Temp HP.
+  // With the box empty, the buttons open their full forms as before.
+  document.addEventListener("click", (event) => {
+    const control = event.target.closest("[data-hp-quick] [data-hp-op]");
+    if (!control) return;
+    const field = control.closest("[data-hp-quick]").querySelector("[data-hp-amount]");
     const amount = field.valueAsNumber;
-    if (!Number.isInteger(amount) || amount < 1 || amount > 0xffffffff) return;
+    if (field.value === "" || !Number.isInteger(amount)) {
+      if (control.dataset.hpOp === "temp") queueMicrotask(() => hpForm.elements.temporary.focus());
+      return;
+    }
+    event.stopImmediatePropagation();
+    event.preventDefault();
+    const status = byId("encounter-status");
+    if (amount < 0 || amount > 0xffffffff) { status.textContent = "Enter a whole number from 0."; return; }
+    const op = control.dataset.hpOp;
+    const hp = get(previewEncounter.current()).hp || initialHp();
+    if (!hp && op !== "set") {
+      status.textContent = "Set your HP first.";
+      const dialog = byId("hp-settings");
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
     field.value = "";
-    update((progress) => {
-      const hp = progress.hp || initialHp();
-      if (!hp) {
-        const dialog = byId("hp-settings");
-        if (!dialog.open) dialog.showModal();
-        hpForm.elements.temporary.value = amount;
-        hpForm.elements.current.focus();
-        return false;
-      }
-      if (!grantOwnerTemporaryHp(progress, amount)) {
-        byId("encounter-status").textContent = `Kept ${hp.temporary} temporary HP.`;
-        return false;
-      }
-      byId("encounter-status").textContent = `Gained ${amount} temporary HP.`;
-      return "gaining temporary HP";
-    });
+    if (op === "damage") {
+      if (amount === 0) return;
+      previewEncounter.transact((state) => {
+        const result = concentrationControls.applyDamage(state, amount);
+        status.textContent = result.feedback;
+        return result.changed;
+      }, {label: "recording damage"});
+    } else if (op === "heal") {
+      update((progress, state) => {
+        const current = (progress.hp || initialHp())?.current;
+        if (!healOwner(progress, "direct", amount)) { status.textContent = "HP is already full."; return false; }
+        const restored = progress.hp.current - current;
+        previewEncounter.log(state, "healing", `Restored ${restored} HP · ${baseline.dataset.owner}`);
+        status.textContent = `Healed ${restored} HP.`;
+        return `healing ${restored} HP`;
+      });
+    } else if (op === "set") {
+      update((progress) => {
+        const existing = progress.hp || initialHp();
+        const max = existing?.max ?? null;
+        const current = max == null ? amount : Math.min(max, amount);
+        if (existing && existing.current === current) return false;
+        progress.hp = {current, max, temporary: existing?.temporary || 0};
+        status.textContent = `HP set to ${current}${max == null ? "" : " / " + max}.`;
+        return "setting HP";
+      });
+    } else if (op === "temp") {
+      update((progress) => {
+        if (!grantOwnerTemporaryHp(progress, amount)) {
+          status.textContent = `Kept ${hp.temporary || 0} temporary HP.`;
+          return false;
+        }
+        status.textContent = `Gained ${amount} temporary HP.`;
+        return "gaining temporary HP";
+      });
+    }
+  }, true);
+  document.addEventListener("keydown", (event) => {
+    // Enter in the quick box has no single meaning, so it does nothing.
+    if (event.key === "Enter" && event.target.matches?.("[data-hp-amount]")) event.preventDefault();
   });
   function recordAttack(name, card) {
     update((progress, state) => {

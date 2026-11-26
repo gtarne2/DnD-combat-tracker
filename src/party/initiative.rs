@@ -40,6 +40,16 @@ pub enum Edit {
         companions: Vec<Companion>,
     },
     Leave,
+    /// The owner of the current row ends that turn. Same effect as the DM's Next.
+    EndTurn {
+        id: Uuid,
+    },
+    /// The DM places a connected player in the order with a score they rolled
+    /// at the table. The player can still resubmit their own score.
+    Seat {
+        member: Uuid,
+        score: i32,
+    },
     Enemy {
         id: Option<Uuid>,
         score: i32,
@@ -644,7 +654,12 @@ impl Fight {
         players: &BTreeMap<Uuid, String>,
     ) -> Result<Vec<(Uuid, Event)>, Rejection> {
         self.check_revision(cmd)?;
-        if dm == matches!(cmd.edit, Edit::Submit { .. } | Edit::Leave) {
+        if dm
+            == matches!(
+                cmd.edit,
+                Edit::Submit { .. } | Edit::Leave | Edit::EndTurn { .. }
+            )
+        {
             return Err(Rejection::Forbidden);
         }
         let before = self.members();
@@ -874,7 +889,33 @@ impl Fight {
                 self.running = false;
                 phase = Phase::Exit;
             }
-            Edit::Next if self.running && !rows.is_empty() => {
+            Edit::Seat { member, score } => {
+                let name = players.get(member).ok_or(Rejection::InvalidInput)?;
+                if let Some(row) = rows.iter_mut().find(|r| r.player() == Some(*member)) {
+                    row.score = *score;
+                } else {
+                    rows.push(Row {
+                        id: Uuid::new_v4(),
+                        score: *score,
+                        actor: Participant::Player {
+                            member: *member,
+                            name: name.clone(),
+                            companions: vec![],
+                        },
+                        actions: Actions::default(),
+                    });
+                }
+            }
+            Edit::Next | Edit::EndTurn { .. } if self.running && !rows.is_empty() => {
+                if let Edit::EndTurn { id } = &cmd.edit {
+                    let own = rows
+                        .iter()
+                        .find(|r| Some(r.id) == self.position.current)
+                        .is_some_and(|r| r.id == *id && r.member() == Some(actor));
+                    if !own {
+                        return Err(Rejection::Forbidden);
+                    }
+                }
                 let i = rows
                     .iter()
                     .position(|r| Some(r.id) == self.position.current)

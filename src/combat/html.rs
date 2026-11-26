@@ -36,7 +36,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         .to_uppercase()
         .to_string();
     escape(&mut html, &initial);
-    html.push_str("</span><div><h1>");
+    html.push_str("</span><button type=\"button\" class=\"identity-portrait\" id=\"portrait-button\" aria-label=\"Character portrait\" title=\"Character portrait\" aria-haspopup=\"dialog\"><img alt=\"\" hidden><span class=\"portrait-empty\" aria-hidden=\"true\"></span></button><div><h1>");
     escape(&mut html, name);
     html.push_str("</h1>");
     let identity = ["Level", "Class", "Archetype"]
@@ -240,7 +240,9 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_rolls(&mut html, sheet);
     html.push_str("<dialog id=\"layout-dialog\" aria-labelledby=\"layout-dialog-title\"><div class=\"dialog-heading\"><h2 id=\"layout-dialog-title\">Layout</h2><form method=\"dialog\"><button>Close</button></form></div>");
     render_layout(&mut html, sheet);
-    html.push_str("<p><label><input type=\"checkbox\" id=\"guidance-without-concentration\"> Guidance does not require concentration at my table</label></p><button type=\"button\" data-dialog=\"encounter-settings\">Optional initiative settings</button>");
+    html.push_str("<p><label><input type=\"checkbox\" id=\"guidance-without-concentration\"> Guidance does not require concentration at my table</label></p><button type=\"button\" data-dialog=\"encounter-settings\">Optional initiative settings</button> <button type=\"button\" data-dialog=\"portrait-dialog\">Character portrait</button>");
+    html.push_str("</dialog>");
+    html.push_str(include_str!("portrait.html"));
     html.push_str(
         "</dialog><section class=\"sheet-page\" id=\"character-dialog\" data-view-scroll=\"character\" aria-labelledby=\"character-page-title\" hidden><h2 id=\"character-page-title\">Character</h2>",
     );
@@ -263,6 +265,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str("</main><script>");
     html.push_str(include_str!("session-view.js"));
     html.push_str(include_str!("preferences.js"));
+    html.push_str(include_str!("portrait.js"));
     html.push_str(include_str!("encounter.js"));
     html.push_str(include_str!("party-actions.js"));
     html.push_str(include_str!("action-economy.js"));
@@ -842,8 +845,7 @@ fn render_stats(html: &mut String, stats: &KeyStats) {
         );
         html.push_str("</p>");
         if key == "hp" {
-            html.push_str("<span class=\"hp-meter\" aria-hidden=\"true\"><span></span></span><span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"health-actions\"><button type=\"button\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-dialog=\"heal-owner\">Heal</button><button type=\"button\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-dialog=\"rest-picker\">Rest</button></div>");
-            html.push_str("<form class=\"quick-temp-hp\" data-quick-temp-hp><label>Temp HP <input type=\"number\" name=\"temporary\" min=\"1\" max=\"4294967295\" inputmode=\"numeric\" required></label><button type=\"submit\" title=\"Keep the higher temporary HP amount\">Gain</button></form>");
+            html.push_str("<span class=\"hp-meter\" aria-hidden=\"true\"><span></span></span><span class=\"temp-hp\" data-temp-hp hidden></span><div class=\"hp-quick\" data-hp-quick><input type=\"number\" data-hp-amount min=\"0\" max=\"4294967295\" inputmode=\"numeric\" placeholder=\"HP\" aria-label=\"HP amount\" title=\"Type a number, then choose what it does. Leave empty to open the full form.\"><div class=\"health-actions\"><button type=\"button\" data-hp-op=\"damage\" data-dialog=\"damage-dialog\" aria-label=\"Record damage\">Damage</button><button type=\"button\" data-hp-op=\"heal\" data-dialog=\"heal-owner\">Heal</button><button type=\"button\" data-hp-op=\"set\" data-dialog=\"hp-settings\">Set HP</button><button type=\"button\" data-hp-op=\"temp\" data-dialog=\"hp-settings\" title=\"Gain temporary HP (keeps the higher amount)\">Temp HP</button></div></div><button type=\"button\" class=\"rest-button\" data-dialog=\"rest-picker\">Rest</button>");
         }
         pin_button(html, label);
         html.push_str("</article>");

@@ -403,18 +403,21 @@ impl Room {
                     }
                     return self.finalize_damage(id, cmd, action_id, strike_id, decision);
                 }
-                let players =
-                    if dm && matches!(cmd.edit, Edit::MonsterAction { .. } | Edit::Import { .. }) {
-                        self.members
-                            .iter()
-                            .filter(|(_, member)| {
-                                member.active && member.principal != Principal::LocalHost
-                            })
-                            .map(|(&id, member)| (id, member.name.clone()))
-                            .collect()
-                    } else {
-                        Default::default()
-                    };
+                let players = if dm
+                    && matches!(
+                        cmd.edit,
+                        Edit::MonsterAction { .. } | Edit::Import { .. } | Edit::Seat { .. }
+                    ) {
+                    self.members
+                        .iter()
+                        .filter(|(_, member)| {
+                            member.active && member.principal != Principal::LocalHost
+                        })
+                        .map(|(&id, member)| (id, member.name.clone()))
+                        .collect()
+                } else {
+                    Default::default()
+                };
                 change.deliveries.extend(self.fight.edit(
                     id,
                     &self.members[&id].name,
@@ -427,7 +430,7 @@ impl Room {
                         cmd.edit,
                         Edit::End | Edit::Load { .. } | Edit::New | Edit::Import { .. }
                     ),
-                    matches!(cmd.edit, Edit::Next | Edit::Start),
+                    matches!(cmd.edit, Edit::Next | Edit::EndTurn { .. } | Edit::Start),
                     None,
                     &mut change,
                 )?;

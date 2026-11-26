@@ -175,6 +175,7 @@ async function main() {
     await hound.getByRole("button",{name:"Edit Warden Hound",exact:true}).click();
     await companionForm.getByLabel("Command costs").fill("Uses the owner's action (table note)");
     await companionForm.getByRole("button",{name:"Save companion"}).click();
+    await hound.getByText("Uses the owner's action (table note)").first().waitFor();
     await hound.getByLabel("HP adjustment").fill("11");
     await hound.getByRole("button",{name:"Damage",exact:true}).click();
     await expectText(houndSummary,"HP 0 / 11");

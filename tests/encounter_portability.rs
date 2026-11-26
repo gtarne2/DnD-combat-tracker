@@ -368,3 +368,110 @@ fn encounter_export_omits_identities_and_imports_into_a_fresh_room_with_explicit
     assert_eq!(view["current"], bitten);
     let _ = fourth;
 }
+
+#[test]
+fn dm_seats_a_player_and_only_the_current_owner_ends_their_turn() {
+    let db = Database(std::env::temp_dir().join(format!("aurora-seat-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = dm_room(&mut service);
+    let lark = member(&mut service, room, FIRST, "Lark");
+    member(&mut service, room, SECOND, "Brannoc");
+
+    // Players cannot seat, and the DM can seat only a current member.
+    rejected(
+        edit(
+            &mut service,
+            room,
+            FIRST,
+            json!({"kind":"seat","member":lark,"score":15}),
+        ),
+        Rejection::Forbidden,
+    );
+    rejected(
+        edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"seat","member":Uuid::new_v4(),"score":15}),
+        ),
+        Rejection::InvalidInput,
+    );
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"seat","member":lark,"score":15}),
+    )
+    .unwrap();
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"seat","member":lark,"score":17}),
+    )
+    .unwrap();
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"enemy","id":null,"score":12,"enemy":{"name":"Ogre","alias":"Brute","revealed":false,
+            "hp":59,"max_hp":59,"ac":11,"conditions":"","notes":""}}),
+    )
+    .unwrap();
+    let view = board(&service, room);
+    assert_eq!(
+        view["rows"].as_array().unwrap().len(),
+        2,
+        "reseating keeps one row"
+    );
+    assert_eq!(row(&view, "Lark")["score"], 17);
+    assert_eq!(row(&view, "Lark")["damage_recipient"], json!(lark));
+
+    // The seated player sees the order and is joined.
+    let seen = service.poll(FIRST, room, 0).unwrap().combat.unwrap();
+    assert_eq!(seen["joined"], true);
+    assert_eq!(seen["rows"][0]["key"], "owner");
+    assert_eq!(seen["rows"][1]["name"], "DM turn");
+
+    edit(&mut service, room, HOST, json!({"kind":"start"})).unwrap();
+    let current = board(&service, room)["current"].clone();
+    assert_eq!(current, row(&board(&service, room), "Lark")["id"]);
+    // Someone else's turn and the DM cannot use end_turn.
+    rejected(
+        edit(
+            &mut service,
+            room,
+            SECOND,
+            json!({"kind":"end_turn","id":current}),
+        ),
+        Rejection::Forbidden,
+    );
+    rejected(
+        edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"end_turn","id":current}),
+        ),
+        Rejection::Forbidden,
+    );
+    edit(
+        &mut service,
+        room,
+        FIRST,
+        json!({"kind":"end_turn","id":current}),
+    )
+    .unwrap();
+    let view = board(&service, room);
+    assert_eq!(view["current"], row(&view, "Ogre")["id"]);
+    // The owner cannot end the enemy's turn.
+    rejected(
+        edit(
+            &mut service,
+            room,
+            FIRST,
+            json!({"kind":"end_turn","id":view["current"]}),
+        ),
+        Rejection::Forbidden,
+    );
+}
