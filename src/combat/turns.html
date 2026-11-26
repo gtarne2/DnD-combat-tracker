@@ -1,11 +1,20 @@
 <section id="encounter" aria-labelledby="encounter-heading">
   <div class="initiative-heading"><h2 id="encounter-heading">Encounter</h2><button type="button" class="quiet-button danger-outline" data-dialog="end-encounter-dialog" id="end-encounter" aria-haspopup="dialog">End Encounter</button></div>
   <div class="initiative-current"><strong id="round-number">Round 1</strong><p id="current-turn"></p><button type="button" class="quiet-button" data-dialog="encounter-settings" id="manage-initiative">Initiative</button></div>
+  <div id="party-encounter" class="party-encounter" hidden>
+    <p class="party-encounter-title"><svg class="icon" aria-hidden="true"><use href="#gi-tabletop-players"/></svg><strong>Party encounter</strong><span id="party-encounter-who"></span></p>
+    <p id="party-encounter-note" role="status"></p>
+    <form id="party-join-form" class="party-join" hidden>
+      <label>Your initiative <input name="score" type="number" min="-2147483648" max="2147483647" required></label>
+      <button>Join encounter</button>
+    </form>
+  </div>
   <ol id="combat-turn-order" aria-label="Initiative order"></ol>
 
   <div class="initiative-footer">
     <div class="turn-actions">
       <button type="button" id="next-turn">Next Turn</button>
+      <button type="button" id="end-my-turn" hidden>End Turn</button>
       <button type="button" id="start-encounter" hidden>Start Encounter</button>
       <button type="button" id="undo-turn" disabled>Undo</button>
     </div>

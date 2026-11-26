@@ -27,7 +27,12 @@
         <button data-edit="end" class="dm-danger"><svg class="icon" aria-hidden="true"><use href="#gi-stop-sign"/></svg><span>End encounter</span></button>
       </div>
       <ol id="dm-turns" class="dm-turns" aria-hidden="true"></ol>
-      <p class="dm-turns-empty" id="dm-turns-empty">No combatants yet. Players appear here when they submit initiative from their sheet. Add enemies from the Monster library.</p>
+      <p class="dm-turns-empty" id="dm-turns-empty">No combatants yet. Players appear here when they join the room. Add enemies from the Monster library.</p>
+      <section class="dm-waiting" id="dm-waiting" aria-labelledby="dm-waiting-title" hidden>
+        <h3 id="dm-waiting-title">Not in the order yet</h3>
+        <p class="dm-waiting-hint">Players can roll from their sheet, or enter the number they rolled at the table.</p>
+        <ul id="dm-waiting-list"></ul>
+      </section>
       <label class="dm-order-picker"><span>Turn order</span> <select id="dm-order"></select></label>
       <div class="dm-toolbar" role="group" aria-label="Enemies">
         <button type="button" id="dm-open-library" class="dm-accent"><svg class="icon" aria-hidden="true"><use href="#gi-dragon-head"/></svg><span>Monster library</span></button>
@@ -74,8 +79,12 @@
             <option value="manual">Manual</option><option value="assist">Assist</option>
           </select></label>
         </div>
-        <p class="dm-rule-text" id="dm-action-text"></p>
-        <p id="dm-rule-counter" class="dm-counter"></p>
+        <article class="dm-rule-detail" id="dm-action-detail" aria-live="polite">
+          <header><h4 id="dm-action-name"></h4><span id="dm-action-cost" class="dm-cost"></span></header>
+          <p class="dm-rule-body" id="dm-action-text"></p>
+          <ol id="dm-action-parts" class="dm-strike-parts" aria-label="Strikes in this action" hidden></ol>
+          <p id="dm-rule-counter" class="dm-counter"></p>
+        </article>
         <div class="dm-controls">
           <button id="dm-preview-action" type="button" class="dm-primary"><svg class="icon" aria-hidden="true"><use href="#gi-sword-brandish"/></svg><span>Preview action</span></button>
           <button id="dm-correct-rule" type="button">Correct power counters</button>
@@ -85,6 +94,10 @@
           <button>Queue recharge roll</button>
           <button type="button" id="dm-clear-roll">Clear queued roll</button>
         </form>
+        <section class="dm-action-catalog" aria-labelledby="dm-action-catalog-title">
+          <h4 id="dm-action-catalog-title">All actions</h4>
+          <div id="dm-action-list" class="dm-action-list"></div>
+        </section>
         <div class="dm-controls dm-quiet-row">
           <button id="dm-add-rule" type="button">Add hand-entered action</button>
           <button id="dm-correct-budget" type="button">Correct action economy</button>

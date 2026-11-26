@@ -1,0 +1,11 @@
+<dialog id="portrait-dialog" aria-labelledby="portrait-dialog-title">
+  <div class="dialog-heading"><h2 id="portrait-dialog-title">Character portrait</h2><form method="dialog"><button>Close</button></form></div>
+  <div class="portrait-editor">
+    <img id="portrait-preview" alt="Current portrait" hidden>
+    <div class="focus-form">
+      <label>Choose an image <input type="file" id="portrait-file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+      <button type="button" id="portrait-remove" hidden>Remove portrait</button>
+    </div>
+  </div>
+  <p class="portrait-hint">The image is cropped to a square and kept in this browser for this character only. It is not shared with the party.</p>
+  <p id="portrait-status" class="focus-feedback" role="status"></p>

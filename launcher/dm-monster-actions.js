@@ -59,10 +59,36 @@ function setupMonsterActions(el, change, selectRow) {
 
   function renderRule() {
     const power = rule(), state = row?.actions;
-    el("dm-action-text").textContent = power?.text || "";
     const policy = power?.policy, counter = power?.counter;
+    el("dm-action-detail").hidden = !power;
+    el("dm-action-name").textContent = power?.name || "";
+    el("dm-action-cost").textContent = power ? costLabel(policy) : "";
+    if (power) el("dm-action-cost").dataset.cost = policy.cost;
+    el("dm-action-text").textContent = power?.text || "";
+    // A multiattack lists its strikes with each strike's own rules, in the order the pack gives.
+    const parts = el("dm-action-parts");
+    const counts = power ? strikeParts(power, row.actions.rules) : new Map();
+    const composite = counts.size > 0;
+    parts.hidden = !composite;
+    parts.replaceChildren(...(composite ? [...counts].map(([id, count]) => {
+      const part = row.actions.rules.find(r => r.id === id);
+      const item = make("li");
+      const head = make("div");
+      head.className = "dm-strike-head";
+      const times = make("span", count ? "×" + count : "•");
+      times.className = "dm-strike-count";
+      times.setAttribute("aria-label", count ? count + (count === 1 ? " strike" : " strikes") : "Part of this action");
+      head.append(times, make("strong", part?.name || id));
+      item.append(head);
+      if (part?.text) {
+        const body = make("p", part.text);
+        body.className = "dm-strike-text";
+        item.append(body);
+      }
+      return item;
+    }) : []));
+    renderCatalog();
     el("dm-rule-counter").textContent = power ? [
-      policy.cost === "legendary" ? policy.legendary + " legendary uses" : labels[policy.cost],
       policy.uses === null ? "" : counter.remaining + " / " + policy.uses + " uses",
       policy.recharge ? (counter.spent ? "Recharge spent" : "Recharge ready") : "",
       counter?.queued == null ? "" : "Queued roll " + counter.queued,
@@ -87,6 +113,77 @@ function setupMonsterActions(el, change, selectRow) {
       el("dm-clear-roll").disabled = busy || counter.queued == null;
     }
   }
+
+  // The strikes a composite action makes, as rule id → count. Packs list them when they can;
+  // otherwise read the rules text for the monster's other action names ("two with its claws").
+  const numbers = {one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, once:1, twice:2};
+  function strikeParts(power, rules) {
+    const counts = new Map();
+    const listed = power.strikes || [];
+    if (listed.length > 1 || listed.length === 1 && listed[0] !== power.id) {
+      for (const id of listed) counts.set(id, (counts.get(id) || 0) + 1);
+      return counts;
+    }
+    if (!/multiattack/i.test(power.name + " " + power.text)) return counts;
+    const text = power.text.toLowerCase();
+    for (const other of rules) {
+      if (other.id === power.id || /multiattack/i.test(other.name)) continue;
+      const base = other.name.toLowerCase().replace(/\s*\(.*\)$/, "").replace(/s$/, "");
+      if (base.length < 3) continue;
+      const pattern = new RegExp("\\b" + base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?:e?s)?\\b");
+      const hit = pattern.exec(text);
+      if (!hit) continue;
+      const before = text.slice(Math.max(0, hit.index - 40), hit.index);
+      const said = [...before.matchAll(/\b(one|two|three|four|five|six|seven|eight|once|twice|\d+)\b/g)].pop()?.[1];
+      counts.set(other.id, said ? numbers[said] ?? Number(said) : 0);
+    }
+    return counts;
+  }
+  const costLabel = policy => policy.cost === "legendary" ? "Legendary · " + policy.legendary + (policy.legendary === 1 ? " use" : " uses") : labels[policy.cost];
+  // Every action of the selected monster, grouped by cost. Selecting a card drives the labelled select.
+  const catalog = el("dm-action-list");
+  function renderCatalog() {
+    const rules = row?.actions?.rules || [];
+    const groups = new Map();
+    for (const power of rules) {
+      const key = power.policy.cost;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(power);
+    }
+    const focused = document.activeElement?.closest?.("#dm-action-list [data-rule]")?.dataset.rule;
+    catalog.replaceChildren(...[...groups].map(([cost, list]) => {
+      const group = make("div");
+      group.className = "dm-action-group";
+      group.append(make("h5", labels[cost] || cost));
+      for (const power of list) {
+        const card = make("button");
+        card.type = "button";
+        card.className = "dm-action-card";
+        card.dataset.rule = power.id;
+        card.dataset.cost = cost;
+        card.setAttribute("aria-pressed", String(power.id === picker.value));
+        card.disabled = busy;
+        card.append(make("strong", power.name));
+        const notes = [];
+        const parts = strikeParts(power, rules);
+        const total = [...parts.values()].reduce((sum, n) => sum + n, 0);
+        if (parts.size) notes.push(total ? total + (total === 1 ? " strike" : " strikes") : parts.size + " parts");
+        if (power.policy.uses != null) notes.push(power.counter.remaining + "/" + power.policy.uses + " uses");
+        if (power.policy.recharge) notes.push(power.counter.spent ? "Recharging" : "Recharge ready");
+        if (notes.length) card.append(make("small", notes.join(" · ")));
+        if (power.counter.spent || power.counter.remaining === 0) card.dataset.spent = "true";
+        group.append(card);
+      }
+      return group;
+    }));
+    if (focused) catalog.querySelector(`[data-rule="${CSS.escape(focused)}"]`)?.focus({preventScroll:true});
+  }
+  catalog.addEventListener("click", event => {
+    const card = event.target.closest("[data-rule]");
+    if (!card || card.disabled || picker.value === card.dataset.rule) return;
+    picker.value = card.dataset.rule;
+    picker.dispatchEvent(new Event("change"));
+  });
 
   function render(state, selected, waiting) {
     busy = waiting;

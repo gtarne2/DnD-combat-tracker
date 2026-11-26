@@ -45,10 +45,11 @@ function setupDmInitiative(request, refresh) {
     const board = room?.combat;
     const rows = board?.rows || [];
     const key = JSON.stringify([rows, board?.running, board?.current, order.value,
-      room?.members?.map(m => [m.member_id, m.inspection?.vitals?.current_hp, m.inspection?.vitals?.max_hp])]);
+      room?.members?.map(m => [m.member_id, m.name, m.online, m.inspection?.vitals?.current_hp, m.inspection?.vitals?.max_hp, m.inspection?.vitals?.initiative]), busy]);
     if (key === turnsKey) return;
     turnsKey = key;
-    el("dm-turns-empty").hidden = rows.length > 0;
+    renderWaiting(rows);
+    el("dm-turns-empty").hidden = rows.length > 0 || waitingCount > 0;
     turns.replaceChildren(...rows.map(row => {
       const item = make("li", null, "dm-turn");
       item.dataset.row = row.id;
@@ -82,6 +83,47 @@ function setupDmInitiative(request, refresh) {
       }
       return item;
     }));
+  }
+  // Connected players without a row yet. The DM can seat them with the score they rolled at the table.
+  let waitingCount = 0;
+  const waitingList = el("dm-waiting-list");
+  function renderWaiting(rows) {
+    const seated = new Set(rows.map(row => row.damage_recipient).filter(Boolean));
+    const members = (room?.members || []).filter(m => m.member_id !== room.self_id && !seated.has(m.member_id));
+    waitingCount = members.length;
+    el("dm-waiting").hidden = !members.length;
+    const typed = new Map([...waitingList.querySelectorAll("input[data-seat]")].map(input => [input.dataset.seat, input.value]));
+    const focused = document.activeElement?.closest?.("#dm-waiting-list [data-seat]")?.dataset.seat;
+    waitingList.replaceChildren(...members.map(member => {
+      const item = make("li", null, "dm-waiting-row");
+      item.dataset.presence = member.online ? "online" : "offline";
+      const who = make("span", null, "dm-waiting-name");
+      who.append(make("span", null, "dm-dot"), make("span", member.name));
+      const vitals = member.inspection?.vitals;
+      const sub = [member.online ? "Online" : "Offline"];
+      if (vitals?.initiative != null) sub.push("Init " + (vitals.initiative >= 0 ? "+" : "") + vitals.initiative);
+      who.append(make("small", sub.join(" · ")));
+      const form = make("form", null, "dm-seat");
+      const input = make("input");
+      Object.assign(input, {type:"number", required:true, step:1, min:-20, max:99, value:typed.get(member.member_id) ?? ""});
+      input.dataset.seat = member.member_id;
+      input.setAttribute("aria-label", "Initiative for " + member.name);
+      input.placeholder = "Init";
+      const add = make("button");
+      add.type = "submit";
+      add.dataset.seat = member.member_id;
+      add.append(icon("dice-twenty-faces-twenty"), make("span", "Add to order"));
+      add.setAttribute("aria-label", "Add " + member.name + " to the turn order");
+      add.disabled = busy;
+      form.append(input, add);
+      form.onsubmit = event => {
+        event.preventDefault();
+        change({kind:"seat", member:member.member_id, score:input.valueAsNumber});
+      };
+      item.append(who, form);
+      return item;
+    }));
+    if (focused) waitingList.querySelector(`input[data-seat="${CSS.escape(focused)}"]`)?.focus({preventScroll:true});
   }
   function renderEnemyCard(row) {
     const card = el("dm-enemy-detail");

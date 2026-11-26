@@ -1,5 +1,5 @@
 const partyInitiative = (() => {
-  let view;
+  let view, left = null;
   function rows(state) {
     const clock = state.progress.partyClock;
     if (view?.combat?.id === clock.encounter && view.combat.rows.length)
@@ -98,21 +98,53 @@ const partyInitiative = (() => {
       busy = true;
       try {
         await send(view, edit);
+        // Leaving returns this sheet to solo turns for this encounter; submitting again rejoins.
+        left = edit.kind === "leave" ? view.room_id + "/" + view.combat.id : null;
         status.textContent = edit.kind === "leave" ? "Left the shared encounter." : "Initiative submitted.";
-      } catch (error) { status.textContent = error.message; }
+      } catch (error) { status.textContent = error.message; railError(error.message); }
       finally { busy = false; await refresh(); }
     }
-    form.onsubmit = event => {
-      event.preventDefault();
+    function railError(message) {
+      const note = document.getElementById("party-encounter-note");
+      note.textContent = message;
+      note.dataset.error = "true";
+      setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
+    }
+    const submit = score => {
       const companions = [...form.querySelectorAll("[data-companion]")].map(input => ({
         name:input.dataset.name, local_id:Number(input.dataset.companion), initiative:input.value === "" ? null : input.valueAsNumber
       }));
-      change({kind:"submit", score:form.elements.score.valueAsNumber, companions});
+      return change({kind:"submit", score, companions});
+    };
+    form.onsubmit = event => {
+      event.preventDefault();
+      submit(form.elements.score.valueAsNumber);
     };
     leave.onclick = () => change({kind:"leave"});
+    // Combat rail: join with a roll, and end the turn when the current row is mine.
+    const join = document.getElementById("party-join-form");
+    join.onsubmit = event => {
+      event.preventDefault();
+      submit(join.elements.score.valueAsNumber);
+    };
+    const endTurn = document.getElementById("end-my-turn");
+    endTurn.onclick = async () => {
+      const id = endTurn.dataset.row;
+      if (!id || busy || !view?.combat) return;
+      busy = true;
+      endTurn.disabled = true;
+      try {
+        await send(view, {kind:"end_turn", id});
+        status.textContent = "";
+      } catch (error) {
+        railError(error.message);
+      } finally { busy = false; endTurn.disabled = false; await refresh(); }
+    };
     return async state => {
+      const hadBoard = Boolean(board());
       view = state;
       panel.hidden = !state?.combat || state.ended;
+      if (hadBoard && !board()) { order = ""; document.dispatchEvent(new Event("preview-encounter-change")); }
       if (!state?.room_id || !state.self_id || state.role === "host") return;
       const key = state.room_id + "/" + state.self_id;
       if (!state.combat && previewEncounter.current().progress?.partyClock?.key !== key && !state.ended) return;
@@ -154,12 +186,24 @@ const partyInitiative = (() => {
       }
       leave.hidden = !state.combat.joined;
       correct.hidden = !sheet.progress?.partyClock?.repair;
-      const signature = JSON.stringify(state.combat.rows);
+      const signature = JSON.stringify([state.combat.rows, state.combat.running, state.combat.current, state.combat.round, state.combat.joined, companionsAtTable()]);
       if (signature !== order) {
         order = signature;
         document.dispatchEvent(new Event("preview-encounter-change"));
       }
     };
   }
-  return {rows, setup, release, remember};
+  // The shared encounter as this player sees it, whether or not they have joined it yet.
+  function board() {
+    if (!view?.combat || view.ended || !view.self_id || view.role === "host") return null;
+    if (!view.combat.joined && left === view.room_id + "/" + view.combat.id) return null;
+    return view.combat;
+  }
+  // Other players in the room, for the combat rail. The DM is left out.
+  function companionsAtTable() {
+    if (!board()) return [];
+    return (view.members || []).filter(member => member.member_id !== view.self_id && member.member_id !== view.dm_id)
+      .map(member => member.name);
+  }
+  return {rows, setup, release, remember, board, players: companionsAtTable};
 })();
