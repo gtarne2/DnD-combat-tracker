@@ -4,7 +4,7 @@ Throwaway tools that answer one question: how can an Owlbear Rodeo extension run
 
 | File | Purpose |
 | --- | --- |
-| `server.cjs` | Test server on `127.0.0.1:47800` only. Answers `/ping`, serves the pop-up bridge page and a localhost copy of the extension, and appends findings to `target/tmp/obr-spike/results.jsonl`. Requests from other origins get 403. |
+| `server.cjs` | Test server on `127.0.0.1:47800` only. Answers `/ping`, serves the pop-up bridge page and a localhost copy of the extension, and appends findings to `results/results.jsonl` beside it when started from `run-spike.cmd`. Requests from other origins get 403. |
 | `run-spike.cmd` | Starts the server on Windows. Needs Node.js 18 or later. |
 | `bridge.html` | Option 2, the pop-up bridge window. It only talks to the extension origins on its allowlist. |
 | `extension/` | The test extension. `obr-sdk-3.1.0.js` is `@owlbear-rodeo/sdk` 3.1.0 (MIT) bundled with esbuild, so nothing loads from a third-party CDN at runtime. |
