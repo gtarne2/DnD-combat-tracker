@@ -17,6 +17,12 @@
 | Validation | `cargo test`: 55 passed. `AURORA_TEST_IMPORTER=$PWD/target/debug/combat-sheet node tests/browser-review.cjs` passed. Linux harness: `--dashboard`, `--initiative`, `--monster-actions`, `--monster-assist`, `--monster-damage`, `--strike-windows`, `--actions` and `--monsters` passed. `--offers` still stops at the Aurora refresh step the Linux harness does not emulate. Not run: Windows package build, 125% scaling, physical Wi-Fi. |
 | Next action | Build the Windows package and run a table session: DM seats a player, a player ends their own turn, and a multiattack from a 5etools-imported monster shows its strikes. |
 
+## Local Windows test package for 1864d93
+
+- Built dev commit `1864d93` with `cargo build --release --locked --offline --bins` using cached GNU Rust, w64devkit, `RUSTFLAGS=-C link-self-contained=yes`, and `CARGO_TARGET_DIR=target/dev-1864d93-build`. Packaged with `launcher\build.cmd target\dev-1864d93-windows`. Both commands passed.
+- Passed `aurora-party.exe init <scratch>/party.sqlite3` and `combat-sheet.exe --preview-dir <scratch> tests/fixtures/combat-sheet.dnd5e tests/fixtures/combat-sheet.xml` using the packaged executables. Both wrote their expected outputs under an isolated scratch directory.
+- The earlier package is at `target/dev-1864d93-windows/Aurora Combat Tracker.exe`. The packaged browser rehearsal and physical two-PC session remain pending. Build a fresh Windows package for the current dev checkout before rehearsing its changes.
+
 ## Handoff procedure
 
 1. At session start, compare the recorded checkout with `git status --short --branch` and `git rev-parse --short HEAD`. Inspect the relevant diff and confirm the task or phase before using earlier results.
