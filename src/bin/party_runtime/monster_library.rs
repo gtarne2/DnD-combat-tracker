@@ -2,6 +2,7 @@ use std::{path::Path as FilePath, time::Duration};
 
 use aurora_combat_tracker::{
     aurora::import_monster_pack,
+    fivetools::import_fivetools_pack,
     monsters::{Pack, PackInfo},
 };
 use axum::{
@@ -85,6 +86,13 @@ struct Summary {
 struct Save {
     expected_revision: Option<Uuid>,
     pack: Pack,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FiveTools {
+    info: PackInfo,
+    json: String,
 }
 
 #[derive(Deserialize)]
@@ -184,6 +192,14 @@ fn dispatch(path: &FilePath, action: &str, body: &[u8]) -> Result<Value, Error> 
             let input: Aurora = serde_json::from_slice(body)?;
             let pack = import_monster_pack(input.info, &input.files)?;
             Ok(serde_json::to_value(pack)?)
+        }
+        "fivetools" => {
+            let input: FiveTools = serde_json::from_slice(body)?;
+            if input.json.len() > PACK_LIMIT {
+                return Err("5etools files are limited to 16 MiB.".into());
+            }
+            let import = import_fivetools_pack(input.info, &input.json)?;
+            Ok(serde_json::to_value(import)?)
         }
         "save" => {
             let input: Save = serde_json::from_slice(body)?;

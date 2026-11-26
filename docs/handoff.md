@@ -11,6 +11,15 @@
 
 | Field | Record |
 | --- | --- |
+| Date and checkout | 2026-11-26 on `claude/project-thread-yeppfq`, branched from `dev` at `3747dbd`. This branch does not include the P10 encounter export work on `claude/project-thread-p9jla2`. |
+| Completed | 5etools bestiary import: `src/fivetools.rs`, the `monsters/fivetools` helper route, an "Import 5etools JSON" button in the DM Monster library, and a warning list in the import review. [Design](architecture.md#offline-monster-library) |
+| Validation | `cargo test --locked` passed (53 tests, including 5 in `tests/fivetools_import.rs`). `cargo check --locked --target x86_64-pc-windows-gnu --bins` passed. The ignored `imports_local_bestiary_file` test converted local copies of the 2014 and 2024 monster manuals and Mordenkainen's Monsters of the Multiverse (450, 503 and 261 monsters) with no leftover tags; those files stay outside Git. A Playwright check of `dm-monsters.js` with a mocked helper imported the converted file, showed the warning list and added a Lich to the encounter. The packaged Windows rehearsal was not run. |
+| Next action | Import a real 5etools file through the packaged launcher on Windows and add a monster to a live encounter. |
+
+## Previous handoff
+
+| Field | Record |
+| --- | --- |
 | Date and checkout | 2026-11-25 on `dev`. The P09D implementation baseline is `73b25d3` on `origin/dev`, including the earlier P01/P02 merge from `main`. |
 | Completed | Published P09C and P09D and prepared the multiplayer UI handoff. The isolated P09D package is in `target/p09d-windows` in the checkout that built it. The running package was left in place. |
 | Modified components | The implementation changed the DM action and damage dialogs, roll calculations, room and strike storage, launcher assets, and synthetic Windows rehearsals. The subsequent handoff updated documentation. |
