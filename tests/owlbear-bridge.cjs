@@ -18,7 +18,7 @@ const root = path.resolve(__dirname, "..");
 const helperPath = path.resolve(process.env.AURORA_PARTY || path.join(root, "target", "debug", process.platform === "win32" ? "aurora-party.exe" : "aurora-party"));
 const extension = path.join(root, "owlbear");
 const OWLBEAR = "https://www.owlbear.rodeo";
-const EXT = "https://raw.githack.com/test/owlbear";
+const EXT = "https://gtarne2.github.io/DnD-combat-tracker";
 
 function assert(condition, message) {
   if (!condition) throw new Error("Assertion failed: " + message);

@@ -548,21 +548,34 @@ impl Fight {
         view
     }
 
-    /// Map-facing projection for a virtual tabletop link (Owlbear Rodeo). It carries only
-    /// what every player may see: row IDs, kinds, revealed names and the turn pointer.
-    /// Unrevealed enemies keep their row ID so the DM can place a hidden token, but no name.
+    /// Map-facing projection for the DM's virtual tabletop link (Owlbear Rodeo): row IDs,
+    /// kinds, revealed names, the turn pointer, and for enemies whether they are down plus the
+    /// monster template's key, name and size for token art. No HP, AC, conditions, scores,
+    /// notes or stat blocks. Unrevealed enemies carry no alias.
     pub fn table_view(&self) -> Value {
         let rows: Vec<Value> = self
             .position
             .rows
             .iter()
             .map(|row| match &row.actor {
-                Participant::Enemy(enemy) => json!({
-                    "id": row.id,
-                    "kind": "enemy",
-                    "revealed": enemy.revealed,
-                    "name": enemy.revealed.then_some(&enemy.alias),
-                }),
+                Participant::Enemy(enemy) => {
+                    let mut view = json!({
+                        "id": row.id,
+                        "kind": "enemy",
+                        "revealed": enemy.revealed,
+                        "name": enemy.revealed.then_some(&enemy.alias),
+                        "down": enemy.hp == Some(0),
+                    });
+                    // For the DM's own extension only: which art to use and how big the token is.
+                    if let Some(template) = &enemy.template {
+                        view["template"] = json!({
+                            "key": format!("{}/{}", template.pack.id, template.monster.id),
+                            "name": template.monster.name,
+                            "size": template.monster.stats.size,
+                        });
+                    }
+                    view
+                }
                 Participant::Player { member, name, .. } => json!({
                     "id": row.id, "kind": "player", "member_id": member, "name": name,
                 }),

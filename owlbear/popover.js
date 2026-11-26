@@ -2,13 +2,58 @@
 // opens the bridge window, which needs a click from the DM.
 import OBR from "./obr-sdk-3.1.0.js";
 import { DEFAULT_PORT, bridgeUrl, savePort, savedPort } from "./bridge-client.js";
+import { artKey, loadArt, saveArt } from "./tokens.js";
+import { loadMatches, saveMatch } from "./players.js";
+import { KIND, rowLabel } from "./labels.js";
 
 const $ = (id) => document.getElementById(id);
 const channel = new BroadcastChannel("aurora-obr");
 let state = null;
 let pairing = null;
+let players = [];
+const waiting = new Set();
+let note = null;
 
-const KIND = { enemy: "Enemy", player: "Player", companion: "Companion" };
+/** Show an action error until the next action; the tracker's own error wins. */
+function showError(text) {
+  note = text || null;
+  const shown = state?.error || note;
+  $("error").hidden = !shown;
+  $("error").textContent = shown || "";
+}
+
+/** Ask the background page to do something with tokens; it answers with a result message. */
+function ask(type, fields) {
+  const id = crypto.randomUUID();
+  waiting.add(id);
+  note = null;
+  channel.postMessage({ type, id, ...fields });
+  render();
+}
+
+function button(label, onClick, title) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "small";
+  b.textContent = label;
+  if (title) b.title = title;
+  b.disabled = waiting.size > 0;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+async function chooseArt(row) {
+  try {
+    const search = row.kind === "enemy" ? row.template?.name || "" : row.name || "";
+    const picked = await OBR.assets.downloadImages(false, search, "CHARACTER");
+    if (picked && picked[0]) {
+      saveArt(artKey(row), picked[0]);
+      render();
+    }
+  } catch (error) {
+    showError(error.message || String(error));
+  }
+}
 
 function setSummary(text, tone) {
   $("summary").textContent = text;
@@ -20,17 +65,61 @@ function renderRows(table) {
   list.replaceChildren();
   const encounter = table?.encounter;
   const rows = encounter?.rows || [];
+  const onMap = state.onMap || {};
+  const art = loadArt();
   $("encounter-title").textContent = encounter?.running ? `Encounter · round ${encounter.round}` : "Encounter (not started)";
   $("rows-empty").hidden = rows.length > 0;
+  const missing = rows.filter((row) => !onMap[row.id]).map((row) => row.id);
+  $("add-all").disabled = !missing.length || waiting.size > 0;
+  $("add-all").onclick = () => ask("add", { rows: missing });
   for (const row of rows) {
     const item = document.createElement("li");
     item.dataset.current = String(row.id === encounter.current);
     const name = document.createElement("span");
-    name.textContent = row.name || "Hidden enemy";
-    const kind = document.createElement("span");
-    kind.className = "kind";
-    kind.textContent = KIND[row.kind] || row.kind;
-    item.append(name, kind);
+    name.className = "name";
+    name.textContent = rowLabel(row) + (row.down ? " · down" : "");
+    name.title = KIND[row.kind] || row.kind;
+    const actions = document.createElement("span");
+    actions.className = "actions";
+    const hasArt = Boolean(art[artKey(row)]);
+    const artTitle = row.kind === "enemy" && row.template ? `Art for every ${row.template.name}` : "Token art";
+    actions.append(button(hasArt ? "Art ✓" : "Art…", () => chooseArt(row), artTitle));
+    if (onMap[row.id]) {
+      const mark = document.createElement("span");
+      mark.className = "on-map";
+      mark.textContent = "on map";
+      actions.append(mark, button("Remove", () => ask("remove", { rows: [row.id] }), "Remove its token, or unlink a token you placed"));
+    } else {
+      actions.append(button("Add", () => ask("add", { rows: [row.id] })));
+    }
+    item.append(name, actions);
+    list.append(item);
+  }
+}
+
+function renderPlayers(table) {
+  const list = $("players");
+  list.replaceChildren();
+  const members = table.encounter.rows.filter((row) => row.kind === "player");
+  const matches = loadMatches(table.room_id);
+  if (!players.length) {
+    const item = document.createElement("li");
+    item.textContent = "No players have joined this Owlbear room.";
+    list.append(item);
+    return;
+  }
+  for (const player of players) {
+    const item = document.createElement("li");
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = player.name;
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Tracker character for ${player.name}`);
+    select.append(new Option("Not matched", ""));
+    for (const member of members) select.append(new Option(member.name || "Unnamed", member.member_id));
+    select.value = matches[player.id] || "";
+    select.addEventListener("change", () => saveMatch(table.room_id, player.id, select.value));
+    item.append(name, select);
     list.append(item);
   }
 }
@@ -47,13 +136,17 @@ function render() {
   $("step-bridge").dataset.done = String(state.connected);
   $("step-pair").hidden = !state.connected || state.paired;
   $("linked").hidden = !(state.connected && state.paired && state.table);
-  if (state.table) renderRows(state.table);
+  if (state.table) {
+    renderRows(state.table);
+    renderPlayers(state.table);
+  }
+  $("map-error").hidden = !state.mapError;
+  $("map-error").textContent = state.mapError ? `Map: ${state.mapError}` : "";
   if (!state.connected) setSummary("Not connected. Open the bridge window.", "bad");
   else if (!state.paired) setSummary("Bridge open. Enter the pairing code.");
   else if (state.error) setSummary("Linked, but the last update failed.", "bad");
   else setSummary("Linked to the tracker.", "ok");
-  $("error").hidden = !state.error;
-  $("error").textContent = state.error || "";
+  showError(note);
 }
 
 channel.onmessage = (event) => {
@@ -62,13 +155,16 @@ channel.onmessage = (event) => {
     state = msg.state;
     render();
   }
+  if (msg.type === "result" && waiting.delete(msg.id)) {
+    render();
+    if (!msg.ok) showError(msg.error);
+  }
   if (msg.type === "pair-result" && msg.id === pairing) {
     pairing = null;
     $("pair-form").querySelector("button").disabled = false;
     if (msg.ok) $("code").value = "";
     else {
-      $("error").hidden = false;
-      $("error").textContent = msg.error;
+      showError(msg.error);
     }
   }
 };
@@ -83,8 +179,7 @@ $("port").addEventListener("change", () => {
 $("open-bridge").addEventListener("click", () => {
   const popup = window.open(bridgeUrl(), "aurora-obr-bridge", "popup,width=440,height=220");
   if (!popup) {
-    $("error").hidden = false;
-    $("error").textContent = "Chrome blocked the window. Allow pop-ups for owlbear.rodeo and try again.";
+    showError("Chrome blocked the window. Allow pop-ups for owlbear.rodeo and try again.");
   }
 });
 
@@ -98,8 +193,7 @@ $("pair-form").addEventListener("submit", (event) => {
     if (pairing !== mine) return;
     pairing = null;
     $("pair-form").querySelector("button").disabled = false;
-    $("error").hidden = false;
-    $("error").textContent = "No answer from the tracker. Check that the bridge window is open.";
+    showError("No answer from the tracker. Check that the bridge window is open.");
   }, 15000);
 });
 
@@ -110,5 +204,11 @@ OBR.onReady(async () => {
     document.documentElement.dataset.theme = (await OBR.theme.getTheme()).mode;
     OBR.theme.onChange((theme) => { document.documentElement.dataset.theme = theme.mode; });
   } catch {}
+  const party = async () => {
+    try { players = await OBR.party.getPlayers(); } catch { players = []; }
+    render();
+  };
+  OBR.party.onChange(party);
+  await party();
   channel.postMessage({ type: "get" });
 });

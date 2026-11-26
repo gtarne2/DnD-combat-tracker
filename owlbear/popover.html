@@ -38,9 +38,16 @@
     </li>
   </ol>
   <section id="linked" hidden>
-    <h2 id="encounter-title">Encounter</h2>
+    <div class="bar">
+      <h2 id="encounter-title">Encounter</h2>
+      <button id="add-all" type="button" class="small">Add all to map</button>
+    </div>
     <ol id="rows" class="rows"></ol>
     <p id="rows-empty" class="hint" hidden>No one is in the initiative order yet.</p>
+    <p id="map-error" class="error" hidden></p>
+    <h2 class="gap">Players</h2>
+    <p class="hint">Which tracker character each Owlbear player controls. Kept in this browser only.</p>
+    <ol id="players" class="rows"></ol>
     <button id="forget" type="button" class="quiet">Unpair this room</button>
   </section>
   <p id="error" class="error" role="alert" hidden></p>

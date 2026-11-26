@@ -14,13 +14,9 @@ use uuid::Uuid;
 /// it is taken, and the dashboard then shows the port to enter in the extension.
 pub const PREFERRED_PORT: u16 = 47831;
 
-/// Extension origins the bridge page will talk to. GitHub Pages for this repository is the
-/// intended home; githack serves the branch builds used for testing.
-pub const EXTENSION_ORIGINS: &[&str] = &[
-    "https://gtarne2.github.io",
-    "https://raw.githack.com",
-    "https://rawcdn.githack.com",
-];
+/// Extension origins the bridge page will talk to. The extension is published only to this
+/// repository's GitHub Pages site (`.github/workflows/owlbear-pages.yml`).
+pub const EXTENSION_ORIGINS: &[&str] = &["https://gtarne2.github.io"];
 
 /// Wrong codes allowed before the code is replaced.
 pub const MAX_FAILED_ATTEMPTS: u8 = 5;

@@ -126,14 +126,15 @@ fn table_view_shows_only_what_players_may_see() {
     let rows = table["encounter"]["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 4);
     let text = table.to_string();
-    // No stat blocks, HP, AC, conditions or private enemy names leave the helper.
+    // No stat blocks, HP, AC, conditions, scores or notes leave the helper.
     for private in [
         "\"hp\"",
         "\"ac\"",
         "conditions",
-        "template",
         "\"notes\"",
         "\"score\"",
+        "\"stats\"",
+        "\"actions\"",
     ] {
         assert!(!text.contains(private), "{private} leaked: {text}");
     }
@@ -141,6 +142,13 @@ fn table_view_shows_only_what_players_may_see() {
     assert_eq!(hidden["kind"], "enemy");
     assert_eq!(hidden["revealed"], false);
     assert!(hidden["name"].is_null());
+    assert_eq!(hidden["down"], false);
+    assert_eq!(
+        hidden["template"]["key"],
+        "srd-5.1-monsters/ID_SRD51_MONSTER_WOLF"
+    );
+    assert_eq!(hidden["template"]["name"], "Wolf");
+    assert_eq!(hidden["template"]["size"], "Medium");
     let shown = rows.iter().find(|r| r["id"] == enemies[0]["id"]).unwrap();
     assert_eq!(shown["revealed"], true);
     assert_eq!(shown["name"], enemies[0]["enemy"]["alias"]);
@@ -215,7 +223,7 @@ fn bridge_checks_pin_the_loopback_origin_and_host() {
     assert!(!owlbear::api_origin_allowed(Some("null"), 47831));
     assert!(!owlbear::api_origin_allowed(None, 47831));
     let page = owlbear::bridge_page();
-    assert!(page.contains("const ORIGINS = [\"https://gtarne2.github.io\""));
+    assert!(page.contains("const ORIGINS = [\"https://gtarne2.github.io\"]"));
     assert!(page.contains("const ACTIONS = [\"pair\",\"status\",\"table\"]"));
     assert!(!page.contains("__ORIGINS__") && !page.contains("__ACTIONS__"));
 }
