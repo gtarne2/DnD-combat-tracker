@@ -22,3 +22,13 @@ Use the historical handoffs and research for specific questions. Keep large docu
 - Use synthetic or sanitized fixtures for automated tests. Keep personal Aurora saves and content libraries outside Git.
 - Run the smallest checks that cover the change. Record the exact commands, results, and outstanding checks in the [handoff](docs/handoff.md#handoff-procedure). Name the next recommended action and stop at the assigned scope.
 - Record durable behavior changes in [requirements.md](docs/requirements.md) and significant design decisions with their rationale in [architecture.md](docs/architecture.md).
+
+## Keep `target` tidy
+
+Every build and test copy on the user's Windows PC stays until someone deletes it. Reuse fixed output folders instead of creating new ones:
+
+- Keep `target\release` current. It holds the exes the user runs, including `Aurora Combat Tracker.exe`. After any change that affects a built exe, finish with `cargo build --release --locked --bins` and `.\launcher\build.cmd` (no output argument) on the default target directory, so `target\release` has the latest build. If a running app blocks this, ask the user to close it and retry, and don't leave the work only in an alternate folder. Say in the handoff whether `target\release` was updated.
+- Package into `target\tracker-windows`. If a running app locks it, use `target\tracker-windows-alt`. Never name a package folder after a phase, commit, review or random suffix.
+- When a separate Cargo build is needed because a helper is running, set `CARGO_TARGET_DIR` to `target\alt-build` and reuse it. Do not create another `*-build` folder; each one costs 1–2 GB.
+- Put scratch output such as review copies, smoke checks and repro files under `target\tmp`, and delete what the session created before finishing.
+- Close any app, helper or party window the session launched before handing off. List anything that could not be deleted or closed in the handoff.
