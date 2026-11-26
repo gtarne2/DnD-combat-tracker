@@ -939,8 +939,18 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .health-actions [data-hp-op=temp] { border-color: #3d5a80; color: #bbd8ff; }
 .health-actions [data-hp-op=set] { color: var(--text); }
 /* Rest sits in the card's title row, beside the pin, instead of on a line of its own. */
-.hp-card .rest-button { position: absolute; top: 3px; right: 26px; display: inline-flex; align-items: center; gap: 4px;
+.hp-card .rest-button { position: absolute; top: var(--title-top); right: 28px; height: 20px; display: inline-flex; align-items: center; gap: 4px;
   padding: 0 7px; min-height: 20px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--amber);
   border-color: #6b5a2e; background: #221d12; --icon: var(--gi-fire); }
 .hp-card .rest-button::before { content: ""; width: 11px; height: 11px; background: currentColor;
   -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+
+/* One title row for every stat card: the heading, Rest and the pin star share a 20px line. */
+.stat-card { --title-top: 5px; }
+@media (min-width: 1080px) { .compact-combat .stat-card { --title-top: 3px; } }
+.stat-card > h3 { min-height: 20px; padding-right: 22px; }
+.stat-card .pin-button { top: var(--title-top); right: 4px; width: 22px; height: 20px; display: grid; place-items: center; }
+.stat-card .pin-button::before { font-size: 15px; line-height: 1; translate: 0 -2px; }
+.hp-card > h3 { padding-right: 90px; }
+#concentration .focus-status h2 { min-height: 20px; }
+@media (min-width: 1080px) { .compact-combat #concentration { padding-top: 3px; } }
