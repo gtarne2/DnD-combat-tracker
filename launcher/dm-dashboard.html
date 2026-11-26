@@ -1,0 +1,202 @@
+<main class="dm-shell">
+  <header class="dm-header">
+    <div><p class="product-name">Aurora Combat Tracker</p><h1>DM dashboard</h1></div>
+    <div id="party-controls"></div>
+  </header>
+  <section class="dm-panel" aria-labelledby="party-overview-heading">
+    <div class="panel-heading">
+      <h2 id="party-overview-heading">Party overview</h2>
+      <label><input type="checkbox" id="dm-show-ac" checked> Show AC in overview</label>
+    </div>
+    <p id="dm-empty" role="status">Waiting for players to join.</p>
+    <div class="table-scroll">
+      <table id="dm-party-table" hidden>
+        <thead><tr><th scope="col">Player</th><th scope="col">Presence</th><th scope="col">HP</th>
+          <th scope="col">Temp HP</th><th scope="col" id="dm-ac-heading">AC</th><th scope="col">Initiative</th>
+          <th scope="col">Conditions</th><th scope="col">Concentration</th><th scope="col">Character</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="dm-panel" id="dm-initiative" aria-labelledby="initiative-heading" hidden>
+    <div class="panel-heading"><h2 id="initiative-heading">Initiative</h2><strong id="dm-round"></strong></div>
+    <div class="dm-initiative-layout">
+    <div>
+    <label>Turn order <select id="dm-order" size="6"></select></label>
+    <div class="dm-controls">
+      <button data-edit="start">Start / resume encounter</button><button data-edit="next">Next Turn</button>
+      <button data-edit="move_up">Move up in tie</button><button data-edit="correct">Correct current turn</button>
+      <button data-edit="end">End encounter</button>
+    </div>
+    <div class="dm-controls">
+      <button type="button" id="dm-open-library">Monster library</button>
+      <button data-edit="add">Add enemy</button><button data-edit="edit">Edit enemy</button>
+      <button data-edit="duplicate">Duplicate</button><button data-edit="reveal">Reveal</button>
+      <button data-edit="group">Group initiative by name</button><button data-edit="remove">Remove enemy</button>
+    </div>
+    <p id="dm-enemy-detail"></p>
+    <details id="dm-instance-stat-block" hidden><summary>Stat block</summary><div class="monster-stat-block"></div></details>
+    <form id="dm-advance"><label>Advance game time <input name="amount" type="number" min="1" required></label>
+      <select name="unit" aria-label="Time unit"><option>seconds</option><option>rounds</option></select><button>Advance time</button></form>
+    <form id="dm-save"><label>Roster name <input name="name" maxlength="120" required></label><button>Save current roster</button></form>
+    <div class="dm-controls"><label>Saved roster <select id="dm-saves"></select></label>
+      <button data-edit="load">Load roster</button><button data-edit="new">New encounter</button></div>
+    <p id="dm-initiative-status" role="status"></p>
+    </div>
+    <section id="dm-monster-actions" aria-labelledby="dm-actions-heading" hidden>
+      <div class="panel-heading">
+        <h3 id="dm-actions-heading">Monster actions</h3>
+        <button id="dm-current-actions" type="button">Show current enemy</button>
+      </div>
+      <p id="dm-actions-actor"></p>
+      <p id="dm-action-budget"></p>
+      <div class="dm-controls">
+        <button id="dm-add-rule" type="button">Add hand-entered action</button>
+        <button id="dm-correct-budget" type="button">Correct action economy</button>
+      </div>
+      <label>Action <select id="dm-action-rule" aria-label="Action"></select></label>
+      <p class="dm-rule-text" id="dm-action-text"></p>
+      <p id="dm-rule-counter"></p>
+      <div class="dm-controls">
+        <button id="dm-preview-action" type="button">Preview action</button>
+        <button id="dm-correct-rule" type="button">Correct power counters</button>
+      </div>
+      <form id="dm-recharge-form" hidden>
+        <label>Recharge roll for next turn <input name="roll" type="number" min="1" required></label>
+        <button>Queue recharge roll</button>
+        <button type="button" id="dm-clear-roll">Clear queued roll</button>
+      </form>
+      <details id="dm-action-history" hidden>
+        <summary>Recorded actions (DM only)</summary><ol></ol>
+      </details>
+    </section>
+    </div>
+  </section>
+</main>
+<dialog id="dm-action-dialog" aria-labelledby="dm-action-dialog-title">
+  <form id="dm-action-form" class="dm-library-body">
+    <h2 id="dm-action-dialog-title"></h2>
+    <div id="dm-action-fields"></div>
+    <div class="dm-controls">
+      <button id="dm-action-submit">Record action</button><button type="button" id="dm-action-cancel">Cancel</button>
+    </div>
+    <p role="status"></p>
+  </form>
+</dialog>
+<dialog id="dm-monster-library" aria-labelledby="monster-library-title">
+  <header class="panel-heading"><h2 id="monster-library-title">Monster library</h2>
+    <form method="dialog"><button>Close</button></form></header>
+  <div class="dm-library-body">
+    <div class="dm-controls">
+      <label>Pack <select id="monster-pack"></select></label>
+      <button type="button" id="monster-export">Export pack JSON</button>
+    </div>
+    <details id="monster-pack-credits" hidden>
+      <summary>Pack credits</summary>
+      <p id="monster-attribution" class="monster-credits"></p>
+    </details>
+    <div class="dm-controls">
+      <label>Import pack JSON <input id="monster-import" type="file" accept=".json,application/json"></label>
+      <button type="button" id="monster-aurora">Import Aurora folder</button>
+      <button type="button" id="monster-new-pack">Create pack</button>
+    </div>
+    <div class="dm-controls">
+      <label>Search monsters <input id="monster-search" type="search"></label>
+      <label>Creature type <select id="monster-type"></select></label>
+      <label>Size <select id="monster-size"></select></label>
+      <label>Challenge <select id="monster-challenge"></select></label>
+    </div>
+    <label>Matches <select id="monster-matches" size="5"></select></label>
+    <div class="dm-controls">
+      <button type="button" id="monster-new">New template</button>
+      <button type="button" id="monster-edit">Edit template</button>
+    </div>
+    <div id="monster-preview"></div>
+    <form class="dm-controls" id="monster-add">
+      <label>Quantity <input name="count" type="number" min="1" max="100" value="1" required></label>
+      <label>Initiative <input name="score" type="number" min="-2147483648" max="2147483647" value="0" required></label>
+      <button>Add to encounter</button>
+    </form>
+    <p id="monster-status" role="status"></p>
+  </div>
+</dialog>
+<dialog id="monster-import-preview" aria-labelledby="monster-import-title">
+  <form class="dm-library-body" id="monster-confirm"><h2 id="monster-import-title">Review pack import</h2>
+    <p id="monster-import-description"></p>
+    <p id="monster-import-credits" class="monster-credits"></p>
+    <button id="monster-confirm-save">Import pack</button>
+    <button type="button" data-close>Cancel</button>
+    <p role="status"></p>
+  </form>
+</dialog>
+<dialog id="monster-pack-dialog" aria-labelledby="monster-pack-title">
+  <form class="dm-library-body" id="monster-pack-form">
+    <h2 id="monster-pack-title">Pack details</h2>
+    <div class="dm-controls">
+      <label>Pack ID <input name="id" required maxlength="160" pattern="[A-Za-z0-9_.:\-]+"></label>
+      <label>Rules edition <input name="edition" required maxlength="120"></label>
+      <label>Source <input name="source" required maxlength="120"></label>
+      <label>Source version <input name="source_version" maxlength="120"></label>
+      <label>Attribution <textarea name="attribution" required maxlength="4096"></textarea></label>
+      <label>License <input name="license" maxlength="120"></label>
+      <label>License URL <input name="license_url" type="url" maxlength="2048"></label>
+      <label id="monster-xml-label" hidden>Local XML folder <input name="folder" type="file" webkitdirectory multiple></label>
+    </div>
+    <button>Continue</button><button type="button" data-close>Cancel</button>
+    <p role="status"></p>
+  </form>
+</dialog>
+<dialog id="monster-template-dialog" aria-labelledby="monster-template-title">
+  <form class="dm-library-body" id="monster-template-form">
+    <h2 id="monster-template-title">Edit monster template</h2>
+    <div class="dm-controls">
+      <label>Name <input name="name" required maxlength="120"></label>
+      <label>Creature type <input name="type"></label>
+      <label>Size <input name="size"></label>
+      <label>Challenge <input name="challenge"></label>
+      <label>HP <input name="hp" type="number" min="0" max="4294967295"></label>
+      <label>AC <input name="ac" type="number" min="-2147483648" max="2147483647"></label>
+    </div>
+    <div class="dm-controls" id="monster-source-locator">
+      <label>Source entry ID <input name="entry_id"></label>
+      <label>Source page <input name="page" type="number" min="1" max="4294967295"></label>
+      <label>Source section <input name="section"></label>
+      <label>Source entry version <input name="entry_version"></label>
+    </div>
+    <details>
+      <summary>Add a rule or action</summary>
+      <div class="dm-controls">
+        <div><label for="monster-rule-category">Category</label> <select id="monster-rule-category" name="rule_category">
+          <option value="traits">Trait</option><option value="actions">Action</option>
+          <option value="bonus_actions">Bonus action</option><option value="reactions">Reaction</option>
+          <option value="legendary_actions">Legendary action</option>
+        </select></div>
+        <label>Rule name <input name="rule_name" maxlength="120"></label>
+        <label>Rules text <textarea name="rule_text" rows="3"></textarea></label>
+        <button type="button" id="monster-add-rule">Add rule</button>
+      </div>
+    </details>
+    <label>Additional stats and actions (JSON) <textarea name="details" rows="12" spellcheck="false"></textarea></label>
+    <button>Save template</button><button type="button" data-close>Cancel</button>
+    <p role="status"></p>
+  </form>
+</dialog>
+<dialog id="dm-enemy"><form id="dm-enemy-form"><h2>Enemy details</h2>
+  <label>Private name <input name="name" maxlength="120" required></label>
+  <label>Player alias <input name="alias" maxlength="120"></label>
+  <label><input type="checkbox" name="revealed"> Reveal alias to players</label>
+  <label>Current HP <input type="number" min="0" name="hp"></label>
+  <label>Maximum HP <input type="number" min="0" name="max_hp"></label>
+  <label>AC <input type="number" name="ac"></label>
+  <label>Initiative <input type="number" name="score" required></label><button type="button" id="dm-roll">Roll initiative (d20)</button>
+  <label>Conditions <input name="conditions" maxlength="2000"></label>
+  <label>Action notes <textarea name="notes" maxlength="16000"></textarea></label>
+  <button>Save enemy</button><button id="dm-cancel" type="button">Cancel</button><p role="status"></p>
+</form></dialog>
+<dialog id="dm-inspector" aria-labelledby="dm-inspector-title">
+  <header class="panel-heading">
+    <div><h2 id="dm-inspector-title">Character inspector</h2><p id="dm-inspector-presence"></p></div>
+    <form method="dialog"><button>Close</button></form>
+  </header>
+  <div id="dm-inspector-content"></div>
+</dialog>

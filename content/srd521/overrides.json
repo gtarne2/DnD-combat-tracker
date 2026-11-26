@@ -1,0 +1,40 @@
+{
+  "ID_SRD521_MONSTER_ARCHMAGE": {
+    "page": 305,
+    "reason": "Restore the 8,000 XP printed on the stat block. Borealis normalized it to the CR table's 8,400.",
+    "stats": {"details": {"xp": 8000}}
+  },
+  "ID_SRD521_MONSTER_WEREBEAR": {
+    "page": 337,
+    "reason": "Use the printed movement alternatives, each with its own bear-form qualifier.",
+    "stats": {"speed": "30 ft., 40 ft. (bear form only), Climb 30 ft. (bear form only)"}
+  },
+  "ID_SRD521_MONSTER_WEREBOAR": {
+    "page": 338,
+    "reason": "Use the printed boar-form movement alternative.",
+    "stats": {"speed": "30 ft., 40 ft. (boar form only)"}
+  },
+  "ID_SRD521_MONSTER_WERETIGER": {
+    "page": 339,
+    "reason": "Use the printed tiger-form movement alternative.",
+    "stats": {"speed": "30 ft., 40 ft. (tiger form only)"}
+  },
+  "ID_SRD521_MONSTER_WEREWOLF": {
+    "page": 339,
+    "reason": "Use the printed wolf-form movement alternative.",
+    "stats": {"speed": "30 ft., 40 ft. (wolf form only)"}
+  },
+  "ID_SRD521_MONSTER_YOUNG_WHITE_DRAGON": {
+    "page": 340,
+    "reason": "The printed Intelligence SAVE is unsigned. Preserve it as a note for adjudication.",
+    "stats": {
+      "saves": {"Strength": 4, "Dexterity": 3, "Constitution": 4, "Wisdom": 3, "Charisma": 1},
+      "details": {"saves_text": "Intelligence SAVE is printed as an unsigned 2 (MOD −2). Resolve at the table."}
+    }
+  },
+  "ID_SRD521_MONSTER_SWARM_OF_INSECTS": {
+    "page": 361,
+    "reason": "Keep the printed choice between Climb and Fly, with the same 20 ft. speed for either.",
+    "stats": {"speed": "20 ft., Climb or Fly 20 ft. (GM’s choice)"}
+  }
+}

@@ -174,6 +174,10 @@ const concentrationControls = (() => {
             return false;
           }
         }
+        if (proposal.healing && !partyActions.applyHp(state, proposal.recipients, proposal.amount, "healing", proposal.name)) {
+          status.textContent = "Healing recipient unavailable. Open the spell again.";
+          return false;
+        }
         if (proposal.effect === "shield") effectControls.recordShield(state, proposal.name, source);
         const situational = proposal.advantageSelected ? "Advantage · " + proposal.advantage : "";
         previewEncounter.log(state, "cast", ["Cast " + proposal.name, kind, roll, situational].filter(Boolean).join(" · "), source);
@@ -257,7 +261,8 @@ const concentrationControls = (() => {
       previews: control.dataset.castPreviews?.split("|") || [], effect: tools.dataset.spellEffect,
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
       advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage};
-    if (level === 0 && !active && !ritualOnly && !proposal.advantage) {
+    proposal.healing = tools.hasAttribute("data-healing-cast");
+    if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage) {
       finishCast(proposal, "cantrip");
       return;
     }
@@ -274,6 +279,15 @@ const concentrationControls = (() => {
     byId("cast-advantage-field").hidden = !proposal.advantage;
     byId("cast-advantage-condition").textContent = proposal.advantage || "";
     castForm.elements.situational.checked = false;
+    byId("cast-healing-field").hidden = !proposal.healing;
+    castForm.elements.healing.value = "";
+    byId("cast-healing-targets").replaceChildren(...(proposal.healing ? [...partyActions.targets(state)] : []).map(([id, target]) => {
+      const label = document.createElement("label");
+      const box = document.createElement("input");
+      Object.assign(box, {type: "checkbox", name: "healTarget", value: id});
+      label.append(box, " " + target.name);
+      return label;
+    }));
     const tracking = Boolean(focus && ["bless", "moonbeam"].includes(proposal.effect));
     byId("cast-target-field").hidden = !tracking;
     if (tracking) targetFields(byId("cast-targets"), state);
@@ -314,6 +328,22 @@ const concentrationControls = (() => {
       proposal.advantageSelected = Boolean(proposal.advantage && castForm.elements.situational.checked);
       const method = proposal.level === 0 ? "cantrip" : ["free", "ritual"].includes(choice) ? choice : "slot";
       const pool = method === "slot" ? choice : method === "free" ? castForm.elements.freePool.value : "";
+      proposal.recipients = new FormData(castForm).getAll("healTarget");
+      proposal.amount = castForm.elements.healing.valueAsNumber;
+      if (proposal.recipients.length && !Number.isSafeInteger(proposal.amount)) {
+        castForm.elements.healing.setCustomValidity("Enter the rolled healing amount.");
+        castForm.elements.healing.reportValidity();
+        castForm.elements.healing.setCustomValidity("");
+        return;
+      }
+      const limit = targetLimit(proposal, method, pool) || 1;
+      if (proposal.recipients.length > limit) {
+        const field = byId("cast-healing-targets").querySelector("input:checked");
+        field.setCustomValidity("Choose up to " + limit + " healing targets.");
+        field.reportValidity();
+        field.setCustomValidity("");
+        return;
+      }
       proposal.targets = new FormData(castForm).getAll("target");
       if (proposal.targets.length > targetLimit(proposal, method, pool)) {
         byId("cast-target-feedback").textContent = "Too many targets for this slot.";
@@ -381,6 +411,30 @@ const concentrationControls = (() => {
     });
   });
 
+  function applyDamage(state, amount, ruleset = state.focus.rules) {
+    const focus = state.focus;
+    const hp = encounterTracker.damageOwner(state, amount);
+    const previousRules = focus.rules;
+    focus.rules = ruleset;
+    if (hp.changed || focus.active) previewEncounter.log(state, "damage", `Took ${amount} damage${hp.current == null ? "" : ` · ${hp.current} HP left`}`);
+    const feedback = hp.current == null ? "HP unavailable."
+      : hp.absorbed ? `${hp.absorbed} absorbed by temporary HP · ${hp.temporary} temp and ${hp.current} HP left.`
+      : hp.changed ? `${amount} damage recorded · ${hp.current} HP left.` : "HP is already 0.";
+    if (hp.dropped && focus.active) {
+      clear(focus);
+      return {changed: true, feedback: feedback + " Concentration ended."};
+    }
+    if (focus.active) {
+      const dc = Math.max(10, Math.floor(amount / 2));
+      focus.sequence += 1;
+      focus.pending.push({
+        id: focus.sequence, damage: amount, dc: focus.rules === "2024" ? Math.min(dc, 30) : dc,
+      });
+      return {changed: true, feedback};
+    }
+    return {changed: hp.changed || previousRules !== ruleset, feedback};
+  }
+
   damage.addEventListener("submit", (event) => {
     event.preventDefault();
     const amount = Number(new FormData(damage).get("damage"));
@@ -388,30 +442,9 @@ const concentrationControls = (() => {
     const ruleset = rules.value;
     damage.elements.namedItem("damage").value = "";
     previewEncounter.transact((state) => {
-      const focus = state.focus;
-      const hp = encounterTracker.damageOwner(state, amount);
-      const previousRules = focus.rules;
-      focus.rules = ruleset;
-      if (hp.changed || focus.active) previewEncounter.log(state, "damage", `Took ${amount} damage${hp.current == null ? "" : ` · ${hp.current} HP left`}`);
-      const feedback = hp.current == null ? "HP unavailable."
-        : hp.absorbed ? `${hp.absorbed} absorbed by temporary HP · ${hp.temporary} temp and ${hp.current} HP left.`
-        : hp.changed ? `${amount} damage recorded · ${hp.current} HP left.` : "HP is already 0.";
-      if (hp.dropped && focus.active) {
-        clear(focus);
-        status.textContent = `${feedback} Concentration ended.`;
-        return true;
-      }
-      if (!focus.active) {
-        status.textContent = feedback;
-        return hp.changed || previousRules !== ruleset;
-      }
-      const dc = Math.max(10, Math.floor(amount / 2));
-      focus.sequence += 1;
-      focus.pending.push({
-        id: focus.sequence, damage: amount, dc: focus.rules === "2024" ? Math.min(dc, 30) : dc,
-      });
-      status.textContent = feedback;
-      return true;
+      const result = applyDamage(state, amount, ruleset);
+      status.textContent = result.feedback;
+      return result.changed;
     }, {label: "recording damage"});
     rules.value = previewEncounter.current().focus.rules;
     byId("damage-dialog").close();
@@ -449,6 +482,7 @@ const concentrationControls = (() => {
     if (!Number.isSafeInteger(seconds) || seconds <= 0 || seconds > 0xffffffff) return;
     previewEncounter.transact((state) => {
       const focus = state.focus;
+      if (state.progress?.partyClock) {status.textContent = "The DM controls game time."; return false;}
       if (focus.active?.remaining == null) return false;
       const updated = rounds ? effectControls.advanceRounds(state, count) : effectControls.advanceTime(state, seconds);
       if (updated.concentrationExpired) {
@@ -473,5 +507,5 @@ const concentrationControls = (() => {
 
   document.addEventListener("preview-encounter-change", render);
   render();
-  return { availableSlots, cast };
+  return { availableSlots, cast, applyDamage };
 })();

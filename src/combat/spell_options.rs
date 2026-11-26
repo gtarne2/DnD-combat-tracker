@@ -5,6 +5,7 @@ pub struct SpellOptions {
     pub trigger: Option<String>,
     pub incoming_events: &'static str,
     pub effect: &'static str,
+    pub healing: bool,
     pub target_counts: Vec<u32>,
     pub advantage: Option<&'static str>,
 }
@@ -38,9 +39,39 @@ impl SpellOptions {
             (false, true) => "missile",
             _ => "",
         };
+        let healing = [
+            "regains hit points",
+            "regain hit points equal to",
+            "regains a number of hit points",
+            "regain a number of hit points",
+            "restores hit points equal to",
+        ]
+        .iter()
+        .any(|phrase| lower.contains(phrase))
+            || lower
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .windows(4)
+                .any(|words| {
+                    matches!(words[0], "regains" | "regain")
+                        && words[1].parse::<u32>().is_ok()
+                        && words[2] == "hit"
+                        && words[3].trim_end_matches(['.', ',']) == "points"
+                });
         let target_counts = level
             .filter(|level| *level > 0)
             .and_then(|level| slots_for_targets(&lower, level))
+            .or_else(|| {
+                if !healing {
+                    return None;
+                }
+                let initial = super::words(&lower).windows(4).find_map(|words| {
+                    (words[0..2] == ["up", "to"] && matches!(words[3], "creatures" | "targets"))
+                        .then(|| count(words[2]))
+                        .flatten()
+                })?;
+                Some(vec![initial; 9])
+            })
             .unwrap_or_default();
         let effect = if !target_counts.is_empty()
             && lower.contains("can roll a d4")
@@ -80,6 +111,7 @@ impl SpellOptions {
             material_notice,
             trigger,
             incoming_events,
+            healing,
             effect,
             target_counts,
             advantage,

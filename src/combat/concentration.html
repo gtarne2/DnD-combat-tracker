@@ -47,6 +47,9 @@
     <p id="cast-roll-preview" hidden></p>
     <p id="cast-material-notice" hidden></p>
     <label id="cast-advantage-field" hidden><input type="checkbox" name="situational"> <span id="cast-advantage-condition"></span></label>
+    <fieldset id="cast-healing-field" hidden><legend>Apply rolled healing</legend>
+      <div id="cast-healing-targets"></div><label>HP per selected target <input name="healing" type="number" min="1" max="4294967295"></label>
+    </fieldset>
     <fieldset id="cast-target-field" hidden><legend>Spell targets</legend><div id="cast-targets"></div><p id="cast-target-feedback" role="status"></p></fieldset>
     <label id="cast-firearm-field" class="firearm-toggle" hidden><input type="checkbox" name="firearm"> Cast through Arcane Firearm <small>+1d8 to one damage roll</small></label>
     <div class="focus-form companion-edit-actions">

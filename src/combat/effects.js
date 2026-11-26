@@ -93,14 +93,16 @@ const effectControls = (() => {
     return new Map([
       ["owner", encounterTracker.ownerName],
       ...(state.companions?.cards || []).map((card) => [`companion:${card.id}`, card.name]),
-      ...(state.progress?.actors || []).map((actor) => [`actor:${actor.id}`, actor.name]),
+      ...(state.progress?.partyClock
+        ? partyInitiative.rows(state).filter(row => row.key?.startsWith("party:")).map(row => [row.key,row.name])
+        : (state.progress?.actors || []).map(actor => [`actor:${actor.id}`, actor.name])),
     ]);
   }
 
   function initiativeEntry(state, key) {
     if (!key.startsWith("companion:")) return key;
     const card = state.companions?.cards.find((card) => `companion:${card.id}` === key && companionControls.available(card));
-    return card ? card.turn === "owner" ? "owner" : key : null;
+    return card ? actionEconomy.turnKey(state,key) : null;
   }
 
   function spellParticipants(state) {
@@ -477,6 +479,7 @@ const effectControls = (() => {
       return;
     }
     previewEncounter.transact((state) => {
+      if (state.progress?.partyClock) {feedback.textContent = "The DM controls game time."; return false;}
       if (rounds) advanceRounds(state, elapsed);
       else advanceTime(state, seconds);
       feedback.textContent = "In-game time advanced.";

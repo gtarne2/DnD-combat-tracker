@@ -147,7 +147,7 @@ const combatTools = (() => {
     if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > 86400) return;
     dawn.close();
     encounterTracker.update((progress, state) => {
-      if (seconds) effectControls.advanceTime(state, seconds);
+      if (seconds && !progress.partyClock) effectControls.advanceTime(state, seconds);
       const changes = [];
       for (const pool of encounterTracker.resources(state, true).filter((entry) => entry.recovery === "dawn")) {
         const spent = Math.min(progress.used[pool.key] || 0, pool.capacity);

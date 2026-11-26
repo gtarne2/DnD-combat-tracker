@@ -1,0 +1,67 @@
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #121619;
+  color: #f0eee8;
+  --surface: #1c2227;
+  --line: #3b464e;
+  --muted: #b4bfc6;
+  --accent: #e7bd73;
+}
+body { margin: 0; }
+.dm-shell { max-width: 1440px; margin: auto; padding: clamp(16px, 4vw, 52px); }
+.dm-header, .panel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.dm-header { align-items: start; margin-bottom: 28px; }
+.product-name { color: var(--accent); font-size: .85rem; margin: 0 0 8px; }
+h1 { margin: 0; font-size: clamp(1.85rem, 4vw, 2.65rem); }
+h2 { margin: 0; font-size: 1.2rem; }
+h3 { margin: 18px 0 10px; color: var(--accent); font-size: 1rem; }
+h4 { margin: 14px 0 4px; }
+button, summary, input { cursor: pointer; }
+button { font: inherit; background: #303941; color: inherit; border: 1px solid var(--line); border-radius: 5px; padding: 5px 10px; }
+button:hover { background: #414d55; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.dm-panel + .dm-panel { margin-top: 18px; }
+.dm-initiative-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (min-width: 900px) {
+  .dm-initiative-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+#dm-monster-actions { border-inline-start: 2px solid var(--line); padding-inline-start: 16px; min-width: 0; }
+#dm-monster-actions h3 { margin-block: 8px; }
+#dm-action-rule { max-width: 100%; }
+.dm-rule-text { white-space: pre-wrap; overflow-wrap: anywhere; margin-block: 8px; }
+#dm-action-fields label { display: grid; gap: 4px; margin-block: 8px; }
+#dm-action-fields fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 12px 0; }
+#dm-action-fields input[type=checkbox] { justify-self: start; }
+#dm-action-fields input[type=number], #dm-recharge-form input { width: 7ch; }
+#dm-action-history li { margin: 8px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+#dm-order { display: block; width: 100%; margin: 8px 0; }
+#dm-initiative form, .dm-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+#dm-enemy-form { display: grid; gap: 12px; padding: 20px; }
+#dm-enemy-form label { display: flex; align-items: center; gap: 10px; }
+.dm-library-body { padding: 16px 20px; }
+.dm-library-body select, .dm-library-body input { max-width: 100%; }
+#monster-matches, #monster-template-form textarea { display: block; width: 100%; margin-block: 8px; }
+.monster-stat-block { border-left: 2px solid var(--line); padding-left: 12px; overflow-wrap: anywhere; }
+.monster-stat-block p, .monster-credits { white-space: pre-wrap; }
+#dm-enemy-detail { white-space: pre-line; }
+.dm-panel, #party-controls { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 16px; }
+#party-controls p, #party-controls ul { margin: 8px 0; color: var(--muted); }
+#party-controls button { margin: 0 5px 4px 0; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+th, td { padding: 10px 8px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+thead { font-size: .84rem; color: var(--muted); }
+th small { display: block; color: var(--muted); }
+dialog { width: min(740px, calc(100vw - 32px)); max-height: 85vh; padding: 0; border: 1px solid var(--line); border-radius: 9px; color: inherit; background: var(--surface); }
+dialog::backdrop { background: rgb(8 12 16 / .75); }
+dialog header { position: sticky; top: 0; background: var(--surface); padding: 16px 20px; border-bottom: 1px solid var(--line); }
+dialog header p { margin: 4px 0 0; color: var(--muted); }
+#dm-inspector-content { padding: 0 20px 20px; }
+#dm-inspector-content dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin: 0; }
+#dm-inspector-content dl div { padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; }
+dt { color: var(--muted); font-size: .85rem; }
+dd { margin: 3px 0 0; }
+article p { white-space: pre-line; overflow-wrap: anywhere; margin: 4px 0; color: var(--muted); }

@@ -1,0 +1,368 @@
+const signedStat = value => (value >= 0 ? "+" : "") + value;
+const monsterPackLabel = pack => [pack.source,pack.edition,pack.source_version,pack.id].filter(Boolean).join(" · ");
+const monsterLicense = license => license && [license.name,license.url].filter(Boolean).join(" · ");
+
+function renderMonsterStatBlock(target, snapshot) {
+  target.replaceChildren();
+  if (!snapshot) return;
+  const {pack, monster} = snapshot;
+  const s = monster.stats, d = s.defenses || {}, details = s.details || {};
+  const add = (tag, text) => {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    target.append(node);
+  };
+  const field = (label, value) => {
+    if (value != null && value !== "") add("p", label + " · " + value);
+  };
+  add("h3", monster.name);
+  add("p", [pack.edition, pack.source, pack.source_version].filter(Boolean).join(" · "));
+  add("p", pack.attribution);
+  field("License", monsterLicense(pack.license));
+  const source = monster.source_locator;
+  if (source) field("Source entry", [
+    source.entry_id, source.section, source.page != null && "Page " + source.page, source.source_version
+  ].filter(Boolean).join(" · "));
+  field("Creature", [s.size || details.sizes?.join(" or "), s.creature_type].filter(Boolean).join(" "));
+  if (s.size && details.sizes?.length) field("Size choices", details.sizes.join(" or "));
+  field("Alignment", details.alignment);
+  field("Challenge", s.challenge);
+  field("Challenge notes", details.challenge_notes);
+  field("XP", details.xp);
+  field("Proficiency bonus", details.proficiency_bonus != null ? signedStat(details.proficiency_bonus) : null);
+  const initiative = details.initiative;
+  if (initiative) field("Initiative", [
+    initiative.modifier != null ? signedStat(initiative.modifier) : null,
+    initiative.score != null ? "(" + initiative.score + ")" : null,
+    initiative.qualifier
+  ].filter(Boolean).join(" "));
+  field("Armor Class", [d.ac ?? "Unknown", d.armor].filter(v => v != null).join(" · "));
+  for (const armor of d.conditional_ac || [])
+    field("Conditional AC", [armor.ac,armor.qualifier].filter(v => v != null).join(" · "));
+  field("HP", (s.hp ?? "Unknown") + (s.hit_dice ? " (" + s.hit_dice + ")" : ""));
+  for (const [label, value] of [
+    ["Speed",s.speed], ["Senses",s.senses], ["Languages",s.languages], ["Gear",details.gear],
+    ["Vulnerabilities",d.vulnerabilities], ["Resistances",d.resistances],
+    ["Immunities",d.immunities], ["Condition immunities",d.condition_immunities]
+  ]) field(label, value);
+  for (const [label, values] of [["Abilities",s.abilities],["Saves",s.saves],["Skills",s.skills]]) {
+    field(label, Object.entries(values || {}).map(([name, value]) =>
+      name + " " + (label === "Abilities" ? value : signedStat(value))).join(", "));
+  }
+  field("Save notes",details.saves_text);
+  field("Skill notes",details.skills_text);
+  if (s.notes) add("p", s.notes);
+  const names = new Map((s.actions || []).map(action => [action.id, action.name]));
+  for (const [key,label] of [
+    ["traits","Traits"],["actions","Actions"],["bonus_actions","Bonus actions"],
+    ["reactions","Reactions"],["legendary_actions","Legendary actions"]
+  ]) {
+    const preamble = key === "legendary_actions" && details.legendary_preamble;
+    if (!s[key]?.length && !preamble) continue;
+    add("h4",label);
+    if (preamble) add("p",preamble);
+    for (const a of s[key] || []) {
+      add("h5",a.name);
+      add("p",a.text);
+      const range = a.range_ft;
+      const damage = (a.damage || []).map(d => [
+        d.average, d.dice && "(" + d.dice + ")", d.damage_type
+      ].filter(v => v != null && v !== "").join(" "));
+      const save = a.resolution?.save;
+      const outcome = {full:"full damage",half:"half damage",none:"no damage"};
+      const mechanics = [
+        a.attack_bonus != null && signedStat(a.attack_bonus) + " to hit",
+        a.reach_ft != null && "Reach " + a.reach_ft + " ft",
+        range && "Range " + range.normal + (range.long != null ? "/" + range.long : "") + " ft",
+        save ? "DC " + save.dc + " " + save.ability + " save (" + outcome[save.on_failure]
+          + " on failure, " + outcome[save.on_success] + " on success)"
+          : a.save_dc != null && "Save DC " + a.save_dc + " (see rules text)",
+        ...damage,
+        a.uses && a.uses.count + " uses" + (a.uses.reset ? " / " + a.uses.reset : ""),
+        a.recharge && "Recharge " + a.recharge.minimum + "–" + a.recharge.die + " on d" + a.recharge.die,
+        a.resolution?.legendary_cost && "Legendary action cost " + a.resolution.legendary_cost,
+        a.multiattack?.length && a.multiattack.map(id => names.get(id) || id).join(", ")
+      ].filter(Boolean);
+      if (mechanics.length) add("p",mechanics.join(" · "));
+      if (a.resolution?.manual_note) add("p",a.resolution.manual_note);
+    }
+  }
+  for (const section of details.sections || []) {
+    add("h4",section.title);
+    add("p",section.text);
+  }
+}
+
+function compareChallenge(left, right) {
+  const fraction = value => {
+    const match = /^(\d{1,6})(?:\/(\d{1,6}))?$/.exec(value);
+    return match && Number(match[2] ?? 1) > 0 ? [Number(match[1]),Number(match[2] ?? 1)] : null;
+  };
+  const a = fraction(left), b = fraction(right);
+  if (a && b) return a[0]*b[1] - b[0]*a[1] || left.localeCompare(right);
+  if (a || b) return a ? -1 : 1;
+  return left.localeCompare(right);
+}
+
+function setupMonsterLibrary(request, addToEncounter) {
+  const el = id => document.getElementById(id);
+  const library = el("dm-monster-library");
+  const packChoice = el("monster-pack");
+  const search = el("monster-search");
+  const matches = el("monster-matches");
+  const preview = el("monster-preview");
+  const status = el("monster-status");
+  const confirm = el("monster-confirm");
+  const packForm = el("monster-pack-form");
+  const templateForm = el("monster-template-form");
+  const add = el("monster-add");
+  const loadControls = [packChoice,el("monster-import"),el("monster-aurora"),el("monster-new-pack")];
+  const filters = [
+    [el("monster-type"), s => [s.creature_type]],
+    [el("monster-size"), s => s.details?.sizes?.length ? s.details.sizes : [s.size]],
+    [el("monster-challenge"), s => [s.challenge],compareChallenge]
+  ];
+  let loaded, pendingImport, packMode, editing, busy = false;
+  const api = (action, data) => request("monsters/" + action,data);
+  const monster = () => loaded?.pack.monsters.find(m => m.id === matches.value);
+  preview.className = "monster-stat-block";
+  for (const button of document.querySelectorAll("[data-close]")) {
+    button.onclick = () => button.closest("dialog").close();
+  }
+  async function run(feedback, task, control) {
+    if (busy) return;
+    busy = true;
+    for (const field of loadControls) field.disabled = true;
+    if (control) control.disabled = true;
+    feedback.textContent = "";
+    try { await task(); }
+    catch (error) { feedback.textContent = error.message; }
+    finally {
+      busy = false;
+      for (const field of loadControls) field.disabled = false;
+      if (control) control.disabled = false;
+      selection();
+    }
+  }
+  const submit = (form, task) => {
+    form.onsubmit = event => {
+      event.preventDefault();
+      run(form.querySelector("[role=status]") || status,task,event.submitter);
+    };
+  };
+
+  function selection() {
+    const selected = monster();
+    const score = add.elements.score;
+    const selectionId = selected ? loaded.revision + ":" + selected.id : "";
+    if (score.dataset.template !== selectionId) {
+      score.dataset.template = selectionId;
+      score.value = selected?.stats.details?.initiative?.score ?? 0;
+    }
+    el("monster-export").disabled = !loaded;
+    el("monster-new").disabled = !loaded;
+    el("monster-edit").disabled = !selected;
+    add.querySelector("button").disabled = !selected;
+    renderMonsterStatBlock(preview, selected && {pack:loaded.pack.info,monster:selected});
+    preview.hidden = !selected;
+  }
+
+  function populateMatches(selected = matches.value) {
+    const tokens = search.value.trim().toLowerCase().split(/\s+/);
+    const visible = (loaded?.pack.monsters || []).filter(m => {
+      const name = m.name.toLowerCase();
+      return tokens.every(token => name.includes(token))
+        && filters.every(([field, values]) => !field.value || values(m.stats).includes(field.value));
+    }).sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    matches.replaceChildren(...visible.map(m => new Option(
+      [m.name,loaded.pack.info.edition,m.id].join(" · "),m.id)));
+    matches.value = visible.some(m => m.id === selected) ? selected : visible[0]?.id ?? "";
+    selection();
+  }
+
+  async function loadPack(selected) {
+    try { loaded = packChoice.value ? await api("get", packChoice.value) : null; }
+    catch (error) { packChoice.value = loaded?.pack.info.id ?? ""; throw error; }
+    const info = loaded?.pack.info;
+    el("monster-attribution").textContent = info
+      ? [info.attribution,monsterLicense(info.license)].filter(Boolean).join(" · ") : "";
+    el("monster-pack-credits").hidden = !loaded;
+    for (const [field, values, compare] of filters) {
+      const options = [...new Set((loaded?.pack.monsters || []).flatMap(m => values(m.stats)).filter(Boolean))].sort(compare);
+      field.replaceChildren(new Option("All",""), ...options.map(value => new Option(value,value)));
+    }
+    populateMatches(selected);
+  }
+
+  async function reload(packId = packChoice.value, selected) {
+    const packs = await api("list");
+    packChoice.replaceChildren(...packs.map(({info}) => new Option(monsterPackLabel(info),info.id)));
+    packChoice.value = packs.some(({info}) => info.id === packId) ? packId : packs[0]?.info.id ?? "";
+    await loadPack(selected);
+    if (!packs.length) status.textContent = "Import a pack or create one to add monsters.";
+  }
+
+  el("dm-open-library").onclick = () => {
+    library.showModal();
+    run(status, () => reload());
+  };
+  packChoice.onchange = () => run(status, () => loadPack());
+  search.oninput = () => populateMatches();
+  for (const [field] of filters) field.onchange = () => populateMatches();
+  matches.onchange = selection;
+
+  async function reviewImport(pack) {
+    const before = await api("validate",pack);
+    pendingImport = {pack,expected_revision:before?.revision ?? null};
+    const after = monsterPackLabel(pack.info) + " · " + pack.monsters.length + " templates.";
+    el("monster-import-description").textContent = before
+      ? "Pack ID conflict. This replaces " + monsterPackLabel(before.info) + " (" + before.count + " templates) with " + after
+      : after;
+    el("monster-import-credits").textContent = (before ? [before.info,pack.info] : [pack.info])
+      .map(info => [monsterPackLabel(info),info.attribution,monsterLicense(info.license)].filter(Boolean).join(" · "))
+      .join("\n");
+    el("monster-confirm-save").textContent = before ? "Replace pack" : "Import pack";
+    confirm.querySelector("[role=status]").textContent = "";
+    confirm.closest("dialog").showModal();
+  }
+
+  el("monster-import").onchange = event => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    run(status, async () => {
+      if (file.size > 16 * 1024 * 1024) throw new Error("Monster packs are limited to 16 MiB.");
+      await reviewImport(JSON.parse(await file.text()));
+    });
+  };
+
+  submit(confirm, async () => {
+    await api("save",pendingImport);
+    confirm.closest("dialog").close();
+    search.value = "";
+    await reload(pendingImport.pack.info.id);
+    status.textContent = "Imported " + pendingImport.pack.info.source + ".";
+  });
+
+  el("monster-export").onclick = () => {
+    if (!loaded) return;
+    const blob = new Blob([JSON.stringify(loaded.pack) + "\n"],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = loaded.pack.info.id + ".json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url),1000);
+  };
+
+  function openPackForm(mode) {
+    packMode = mode;
+    packForm.reset();
+    const fields = packForm.elements;
+    const aurora = mode === "aurora";
+    fields.id.value = aurora ? "aurora-local" : "homebrew-" + crypto.randomUUID();
+    fields.edition.value = "2014";
+    fields.source.value = aurora ? "Local Aurora companions" : "Local homebrew";
+    fields.attribution.value = aurora ? "Imported from local Aurora XML." : "Private homebrew.";
+    fields.folder.required = aurora;
+    el("monster-xml-label").hidden = !aurora;
+    packForm.querySelector("[role=status]").textContent = "";
+    packForm.closest("dialog").showModal();
+  }
+  el("monster-aurora").onclick = () => openPackForm("aurora");
+  el("monster-new-pack").onclick = () => openPackForm("create");
+
+  submit(packForm, async () => {
+    const f = packForm.elements;
+    const info = Object.fromEntries(["id","edition","source","source_version","attribution"].map(name => [name,f[name].value.trim()]));
+    info.source_version ||= null;
+    const license = f.license.value.trim();
+    if (license) info.license = {name:license,url:f.license_url.value.trim() || null};
+    else if (f.license_url.value.trim()) throw new Error("Enter a license name for the URL.");
+    if (packMode === "aurora") {
+      const xml = [...f.folder.files].filter(file => /\.xml$/i.test(file.name))
+        .sort((a,b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath,"en"));
+      if (!xml.length) throw new Error("Choose a folder containing Aurora XML files.");
+      if (xml.reduce((size,file) => size + file.size,0) > 24 * 1024 * 1024)
+        throw new Error("Choose an Aurora folder with up to 24 MiB of XML.");
+      await reviewImport(await api("aurora",{info,files:await Promise.all(xml.map(file => file.text()))}));
+      packForm.closest("dialog").close();
+    } else {
+      packForm.closest("dialog").close();
+      openTemplate({pack:{schema_version:2,info,monsters:[]},revision:null});
+    }
+  });
+
+  function openTemplate(base, original) {
+    editing = {base, original};
+    templateForm.reset();
+    const stats = original?.stats || {};
+    const f = templateForm.elements;
+    f.name.value = original?.name || "";
+    for (const [field,key] of [["type","creature_type"],["size","size"],["challenge","challenge"],["hp","hp"]])
+      f[field].value = stats[key] ?? "";
+    f.ac.value = stats.defenses?.ac ?? "";
+    const locator = original?.source_locator;
+    el("monster-source-locator").hidden = base.pack.schema_version === 1;
+    for (const key of ["entry_id","page","section"]) f[key].value = locator?.[key] ?? "";
+    f.entry_version.value = locator?.source_version ?? "";
+    const {creature_type,size,challenge,hp,defenses,...extra} = stats;
+    const {ac,...otherDefenses} = defenses || {};
+    f.details.value = JSON.stringify({actions:[],traits:[],reactions:[],legendary_actions:[],...extra,defenses:otherDefenses},null,2);
+    templateForm.querySelector("[role=status]").textContent = "";
+    templateForm.closest("dialog").showModal();
+  }
+
+  el("monster-add-rule").onclick = () => {
+    const f = templateForm.elements;
+    const status = templateForm.querySelector("[role=status]");
+    try {
+      const stats = JSON.parse(f.details.value);
+      const key = f.rule_category.value;
+      if (!f.rule_name.value.trim() || !f.rule_text.value.trim()) throw new Error("Enter a rule name and text.");
+      (stats[key] ||= []).push({id:crypto.randomUUID(),name:f.rule_name.value.trim(),text:f.rule_text.value});
+      f.details.value = JSON.stringify(stats,null,2);
+      f.rule_name.value = f.rule_text.value = "";
+      status.textContent = "Added the rule to the template.";
+    } catch (error) { status.textContent = error.message; }
+  };
+
+  el("monster-new").onclick = () => openTemplate(loaded);
+  el("monster-edit").onclick = () => openTemplate(loaded,monster());
+  submit(templateForm, async () => {
+    const f = templateForm.elements;
+    const stats = JSON.parse(f.details.value);
+    const object = value => value && typeof value === "object" && !Array.isArray(value);
+    if (!object(stats) || stats.defenses != null && !object(stats.defenses))
+      throw new Error("Enter JSON objects for additional stats and defenses.");
+    const {base, original} = editing;
+    const template = {id:original?.id || crypto.randomUUID(),name:f.name.value.trim(),stats:{
+      ...stats,creature_type:f.type.value.trim() || null,size:f.size.value.trim() || null,
+      challenge:f.challenge.value.trim() || null,hp:f.hp.value === "" ? null : f.hp.valueAsNumber,
+      defenses:{...stats.defenses,ac:f.ac.value === "" ? null : f.ac.valueAsNumber}
+    }};
+    if (base.pack.schema_version === 2) {
+      const locator = {entry_id:f.entry_id.value.trim() || null,page:f.page.valueAsNumber || null,
+        section:f.section.value.trim() || null, source_version:f.entry_version.value.trim() || null};
+      if (Object.values(locator).some(Boolean)) template.source_locator = locator;
+    }
+    const pack = {...base.pack, monsters:original
+      ? base.pack.monsters.map(m => m.id === original.id ? template : m)
+      : [...base.pack.monsters,template]};
+    await api("save",{pack,expected_revision:base.revision});
+    templateForm.closest("dialog").close();
+    search.value = "";
+    await reload(pack.info.id,template.id);
+    status.textContent = "Saved " + template.name + ".";
+  });
+
+  submit(add, async () => {
+    const selected = monster();
+    if (!selected) return;
+    const template = {schema_version:loaded.pack.schema_version,pack:loaded.pack.info,revision:loaded.revision,monster:selected};
+    const {count,score} = add.elements;
+    if (await addToEncounter({kind:"add_monsters",template,count:count.valueAsNumber,score:score.valueAsNumber})) {
+      library.close();
+    } else throw new Error(el("dm-initiative-status").textContent || "Encounter unavailable.");
+  });
+}

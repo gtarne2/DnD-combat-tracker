@@ -28,6 +28,17 @@ const attackModifiers = (() => {
 
   const signed = (amount) => (amount >= 0 ? "+" : "") + amount;
 
+  function eligibleTargets(category) {
+    const result = new Map();
+    for (const tools of document.querySelectorAll("#all-options [data-attack-kind][data-base-attack]")) {
+      const card = tools.closest(".option-row[data-pin]");
+      if (card && tools.dataset.attackKind === category && /^[+-]?\d+/.test(tools.dataset.baseAttack)) {
+        result.set(category + ":" + card.dataset.pin, card.querySelector(".option-title").textContent.trim());
+      }
+    }
+    return result;
+  }
+
   function assignmentControl(id, name, state) {
     const bonus = imported.get(id);
     if (!bonus) return null;
@@ -65,21 +76,27 @@ const attackModifiers = (() => {
     const kind = data.attackKind;
     const hasAttack = /^[+-]?\d+(?=\s|$)/.test(data.baseAttack || "");
     const matches = (target) => Boolean(target && kind && (target === kind
-      || (kind === "weapon" && card.dataset.pin && target === "weapon:" + card.dataset.pin)));
+      || (card.dataset.pin && target === kind + ":" + card.dataset.pin)));
     let attack = 0;
     let damage = 0;
+    const grants = Object.values(state.progress?.partyGrants || {}).filter(grant => matches(grant.target));
+    const infusions = grants.filter(grant => grant.stacking === "infusion");
     for (const id of state.progress?.infusions || []) {
-      const bonus = imported.get(id);
-      if (bonus && matches(state.progress.infusionTargets?.[id])) {
-        attack = Math.max(attack, bonus.attack);
-        damage = Math.max(damage, bonus.damage);
-      }
+      if (imported.has(id) && matches(state.progress.infusionTargets?.[id])) infusions.push(imported.get(id));
     }
+    for (const bonus of infusions) {
+      attack = Math.max(attack, bonus.attack);
+      damage = Math.max(damage, bonus.damage);
+    }
+    const custom = grants.filter(grant => grant.stacking === "custom");
     for (const ability of state.progress?.abilities || []) {
       if (ability.kind === "imbuement" && ability.active && matches(ability.attackTarget)) {
-        attack += Number(ability.attackBonus) || 0;
-        if (kind === "weapon") damage += Number(ability.damageBonus) || 0;
+        custom.push({attack: Number(ability.attackBonus) || 0, damage: Number(ability.damageBonus) || 0});
       }
+    }
+    for (const bonus of custom) {
+      attack += bonus.attack;
+      if (kind === "weapon") damage += bonus.damage;
     }
     if (!hasAttack) attack = 0;
     const baseDamage = data.baseDamage || "";
@@ -132,5 +149,5 @@ const attackModifiers = (() => {
     equipped.checked = firearmEnabled(previewEncounter.current());
   });
   equipped.checked = firearmEnabled(previewEncounter.current());
-  return {targetOptions, assignmentControl, forOption, updateOption, firearmEnabled, firearmHint};
+  return {eligibleTargets, infusion: id => imported.get(id), targetOptions, assignmentControl, forOption, updateOption, firearmEnabled, firearmHint};
 })();

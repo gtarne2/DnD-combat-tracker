@@ -166,6 +166,8 @@ const playbook = (() => {
     }
     if (use.imported?.key && use.imported.cost == null) {
       amountProposal = {key, timing};
+      amountForm.elements.recipient.replaceChildren(new Option("Record points only", ""),
+        ...[...partyActions.targets(previewEncounter.current())].map(([id, target]) => new Option(target.name, id)));
       byId("feature-amount-title").textContent = use.imported.name;
       byId("feature-amount-remaining").textContent = use.remaining + " points remaining";
       amountForm.elements.amount.max = use.remaining;
@@ -176,7 +178,7 @@ const playbook = (() => {
     recordImportedUse(key, timing);
   }
 
-  function recordImportedUse(key, timing, amount) {
+  function recordImportedUse(key, timing, amount, recipient) {
     previewEncounter.transact((state) => {
       const current = featureUse(key, state);
       if (!current || current.ability || current.reason) {
@@ -189,6 +191,10 @@ const playbook = (() => {
         return false;
       }
       const name = current.imported?.name || current.pool.name;
+      if (recipient && !partyActions.applyHp(state, [recipient], amount, "healing", name)) {
+        useFeedback("Healing recipient unavailable. Choose the feature again.");
+        return false;
+      }
       const cost = current.resourceKey ? " · " + (amount ?? current.cost) + " from " + current.pool.name : "";
       useFeedback(name + " used" + cost + ".");
       previewEncounter.log(state, "action", "Used " + name + cost, "option:" + key);
@@ -200,7 +206,7 @@ const playbook = (() => {
     event.preventDefault();
     const amount = amountForm.elements.amount.valueAsNumber;
     if (!amountProposal || !Number.isSafeInteger(amount) || amount < 1) return;
-    recordImportedUse(amountProposal.key, amountProposal.timing, amount);
+    recordImportedUse(amountProposal.key, amountProposal.timing, amount, amountForm.elements.recipient.value);
     amountDialog.close();
   };
 
@@ -306,6 +312,9 @@ const playbook = (() => {
       const saved = progress.abilities.find((entry) => entry.id === source.id);
       if (saved) {
         if (values.kind === "use") saved.active = false;
+        if (saved.kind === "imbuement" && (saved.name !== values.name || linkKey(saved) !== values.link)) {
+          delete progress.partyAssignments?.["ability:" + saved.id];
+        }
         Object.assign(saved, values);
       } else {
         if (source.id != null) return false;
@@ -361,17 +370,10 @@ const playbook = (() => {
         if (protector.open) protectorFeedback.textContent = "This cannon is no longer available for activation.";
         return false;
       }
-      const targets = protectorTargets(state);
-      if (recipients.some(id => !targets.has(id))) {
+      if (!actionEconomy.spend(state, "owner", "bonus-action")) return false;
+      if (!partyActions.applyHp(state, recipients, amount, "temporary_hp", action.name)) {
         protectorFeedback.textContent = "A selected recipient is unavailable. Reopen Protector to refresh the list.";
         return false;
-      }
-      if (!actionEconomy.spend(state, "owner", "bonus-action")) return false;
-      for (const id of recipients) {
-        const { hp } = targets.get(id);
-        const temporary = Math.max(hp.temporary || 0, amount);
-        if (id === "owner") progress.hp = {...hp, temporary};
-        else hp.temporary = temporary;
       }
       progress.followupUses = {...progress.followupUses, [action.key]: turn};
       previewEncounter.log(state, "action", `Used ${action.name} · Bonus Action`);
@@ -381,15 +383,6 @@ const playbook = (() => {
     });
   }
 
-  function protectorTargets(state) {
-    const targets = new Map();
-    const ownerHp = encounterTracker.hp(state);
-    if (ownerHp) targets.set("owner", {name: encounterTracker.ownerName, hp: ownerHp});
-    for (const card of state.companions?.cards || []) {
-      if (card.currentHp != null && companionControls.available(card)) targets.set(String(card.id), {name: card.name, hp: card});
-    }
-    return targets;
-  }
 
   function activateFollowup(action) {
     if (action.variant !== "protector") {
@@ -403,11 +396,11 @@ const playbook = (() => {
     byId("protector-description").textContent = action.detail || "";
     const targets = byId("protector-targets");
     targets.querySelectorAll("label, p").forEach(node => node.remove());
-    for (const [id, {name, hp}] of protectorTargets(previewEncounter.current())) {
+    for (const [id, {name, hp}] of partyActions.targets(previewEncounter.current())) {
       const label = make("label");
       const checkbox = make("input");
       Object.assign(checkbox, {type: "checkbox", name: "recipient", value: id});
-      label.append(checkbox, ` ${name} · ${hp.temporary || 0} temp HP`);
+      label.append(checkbox, hp ? ` ${name} · ${hp.temporary || 0} temp HP` : ` ${name}`);
       targets.append(label);
     }
     if (!targets.querySelector("input")) targets.append(make("p", "Set current HP to make a recipient available."));
@@ -488,7 +481,7 @@ const playbook = (() => {
       .map((key) => sources.get(key));
     const signature = JSON.stringify([abilities(state), pools(state), state.progress?.used,
       actions.map((action) => [action, followupReason(action, state)]), state.progress?.infusions,
-      state.progress?.infusionTargets, linkedEffects]);
+      state.progress?.infusionTargets, partyActions.members(), previewEncounter.delivery().sources, linkedEffects]);
     if (signature === lastSignature) return;
     lastSignature = signature;
     const openCards = new Map([...byId("playbook").querySelectorAll("details[data-view-disclosure]")]
@@ -533,7 +526,11 @@ const playbook = (() => {
         details.append(spend);
       }
       const assignment = attackModifiers.assignmentControl(id, name, state);
-      if (assignment) details.append(assignment);
+      if (assignment) {
+        details.append(assignment);
+        const party = active && partyActions.grantControl("infusion:" + id, name, attackModifiers.infusion(id).scope);
+        if (party) details.append(party);
+      }
       details.append(abilityDetails({}, sources.get(`option:Feature:${id}`)));
       restoreCard(details, `infusion:${id}`);
       row.append(details, toggle);
@@ -558,6 +555,10 @@ const playbook = (() => {
       const controls = make("div");
       controls.className = "companion-card-actions";
       controls.append(button("Edit", () => openAbility(ability)));
+      if (ability.active && ability.kind === "imbuement") {
+        const party = partyActions.grantControl("ability:" + ability.id, ability.name, null);
+        if (party) controls.append(party);
+      }
       if (content.textContent.length > 650 || content.querySelector("table")) {
         controls.prepend(button("Open full details", () => {
           openReference = ability.id;
@@ -675,6 +676,7 @@ const playbook = (() => {
       previewEncounter.log(state, "rest", kind === "long" ? "Long rest" : "Short rest");
       for (const ability of abilities(state)) {
         if (resets(ability.reset, kind)) {
+          delete progress.partyAssignments?.["ability:" + ability.id];
           ability.active = false;
           ability.uses = 0;
         }
@@ -689,8 +691,10 @@ const playbook = (() => {
           effect.endedByRest = true;
         }
       }
-      effectControls.tickRoundEffects(state, seconds / 6);
-      effectControls.advanceTime(state, seconds);
+      if (!progress.partyClock) {
+        effectControls.tickRoundEffects(state, seconds / 6);
+        effectControls.advanceTime(state, seconds);
+      }
       if (kind === "long") {
         const available = new Set(knownInfusions.map(([id]) => id));
         const saved = (progress.infusions || []).filter((id) => !available.has(id));

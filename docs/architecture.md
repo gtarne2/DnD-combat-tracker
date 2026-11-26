@@ -1,20 +1,124 @@
 # Architecture
 
+## Shipped component map
+
+The Windows Forms launcher invokes `combat-sheet` to generate a local player sheet. For a party, it starts `aurora-party` and attaches a loopback capability to the player sheet or opens a separate DM dashboard. Guest helpers connect to the host over TLS. The player browser owns character mutations and local undo. The host's Rust room service owns membership, addressed deliveries, shared initiative, and enemy instances.
+
+| Area | Entry points and responsibility | Details |
+| --- | --- | --- |
+| Aurora import and refresh | `src/bin/combat-sheet.rs`, `src/aurora.rs`, and `src/aurora/` resolve the save against ordered XML definitions. `launcher/RefreshBridge.cs` stages and applies an updated sheet. | [Import](#aurora-content-import) · [Re-import](#re-importing-a-character) |
+| Player combat and persistence | `src/combat.rs` projects the imported character. `src/combat/html.rs` embeds `src/combat/` HTML, CSS, and ordered JavaScript. `encounter.js` owns browser writes and undo. `src/session.rs` and the Rust combat modules provide a separate testable core. | [Combat sheet](#combat-sheet) · [Encounter tracking](#encounter-tracking) · [Backups and controls](#session-portability-and-combat-controls) |
+| Native launch and connection | `launcher/TrackerLauncher.cs` and `PartySession.cs` own file selection, lifecycle, and lobby generation. `src/bin/aurora-party.rs` and `src/bin/party_runtime/` handle loopback, LAN, credential storage, and publication. | [Launcher and transport](#windows-launcher-and-party-transport) |
+| Room protocol and storage | `src/party.rs` exposes `RoomService`. `src/party/` handles wire types, room state, persistence, and shared initiative. Player-side `src/combat/party*.js` modules publish allowed data and apply addressed updates through the sheet writer. | [Room service](#home-wi-fi-multiplayer) · [HP delivery](#recipient-owned-healing-and-temporary-hp) · [Shared turns](#shared-initiative-and-turn-boundaries) |
+| DM dashboard and library | `launcher/dm-dashboard.*`, `dm-initiative.js`, `dm-monster-actions.js`, and `dm-monsters.js` handle the DM view. `src/party/monster_actions.rs` owns recorded actions and counters. `src/monsters.rs` validates packs and snapshots. `monster_library.rs` in the party runtime installs and stores packs. `tools/` builds and audits the licensed inputs in `content/`. | [DM sharing](#dm-dashboard-and-sharing) · [Monster actions](#manual-monster-actions) · [Monster library](#offline-monster-library) |
+| Verification | `tests/` holds Rust integration tests and Playwright rehearsals. `tests/fixtures/` holds synthetic character, XML, and wire data. `launcher/build.cmd` assembles the Windows package. | [Development checks](development.md#validation-matrix) |
+
+### Regression boundaries
+
+- Player combat runs through the same handlers from Combat and Quick Actions. Preserve embedded script order and the browser writer's existing storage and undo behavior. [Combat controls](#session-portability-and-combat-controls)
+- Import reads Aurora sources as input. Keep stable IDs, pending resource adjustments, and saved progress when staging or applying refreshes. [Re-import](#re-importing-a-character) · [Consumables](#consumable-use)
+- Party state uses opaque IDs and revisioned commands. Keep recipient updates and consumption receipts atomic, and check privacy in serialized responses as well as rendered views. [Delivery and undo](#recipient-owned-healing-and-temporary-hp) · [DM sharing](#dm-dashboard-and-sharing)
+- Correcting the shared turn pointer is distinct from advancing a turn. Pack edits apply to future additions. Existing enemies carry immutable stat-block snapshots. [Shared turns](#shared-initiative-and-turn-boundaries) · [Monster library](#offline-monster-library)
+
 ## Planned desktop shell
 
-**Rust** owns the Aurora importer and encounter state. The importer turns a character save and its content definitions into data the app can use. The combat logic owns how damage, concentration, companion changes, and timed effects update an encounter. Keep this logic testable without opening the desktop window.
-
-**Tauri** provides the Windows window, native file dialogs, and a bridge from the UI to Rust. A Svelte click handler calls a named Rust command through `invoke()`. The command calls the core and returns the updated session view or an error through local inter-process communication.
-
-**Svelte and TypeScript** render the combat sheet and handle interactions such as opening a description or changing the layout. A change to encounter state, such as spending a scroll, goes through a Rust command.
-
-The shipped Windows workflow uses the Windows Forms launcher, the Rust importer and renderer, and a local browser sheet. The browser owns live encounter updates, undo, preferences, and backups. Rust remains the source of imported data and also provides the encounter model for the planned shell.
+The proposed Tauri shell would provide the window, file dialogs, and native bridge. Svelte and TypeScript would render the sheet and call named Rust commands through `invoke()`. The Rust combat core would handle session updates and return a view or error. Its tests can run without a desktop window. Use the shipped component map above for current changes.
 
 Aurora is the source of character build data. The tracker owns the session and layout, so re-import can update available options without resetting the fight. Companion behavior comes from imported definitions and editable cards. The Artillerist’s cannon exercises the same companion system as a ranger’s pet or a summon.
 
-## Planned home Wi-Fi multiplayer
+## Home Wi-Fi multiplayer
 
-The proposed Rust party helper connects each local player sheet to one host. Players own character mutations and choose what the DM may inspect. A DM host owns the shared encounter clock and monster instances. Manual play is the default, with optional attack assistance. The phased plan specifies the wire contract, visibility rules, delivery and undo semantics, monster pack sources, and acceptance checks. [Multiplayer and DM implementation plan](local-multiplayer-plan.md)
+P01 implements the host-side room authority in Rust. P02 connects helpers to it from the Windows launcher. Players own their character mutations and choose what the DM may inspect. The DM host owns the shared encounter clock and individual enemy records. [Multiplayer and DM implementation plan](local-multiplayer-plan.md)
+
+`party::RoomService` is the entry point for native dispatch. Call `execute` with a verified principal and a versioned JSON command. The native layer supplies local-host authority or an opaque pairing identity bound to a room and character. P02 owns credential protection, transport authentication, and mapping a verified connection to that identity. Create chooses the host mode. Join assigns a fresh member UUID. Only the local host of a DM room may write the shared round. Its first edit expects revision zero, and each subsequent edit must match the encounter ID and revision. This round is a display value. Turn-boundary mechanics belong to P06.
+
+`aurora-party init` initializes or reopens `%LOCALAPPDATA%\Aurora Combat Tracker\party.sqlite3`. An explicit database path supports isolated runs. SQLite schema version 1 stores a room snapshot, command journal, and per-member delivery streams. An immediate write transaction serializes competing commands and commits the room, addressed events, and command result together. The journal binds each room and command ID to its principal and typed request. Replaying a journaled command returns its original receipt or rejection. A disconnected sender can retry an outgoing action or grant end after resuming its lease. A storage failure rolls back the transaction and allows the same command to be retried.
+
+`poll` reads the current member projection and up to 128 events after that member's cursor from one database snapshot. Clients advance their cursor after processing each event. Offer events go only to the sender and recipient. `publish` replaces the owner's entire DM inspection in memory. A disconnect marks the last publication stale through the member's offline flag. Resume clears it for fresh publication. Leave, close, and host restart discard the applicable inspections. After restart each participant issues a fresh resume command. An old command retry only returns its saved result.
+
+Leaving expires pending HP offers involving that member. Closing expires every pending HP offer and ends membership. Either action preserves HP claims and receipts and ends outstanding or accepted attack grants for the affected members. A paired participant can still call `reconcile` for their addressed offers, and the original recipient can finish a claim. Reconciliation exposes offer status without the recipient's resulting HP or other character changes. The synthetic exchanges exercise the same Rust dispatch as the Windows helper. [Protocol examples](../tests/fixtures/party-exchanges.json)
+
+### Windows launcher and party transport
+
+The launcher starts `aurora-party serve` with its configuration on a private stdin pipe. The helper returns a fresh loopback capability on stdout and exits when the pipe closes. The launcher embeds that URL in the generated sheet on every refresh or opens a local DM lobby without running the importer. Party requests require the capability and the file origin (`null`). The helper's role determines which actions the view may call. Aurora refresh continues to use the launcher's separate bridge.
+
+A host binds TLS to one selected IPv4 address. An invitation carries the endpoint, room ID, protocol version, random admission secret, certificate and SHA-256 fingerprint. The guest's Rust HTTP client trusts the invited certificate for the party service name, connects to the advertised address, and disables redirects and proxies. It checks an existing room's saved fingerprint before changing endpoints. The LAN router accepts only the versioned party endpoint. Guests can join, resume, poll, leave, and exchange addressed offers. The host derives the paired principal from the guest's native bearer credential. Host and DM commands have a local dispatch path.
+
+The Windows user’s DPAPI key protects host keys, invitations and peer credentials in the launcher’s separate `party-bindings.sqlite3`. Bindings are scoped by local character path (or the DM profile) and room. Pending admissions retain the identity needed to retry. Explicit resume uses the last active binding. Retired bindings remain local for future receipt reconciliation. The host reuses its certificate and port on resume. A guest helper maintains a cursor-based long poll even when the sheet is closed. The host marks guests offline after ten seconds without renewal. The helper cursor tracks roster display within its process. Each sheet also persists its own cursor for mechanical clock deliveries.
+
+### Recipient-owned healing and temporary HP
+
+The room service routes offers and returns the offered amount, source and status to the two members involved. The recipient's sheet claims the offer before applying its existing owner healing or temporary HP rules. The encounter transaction writes the updated snapshot and the consumed offer ID into the same storage envelope. The browser sends acceptance after that write succeeds. Capped healing and a smaller temporary HP offer still get durable receipts. Undo restores the previous HP snapshot with the consumed ID intact. When an acknowledgment is lost, the sheet can resend it using the local receipt.
+
+Web Locks serialize the claim, local write and recipient decisions across tabs. Browsers without Web Locks use one active writer through an IndexedDB read-write transaction. Party delivery requires browser storage and one of these writer mechanisms. Both routes use the encounter transaction shared with local updates and backup restore.
+
+Version 1 backups omit the live receipt ledger. Restoring while attached invalidates the sheet capability at the local helper, preserves existing local receipts and records a restore marker to invalidate older tabs. Resume from the launcher to reattach. A claimed offer with no local receipt presents Apply offer, Already handled and Decline. The helper can also resume a closed room for addressed receipt reconciliation. Membership remains ended.
+
+### Casting and granting to party members
+
+Combat and Quick Actions use the same cast, point-spending and Protector handlers. The Rust projection identifies healing mechanics and target counts. The sheet collects the actual roll. Inside the encounter writer, `party-actions.js` resolves room and member IDs, applies local HP rules and stages one send command per remote target. One storage write commits costs, local effects and the outbox. The commands share an action ID and have independent retry IDs. Only a successful helper response retires a command. Reloaded sheets retry commands for their current membership.
+
+A committed outgoing action starts a new local undo history. Session → Party supports withdrawing pending offers and asking a recipient to reverse an accepted HP change. The recipient controls mechanical corrections. The sender can correct their own resources and turn counters.
+
+A grant offer carries its opaque grant ID, source label, weapon or spell category, attack and damage bonuses, stacking rule and end rule. The recipient selects an attack from their own sheet. Its local pin feeds the same modifier calculation as an owned assignment. Imported infusions use the highest matching bonus. Custom imbuements add their modifiers. The private selection and live grant bindings are excluded from portable backups.
+
+Source assignments live with the caster. Each encounter commit reconciles removal, replacement, linked-effect expiry and rest resets with the outbox. The room records ended grant IDs by issuer, so an end arriving before its send also prevents acceptance. A recipient reconciles the final addressed status after reconnect, recording an end receipt and removing the modifier from current state and retained undo snapshots.
+
+### DM dashboard and sharing
+
+The launcher packages the DM dashboard as HTML, CSS and JavaScript assets and writes a local view for Host as DM and DM resume. It uses the same loopback capability and room poll as the Party controls. The importer is bypassed for the DM. The overview AC preference stays in the DM browser. The overview and read-only inspector render text from the latest DM projection and clear revoked fields on the next poll.
+
+The player sheet stores the sharing choice locally by profile, room and member. An explicit allowlist builds the publication from current encounter state, effective combat stats and the rendered rules for the permitted categories. The browser coalesces redraw events and skips identical publications within a connection session. It reads the current choice and sheet state under the encounter writer before sending. An open sheet republishes after resume using the current choice.
+
+The guest helper attaches a sequence number to each typed publication. The host assigns a new publication session on resume and holds the latest sequence and inspection in memory. This prevents a delayed request from restoring withdrawn fields after a downgrade or reconnect. The published values stay out of the command journal, events, backups and SQLite room snapshot. The host's DM projection is the only response with inspections. The loopback guest response exposes the player's own publication session and the public roster, while leave removes the inspection from memory.
+
+### Shared initiative and turn boundaries
+
+The DM dashboard and the player’s Initiative dialog send revisioned edits to the Rust room service. A transaction commits the encounter, command receipt and addressed clock events together. A repeated command ID returns the original result. An edit based on an older encounter ID or revision asks the caller to refresh. Named saves capture row IDs, tie order, round and current actor. Ending pauses that position. New encounter clears the working roster. A player leaving also leaves saved rosters in that room.
+
+Each enemy is an independent instance. Grouping copies the selected score to enemies with the same private name, preserving their IDs, HP and notes. The host builds the player projection before transmission. Hidden rows expose an opaque ID and “DM turn.” Revealing a row shares its alias and initiative. The DM projection alone contains the enemy record.
+
+The host sends a clock delivery to each participating sheet, mapping its member and companion IDs to local turn keys. Starting enters the first turn. Next Turn applies the outgoing end, a six-second rollover when appropriate, and the incoming start through the same boundary functions as solo initiative. A manual time advance uses the existing duration functions. Pointer corrections and named-position resumes carry position only.
+
+The sheet consumes clock deliveries in cursor order under the encounter writer. One storage write commits the mechanical changes and the room/member cursor and starts a new undo history. The sheet keeps its solo roster and saves its solo pointer while the DM controls initiative. A backup exports the solo pointer. On reattachment, the last consumed delivery can supply the shared position without repeating its effects. The owner can explicitly restore fields changed by the latest mechanical clock update if those values still match the recorded result. This leaves the authoritative turn and delivery cursor intact.
+
+### Offline monster library
+
+The launcher packages the Monster library alongside the DM initiative controls. The DM helper stores packs in `monster-library.sqlite3` under launcher app data. The helper exposes the library through the DM’s loopback capability. Pack data stays on the DM machine. Only the DM projection includes enemy stat blocks.
+
+The native pack envelope has `schema_version`, `info` and `monsters`. Rust reads v1 and v2 into a common stat block, with optional fields defaulting to unknown and numeric zero preserved. V1 installs retain their schema when read, edited or exported. New homebrew and Aurora imports use v2. Existing room rows can be template-free, and an unversioned snapshot reads as v1. New v2 snapshots record their version. Unknown majors fail at the typed reader. The library continues to use the same SQLite table.
+
+V2 adds optional pack license and per-template source entry, page, section and version. It preserves mixed sizes, alignment, printed initiative score and modifier, conditional AC alternatives, proficiency bonus, XP, gear, qualified stat notes, legendary preambles and ordered sections. Movement, senses and qualified defenses retain their published wording. The DM reader sorts numeric CR filters by fraction and uses the printed initiative score as the editable Add default. It initializes encounter AC from the base value.
+
+Each rule keeps its template-scoped ID and full text. V2 can attach a save ability and DC with explicit full, half or zero damage branches, and a legendary action can carry its cost. Existing range, damage components, use/reset and recharge fields carry forward. V2 damage dice accept one term of 1–100 dice with 2–1,000 sides and an optional signed modifier up to 10,000. Use the rules text and an optional manual note for unresolved riders. V2 multiattack can reference up to 32 ordinary leaf actions in order, including repeats. Rust rejects missing and cyclic references before installing either pack version. The stat block and action descriptions are independent of party state and can also describe player-owned companions. Companion cards retain their own IDs, live stats, turns, commands, durations, edits and undo.
+
+Replacing a pack requires the installed revision shown in the conflict preview. The save validates the entire pack and uses one conditional SQLite write. Separate pack IDs distinguish editions with the same creature names. Add to encounter creates up to 100 independent rows in one room transaction, each with a private immutable copy of the selected template and installed revision. Instance edits, named rosters and helper restart retain the snapshot, including after a pack update.
+
+Aurora folder import reads selected XML files in relative-path order and uses the existing content index to resolve creature-shaped Companion definitions, appends and linked rules without loading a character. It keeps the source entry ID and published version where available. Supported literal stats become structured values. Formulae, unresolved links and imported action text remain readable for table adjudication. The importer reads the selected files without modifying them.
+
+#### Bundled English SRD monster packs
+
+One converter builds the native v2 packs for SRD 5.1 (2014) and SRD 5.2.1 (2024), using edition-specific pinned Borealis inputs and the English Creative Commons PDFs. It checks SHA-256, joins stable IDs to the official entry and page ledgers, applies reviewed corrections, and writes deterministic JSON in official order. Rule IDs use the category and base name. The source audits check printed rule text and the fields used for encounter initialization. [2014 source review](srd51-pack.md) · [2024 source review](srd521-pack.md)
+
+The Windows helper embeds and validates both packs through the Rust reader used for imported packs. On the first DM library request it independently installs each missing pack ID. The conditional inserts allow concurrent opens and preserve installed packs and local replacements. The 2014 pack remains the default. The library labels results with the selected pack's edition. DM initiative and the stat-block inspector read the edition and published source from each instance snapshot. Installing or replacing a pack leaves the copied snapshot and its SQLite installation revision intact.
+
+Entries initialize encounter HP and unconditional AC. The 2024 preview also carries the printed initiative modifier and score as distinct fields and uses the score as the editable Add default. Alternative sizes participate in each applicable size filter. The bundled rules use full readable text for table adjudication, including conditional riders, save branches, multiattack substitutions, and lair use limits. **Pack credits** and exported metadata carry attribution, upstream provenance, and CC BY 4.0 license references. The Windows package includes both notices files beside the executables.
+
+### Manual monster actions
+
+The Host as DM dashboard opens the acting enemy's rules beside initiative and allows a selected enemy's reaction or legendary action to be entered out of turn. The browser keeps a preview local and supplies stable action and strike UUIDs on commit. Rust validates the source, ordered strike rules, targets and available costs, then stores the action and its cost in the same revisioned room transaction. Ordered template strikes can repeat and each has its own target. A text-only rule can use manually added strikes. The existing command receipt handles retries. Recorded totals, rulings, target details and counters appear only in the DM projection.
+
+Action state lives with the initiative row and defaults to fresh values for older rows. Template snapshots retain the printed rules. The DM can configure a text-only cost, limited-use reset, recharge threshold or legendary budget and can correct current counters without rewriting a past action. Legendary capacity is entered per enemy because the printed capacity can depend on its circumstances. The DM adjudicates reaction triggers, legendary timing and situational rules at the table. Named saves preserve the entire action state, including queued recharge rolls. Duplication copies configured counters, drops queued rolls and starts an empty history under a new row ID. The dashboard shows the latest 20 records per enemy.
+
+The same turn operation that creates the P06 clock events processes enemy recovery in outgoing end, round advance and incoming start order. Ordinary action slots recover at the start of the enemy's turn. A queued recharge roll is consumed at that start and its result is retained. Limited uses and legendary budgets can recover at own start, own end or a round advance. Rests and unrecognized reset wording use manual correction. Pointer corrections, named-position resumes and elapsed seconds leave per-turn counters alone. Manual rulings leave player HP and reactions with their owners.
+
+#### Delivering a final damage amount
+
+The DM records the strike first and then confirms its final amount in Recorded actions. The host resolves the chosen player to a room member at recording time, including members who have yet to submit initiative. It uses the strike UUID as the wire action ID and stores the parent action, strike and offer linkage in a room-level ledger. Finalizing a strike and sending its offer commit together. The ledger survives named-roster loads so an earlier snapshot cannot reissue a finalized strike. Misses, zero amounts and results handled at the table create no offer. Non-player targets are resolved at the table.
+
+The addressed offer reuses `Effect::Damage` and carries a generic DM label, the final amount, an opaque strike ID and receipt status. Damage is created through the DM initiative command. Generic launcher sends still reject damage. The room's DM-only projection links offers to recorded strikes, and the dashboard's Party section lets the DM withdraw pending offers or request a recipient correction. A recipient using an older sheet needs the updated package to see damage offers.
+
+The player claims damage through the same writer and receipt path as healing. The local damage form and party acceptance share `concentrationControls.applyDamage`: temporary HP absorbs damage first, the original final amount drives the concentration DC under the owner's saved rules, reaching zero ends concentration, and the damage log commits with the receipt. Missing HP blocks application and leaves the offer available. Undo restores HP, concentration and log state while retaining the receipt. An already claimed offer stays recoverable after browser or room closure.
 
 ## Aurora content import
 

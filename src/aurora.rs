@@ -8,6 +8,8 @@ use std::{
 use roxmltree::{Document, Node};
 
 mod content;
+mod monster_import;
+pub use monster_import::import_monster_pack;
 mod currency;
 mod profile;
 mod rolls;

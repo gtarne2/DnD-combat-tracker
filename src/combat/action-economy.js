@@ -9,6 +9,7 @@ const actionEconomy = (() => {
   function turnKey(state, actor) {
     if (actor === "owner") return actor;
     const card = state.companions?.cards.find((card) => `companion:${card.id}` === actor);
+    if (card && state.progress?.partyClock) return state.progress.partyClock.separate.includes(card.id) ? actor : "owner";
     return card?.turn === "owner" ? "owner" : actor;
   }
 
@@ -120,5 +121,5 @@ const actionEconomy = (() => {
     });
   };
   document.addEventListener("preview-encounter-change", render);
-  return {timing, override, reason, spend, reset, open, render};
+  return {turnKey, timing, override, reason, spend, reset, open, render};
 })();

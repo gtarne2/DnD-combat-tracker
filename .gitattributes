@@ -1,0 +1,5 @@
+/content/srd51/upstream/** -text
+/content/srd51/entries.tsv text eol=lf
+/content/srd521/upstream/** -text
+/content/srd521/entries.tsv text eol=lf
+/content/monster-packs/** text eol=lf

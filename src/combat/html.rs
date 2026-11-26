@@ -264,8 +264,10 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("session-view.js"));
     html.push_str(include_str!("preferences.js"));
     html.push_str(include_str!("encounter.js"));
+    html.push_str(include_str!("party-actions.js"));
     html.push_str(include_str!("action-economy.js"));
     html.push_str(include_str!("companions.js"));
+    html.push_str(include_str!("party-initiative.js"));
     html.push_str(include_str!("turns.js"));
     html.push_str(include_str!("effects.js"));
     html.push_str(include_str!("consumables.js"));
@@ -283,6 +285,8 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("encounter-library.js"));
     html.push_str(include_str!("journal.js"));
     html.push_str(include_str!("session-files.js"));
+    html.push_str(include_str!("party-sharing.js"));
+    html.push_str(include_str!("party.js"));
     html.push_str(include_str!("import-report.js"));
     html.push_str("</script></body></html>");
     html
@@ -673,6 +677,9 @@ fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGrou
         ("data-save-dc", detail("Save DC")),
     ] {
         roll_attribute(html, name, value);
+    }
+    if spell.healing || healing.is_some() {
+        html.push_str(" data-healing-cast");
     }
     if !spell.incoming_events.is_empty() {
         roll_attribute(html, "data-incoming-events", Some(spell.incoming_events));

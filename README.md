@@ -5,16 +5,21 @@ A personal Windows companion app for characters built in Aurora. It brings attac
 - [User requirements](docs/requirements.md)
 - [Architecture](docs/architecture.md)
 - [Windows development and workflow](docs/development.md)
+- [Shared agent instructions](AGENTS.md) · [Current development handoff](docs/handoff.md)
 
 ## Open the tracker on Windows
 
 Extract the Windows package and double-click **Aurora Combat Tracker.exe**.
-If you are running from source, first run `cargo build --release --bin combat-sheet`
+If you are running from source, first run `cargo build --release --bins`
 and `.\launcher\build.cmd`, then open the launcher in `target\release`.
 
 1. Click **Browse** and select your Aurora `.dnd5e` save.
 2. Click **Add folder** to scan a parent folder and all its subfolders for XML each time you open the sheet. You can also use **Add files** for individual XML files or open the sheet with the save alone. Files inside a folder load in path order. To give an override priority, add it separately and move it below the folder.
 3. Click **Open Combat Sheet** to open it in your default browser.
+
+For multiplayer, open **Party…** in the launcher. Choose **Host Party** with a character or **Host as DM** for a lobby without a save. Select the host's Wi-Fi adapter. In **Session → Party** (or the DM lobby), click **Copy invite**. Each player selects their character, chooses **Party… → Join**, and pastes the invitation. Use **Resume party** or **Resume DM room** after restarting the launcher.
+
+In **Host as DM**, open **Monster library** to search the bundled SRD packs offline. The library opens on **2014 (SRD 5.1)**. Choose **2024 (SRD 5.2.1)** from Pack to use the newer rules in the same encounter. Select a creature to preview its rules and add it to initiative. **Pack credits** shows the source and license. [2014 notices](content/monster-packs/SRD-5.1-NOTICES.txt) · [2024 notices](content/monster-packs/SRD-5.2.1-NOTICES.txt)
 
 Supported cantrips show their dice at your character's level. Choose a slot in the cast dialog to
 preview supported damage, healing, or projectile counts. Class features can use imported counters

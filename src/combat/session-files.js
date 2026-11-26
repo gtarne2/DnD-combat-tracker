@@ -88,7 +88,35 @@
       const spent = JSON.parse(localStorage.getItem(`aurora-combat-consumables-v1:${profile}`));
       if (spent) data.encounter = {spent};
     }
+    data.encounter = portableEncounter(data.encounter);
     return data;
+  }
+
+  function portableEncounter(encounter) {
+    if (!encounter) return encounter;
+    function portableSnapshot(snapshot) {
+      const copy = {...snapshot};
+      delete copy.partyDelivery;
+      if (copy.progress) {
+        copy.progress = {...copy.progress};
+        if (copy.progress.partyClock) {
+          Object.assign(copy.progress, copy.progress.partyClock.solo);
+          delete copy.progress.partyClock;
+        }
+        delete copy.progress.partyGrants;
+        delete copy.progress.partyAssignments;
+      }
+      return copy;
+    }
+    const portable = portableSnapshot(encounter);
+    if (portable.undo) portable.undo = portable.undo.map(entry => {
+      const copy = portableSnapshot(entry);
+      if (copy.before) {
+        copy.before = portableSnapshot(copy.before);
+      }
+      return copy;
+    });
+    return portable;
   }
 
   function summary(data) {
@@ -138,27 +166,35 @@
   byId("confirm-restore-session").onclick = () => {
     const backup = pending?.backup;
     if (!backup) return;
-    const restore = () => {
+    const restore = async () => {
       const previous = new Map();
       try {
+        const partyUrl = document.body.dataset.partyUrl;
+        if (partyUrl) {
+          const detached = await fetch(partyUrl + "/detach", {method: "POST", cache: "no-store", referrerPolicy: "no-referrer"});
+          if (!detached.ok) throw new Error("Could not detach the party. Resume it or open the sheet in solo mode before restoring.");
+        }
         for (const [part, key] of Object.entries(keys)) {
           previous.set(key, localStorage.getItem(key));
-          const value = backup.data[part];
+          let value = backup.data[part];
+          if (part === "encounter") {
+            const ledger = JSON.parse(previous.get(key))?.partyDelivery;
+            value = {...portableEncounter(value), partyDelivery: {receipts: {}, ...ledger, restoreEpoch: crypto.randomUUID()}};
+          }
           if (value === null && part !== "encounter") localStorage.removeItem(key);
           else localStorage.setItem(key, ["journal", "notes"].includes(part) ? value : JSON.stringify(value ?? {}));
         }
         sessionView.suspend();
         location.reload();
-      } catch {
+      } catch (error) {
         for (const [key, value] of [...previous].reverse()) {
           try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch {}
         }
-        status.textContent = "Could not write the backup to browser storage.";
+        status.textContent = "Could not restore the backup. " + error.message;
       }
     };
-    if (navigator.locks && profile) navigator.locks.request(keys.encounter, restore).catch(() => {
+    previewEncounter.withWriter(restore, Boolean(document.body.dataset.partyUrl)).catch(() => {
       status.textContent = "Could not lock this tracker session for restore.";
     });
-    else restore();
   };
 })();

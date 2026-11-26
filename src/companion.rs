@@ -322,14 +322,14 @@ fn read_template(
     details
 }
 
-fn hp_number(value: &str) -> Option<u32> {
+pub(crate) fn hp_number(value: &str) -> Option<u32> {
     if let Ok(number) = value.parse() {
         return Some(number);
     }
     value.split_once(" (")?.0.parse().ok()
 }
 
-fn setter(source: &ContentDefinition, name: &str) -> Option<String> {
+pub(crate) fn setter(source: &ContentDefinition, name: &str) -> Option<String> {
     source
         .element
         .children_named("setters")
@@ -351,7 +351,7 @@ fn cannon_setter(
     setter(variant, name).or_else(|| setter(parent, name))
 }
 
-fn description(source: &ContentDefinition) -> String {
+pub(crate) fn description(source: &ContentDefinition) -> String {
     let full: Vec<_> = source
         .element
         .children_named("description")

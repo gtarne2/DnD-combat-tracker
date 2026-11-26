@@ -5,4 +5,6 @@ pub mod concentration;
 pub mod effects;
 pub mod encounter;
 pub mod inventory;
+pub mod monsters;
+pub mod party;
 pub mod session;

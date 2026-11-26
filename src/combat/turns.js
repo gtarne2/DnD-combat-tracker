@@ -59,6 +59,7 @@ const encounterTracker = (() => {
   }
 
   function turns(state) {
+    if (state.progress?.partyClock) return partyInitiative.rows(state);
     const companions = state.companions || {owner: null, cards: []};
     const result = [];
     const shared = companions.cards.filter((card) => card.turn === "owner" && companionControls.available(card))
@@ -81,10 +82,10 @@ const encounterTracker = (() => {
     return [...all.values()].filter((resource) => includeRemoved || !progress.removedResources?.includes(resource.key));
   }
 
-  function initialHp() {
-    const match = /^(\d+)(?:\s*\/\s*(\d+)|(?:\s+max)?)$/i.exec(hpBaseline.trim());
+  function initialHp(baseline = hpBaseline) {
+    const match = /^(\d+)(?:\s*\/\s*(\d+)|(?:\s+max)?)$/i.exec(baseline.trim());
     if (!match) return null;
-    return {current: Number(match[1]), max: match[2] ? Number(match[2]) : /max$/i.test(hpBaseline) ? Number(match[1]) : null};
+    return {current: Number(match[1]), max: match[2] ? Number(match[2]) : /max$/i.test(baseline) ? Number(match[1]) : null};
   }
   function displayHp(hp) {
     return hp == null ? "Unavailable" : hp.max == null ? String(hp.current) : `${hp.current} / ${hp.max}`;
@@ -109,13 +110,15 @@ const encounterTracker = (() => {
     paintKeyHp(progress);
     if (signature === lastRender) return;
     lastRender = signature;
+    const sharedClock = Boolean(progress.partyClock);
     const running = progress.active !== false;
     const active = running ? rows.find((row) => row.key === progress.current) || rows[0] : null;
     byId("round-number").textContent = running ? `Round ${progress.round}` : "Encounter inactive";
-    byId("current-turn").textContent = !running ? "" : rows.length > 1 ? "Turn: " + active.name : "Solo turn";
+    byId("current-turn").textContent = !running ? "" : rows.length > 1 || sharedClock ? "Turn: " + active.name : "Solo turn";
     byId("current-turn").hidden = !running;
-    byId("end-encounter").hidden = !running;
-    byId("next-turn").hidden = !running;
+    byId("encounter-owner").hidden = byId("combatant-panel").hidden = sharedClock;
+    byId("end-encounter").hidden = !running || sharedClock;
+    byId("next-turn").hidden = !running || sharedClock;
     byId("start-encounter").hidden = running;
     const lastAttack = byId("last-attack");
     lastAttack.hidden = !progress.lastAttack;
@@ -252,7 +255,7 @@ const encounterTracker = (() => {
 
   function reconcileCurrent(state) {
     const progress = state.progress;
-    if (!progress?.current) return;
+    if (!progress?.current || progress.partyClock) return;
     const rows = turns(state);
     if (!rows.some((row) => row.key === progress.current)) progress.current = rows[0]?.key || null;
   }
@@ -264,7 +267,7 @@ const encounterTracker = (() => {
     const title = byId("end-encounter-name").value.trim();
     byId("end-encounter-name").value = "";
     update((progress, state) => {
-      if (progress.active === false) return false;
+      if (progress.active === false || progress.partyClock) return false;
       delete progress.spellTurnReminder;
       const archives = progress.archives ||= [];
       archives.push({id: ++progress.sequence, at: new Date().toISOString(), title: title || `Encounter ${archives.length + 1}`,
@@ -287,25 +290,28 @@ const encounterTracker = (() => {
       return "starting a new encounter";
     });
   });
+  function enterTurn(state, from, to, wrap) {
+    const progress = state.progress;
+    delete progress.spellTurnReminder;
+    progress.turnSequence = (progress.turnSequence || 0) + 1;
+    if (from) effectControls.boundary(state, "end", from);
+    progress.current = to;
+    if (wrap) {
+      progress.round += 1;
+      effectControls.advanceRounds(state, 1, {initiative:true});
+    }
+    reconcileCurrent(state);
+    actionEconomy.reset(state, progress.current);
+    effectControls.boundary(state, "start", progress.current);
+  }
+
   byId("next-turn").addEventListener("click", () => {
     update((progress, state) => {
-      if (progress.active === false) return false;
-      delete progress.spellTurnReminder;
+      if (progress.active === false || progress.partyClock) return false;
       const rows = turns(state);
       const index = Math.max(0, rows.findIndex((row) => row.key === progress.current));
       const wrap = index === rows.length - 1;
-      progress.turnSequence = (progress.turnSequence || 0) + 1;
-      effectControls.boundary(state, "end", rows[index].key);
-      progress.current = rows[wrap ? 0 : index + 1].key;
-      if (wrap) {
-        progress.round += 1;
-        effectControls.advanceRounds(state, 1, {initiative: true});
-      }
-      reconcileCurrent(state);
-      if (progress.current) {
-        actionEconomy.reset(state, progress.current);
-        effectControls.boundary(state, "start", progress.current);
-      }
+      enterTurn(state, rows[index].key, rows[wrap ? 0 : index + 1].key, wrap);
       return wrap ? "advancing to round " + progress.round : "advancing the turn";
     });
   });
@@ -545,6 +551,15 @@ const encounterTracker = (() => {
     progress.hp = {...hp, current, temporary};
     return true;
   }
+  function temporaryHp(hp, amount) {
+    return Math.max(hp.temporary || 0, amount);
+  }
+  function grantOwnerTemporaryHp(progress, amount) {
+    const hp = progress.hp || initialHp();
+    if (!hp || temporaryHp(hp, amount) === (hp.temporary || 0)) return false;
+    progress.hp = {...hp, temporary: temporaryHp(hp, amount)};
+    return true;
+  }
   document.addEventListener("preview-stat-overrides", () => { hpBaseline = keyHp(); render(); });
   document.addEventListener("preview-encounter-change", render);
   render();
@@ -584,11 +599,10 @@ const encounterTracker = (() => {
         hpForm.elements.current.focus();
         return false;
       }
-      if (amount <= (hp.temporary || 0)) {
+      if (!grantOwnerTemporaryHp(progress, amount)) {
         byId("encounter-status").textContent = `Kept ${hp.temporary} temporary HP.`;
         return false;
       }
-      progress.hp = {...hp, temporary: amount};
       byId("encounter-status").textContent = `Gained ${amount} temporary HP.`;
       return "gaining temporary HP";
     });
@@ -607,6 +621,6 @@ const encounterTracker = (() => {
       return "attacking with " + name;
     });
   }
-  return {damageOwner, healOwner, hpAdjustment, spendResource, restoreResource, recordAttack, hp: (state) => state.progress?.hp || initialHp(),
+  return {enterTurn,damageOwner, healOwner, temporaryHp, grantOwnerTemporaryHp, hpAdjustment, spendResource, restoreResource, recordAttack, hp: (state, baseline) => state.progress?.hp || initialHp(baseline),
     update, ownerName: baseline.dataset.owner, turns, resources: (state, includeRemoved) => resourceList(get(state), includeRemoved)};
 })();

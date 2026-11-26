@@ -12,16 +12,18 @@ internal sealed class RefreshBridge : IDisposable
     private readonly string token = Guid.NewGuid().ToString("N");
     private readonly Func<string, Task<string>> generate;
     private readonly string previews;
+    private readonly string partyUrl;
     private string preview;
     private string pending;
     private string stagedRevision;
     private bool stopped;
     public string Url { get; private set; }
 
-    internal RefreshBridge(string previews, Func<string, Task<string>> generate)
+    internal RefreshBridge(string previews, Func<string, Task<string>> generate, string partyUrl = null)
     {
         this.previews = previews;
         this.generate = generate;
+        this.partyUrl = partyUrl;
         listener.Start();
         Url = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port + "/" + token;
     }
@@ -43,7 +45,8 @@ internal sealed class RefreshBridge : IDisposable
         {
             generated = await generate(directory);
             var html = File.ReadAllText(generated, Encoding.UTF8).Replace("<body data-profile=",
-                "<body data-refresh-url=\"" + Url + "\" data-refresh-revision=\"" + revision + "\" data-profile=");
+                "<body " + (partyUrl == null ? "" : "data-party-url=\"" + WebUtility.HtmlEncode(partyUrl) + "\" ")
+                + "data-refresh-url=\"" + Url + "\" data-refresh-revision=\"" + revision + "\" data-profile=");
             var destination = Path.Combine(previews, Path.GetFileName(generated));
             if (preview != null && preview != destination)
                 throw new InvalidOperationException("The Aurora save resolved to a different tracker session.");

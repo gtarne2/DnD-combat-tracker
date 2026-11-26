@@ -66,6 +66,18 @@
 </dialog>
 <dialog id="encounter-settings" aria-labelledby="encounter-settings-heading">
   <div class="dialog-heading"><h2 id="encounter-settings-heading">Manage initiative</h2><form method="dialog"><button>Close</button></form></div>
+  <button id="resume-solo-initiative" type="button" hidden>Resume solo initiative</button>
+  <section id="party-initiative" hidden aria-label="Party initiative">
+    <h3>Party initiative</h3>
+    <form class="focus-form">
+      <label>Your initiative <input type="number" name="score" min="-2147483648" max="2147483647" required></label>
+      <div class="party-companions"></div>
+      <button>Submit initiative</button>
+    </form>
+    <button type="button" class="party-leave" hidden>Leave encounter</button>
+    <button type="button" class="clock-repair" hidden title="Restore timers and turn actions changed by the last clock update. Keep the current DM turn.">Restore my last clock outcomes</button>
+    <p role="status"></p>
+  </section>
   <div class="initiative-list"><ol id="turn-order"></ol></div>
       <form class="focus-form" id="encounter-owner">
         <label>Your initiative <input name="initiative" type="number" min="-2147483648" max="2147483647"></label>

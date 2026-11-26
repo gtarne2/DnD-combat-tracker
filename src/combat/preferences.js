@@ -237,6 +237,7 @@ const layoutPreferences = (() => {
     pinnedResources: () => pinnedResources,
     setPinnedResources: (keys) => { pinnedResources = keys; savePreferences("Resource pins saved."); },
     statOverride: (key) => overrides.get(key),
+    sharedStat: (key) => readPreferences().overrides?.[key] || originalStats.get(key),
     inspectorSplit,
     setInspectorSplit(value) {
       inspectorSplit = value;

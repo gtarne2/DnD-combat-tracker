@@ -34,7 +34,11 @@ async function main() {
   }
   try {
     const page = await newProfile();
-    const companionsUrl = generate(fixture("companions.dnd5e"), fixture("companions.xml"));
+    const companionsSave = path.join(directory,"companions.dnd5e");
+    const companionsXml = path.join(directory,"companions.xml");
+    fs.copyFileSync(fixture("companions.dnd5e"),companionsSave);
+    fs.copyFileSync(fixture("companions.xml"),companionsXml);
+    const companionsUrl = generate(companionsSave,companionsXml);
     await page.goto(companionsUrl);
     await page.getByRole("button", {name: "Create Force Ballista", exact: true}).click();
     const cannon = page.locator(".companion-card").filter({hasText: "Force Ballista"});
@@ -158,6 +162,37 @@ async function main() {
     await library.getByRole("button", {name: "Close"}).click();
     await owl.waitFor();
     console.log("Separate round timers, companion effect cleanup, effect presets, and roster reuse passed.");
+
+    await page.locator("#companion-template").selectOption("ID_TEST_WARDEN_HOUND");
+    await page.getByRole("button",{name:"Add companion",exact:true}).click();
+    await companionForm.getByRole("button",{name:"Save companion"}).click();
+    const hound = page.locator(".companion-card").filter({hasText:"Warden Hound"});
+    const houndSummary = hound.locator("summary").first();
+    const houndId = await hound.getAttribute("data-companion-id");
+    const cannonId = await cannon.getAttribute("data-companion-id");
+    await houndSummary.click();
+    await hound.getByText("With owner",{exact:true}).waitFor();
+    await hound.getByRole("button",{name:"Edit Warden Hound",exact:true}).click();
+    await companionForm.getByLabel("Command costs").fill("Uses the owner's action (table note)");
+    await companionForm.getByRole("button",{name:"Save companion"}).click();
+    await hound.getByLabel("HP adjustment").fill("11");
+    await hound.getByRole("button",{name:"Damage",exact:true}).click();
+    await expectText(houndSummary,"HP 0 / 11");
+    await hound.getByRole("button",{name:"Track turn actions: Warden Hound"}).waitFor();
+    await page.locator("#undo-turn").click();
+    await expectText(houndSummary,"HP 11 / 11");
+    fs.writeFileSync(companionsXml,fs.readFileSync(companionsXml,"utf8")
+      .replace("Action to command","Revised import command")
+      .replace('<set name="hp">11</set>','<set name="hp">13</set>'));
+    assert.equal(generate(companionsSave,companionsXml),companionsUrl);
+    await page.reload();
+    await expectText(houndSummary,"HP 11 / 11");
+    assert.equal(await hound.getAttribute("data-companion-id"),houndId);
+    assert.equal(await cannon.getAttribute("data-companion-id"),cannonId);
+    assert.equal(await hound.getByText("Uses the owner's action (table note)",{exact:true}).count(),1);
+    await expectText(cannon.locator("summary").first(),"Expired");
+    await quick.waitFor({state:"detached"});
+    console.log("Imported companion re-import, owner turn, zero HP, local edits and undo passed.");
 
     const save = path.join(directory, "synthetic.dnd5e");
     const xml = fixture("combat-sheet.xml");
