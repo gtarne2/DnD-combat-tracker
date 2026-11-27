@@ -1,0 +1,3 @@
+#!/bin/sh
+# App bundle entry point: the player launcher (pick a character, join a party, open the sheet).
+exec "$(dirname "$0")/aurora-party" player
