@@ -2,6 +2,9 @@
 import OBR from "./obr-sdk-3.1.0.js";
 import { CHANNEL, TEMPLATE, buildTemplate, drawSpec, isShape, pixelsPerFoot, placement, tokenCells, validSpec } from "./templates.js";
 import { loadMatches } from "./players.js";
+import { outline, rowsInside } from "./inside.js";
+
+const LINK = "com.aurora-tracker/link";
 
 const DRAWN = "aurora-obr-drawn:";
 /** How long the caster's extension has to draw a template before the DM's extension does. */
@@ -38,8 +41,8 @@ export async function syncTemplates(table, now = Date.now()) {
   const notes = [];
   const todo = wanted.filter((t) => !drawn.has(t.id));
   if (todo.length) {
-    const tokens = await OBR.scene.items.getItems((item) => item.metadata?.["com.aurora-tracker/link"]?.room === room);
-    const byRow = new Map(tokens.map((item) => [item.metadata["com.aurora-tracker/link"].row, item]));
+    const tokens = await OBR.scene.items.getItems((item) => item.metadata?.[LINK]?.room === room);
+    const byRow = new Map(tokens.map((item) => [item.metadata[LINK].row, item]));
     const dpi = await OBR.scene.grid.getDpi();
     const perFoot = pixelsPerFoot(dpi, await OBR.scene.grid.getScale());
     const matches = loadMatches(room);
@@ -84,4 +87,36 @@ export function listenForDraws() {
     if (existing.length) return;
     await OBR.scene.items.addItems([buildTemplate(spec)]);
   });
+}
+
+/**
+ * DM side, stage O4. Which rows each drawn template covers, by the half-square rule.
+ * Returns {reports, note}; reports are [{template, rows}] for the helper.
+ */
+export async function insideReports(table) {
+  if (!(await OBR.scene.isReady())) return { reports: [], note: null };
+  if ((await OBR.scene.grid.getType()) !== "SQUARE") {
+    return { reports: [], note: "Who is inside a template works on square grids only." };
+  }
+  const room = table.room_id;
+  const templates = new Map((table.encounter.templates || []).map((t) => [t.id, t]));
+  const rows = new Set(table.encounter.rows.map((row) => row.id));
+  const drawings = await OBR.scene.items.getItems((item) => item.metadata?.[TEMPLATE]?.room === room);
+  if (!drawings.length) return { reports: [], note: null };
+  const tokens = await OBR.scene.items.getItems((item) => item.metadata?.[LINK]?.room === room && rows.has(item.metadata[LINK].row));
+  const dpi = await OBR.scene.grid.getDpi();
+  const reports = [];
+  for (const drawing of drawings) {
+    const template = templates.get(drawing.metadata[TEMPLATE].id);
+    if (!template) continue;
+    const creatures = tokens.map((token) => ({
+      row: token.metadata[LINK].row,
+      position: token.position,
+      cells: tokenCells(token),
+      caster: token.metadata[LINK].row === template.caster,
+    }));
+    const inside = rowsInside(outline(drawing), creatures, dpi, { skipCaster: template.shape === "emanation" });
+    reports.push({ template: template.id, rows: [...new Set(inside)].sort() });
+  }
+  return { reports, note: null };
 }
