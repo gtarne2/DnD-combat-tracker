@@ -4,11 +4,22 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+
+// Version details for the file's Properties page. An unsigned exe with blank details looks more
+// like throwaway malware to antivirus heuristics, so the launcher says what it is.
+[assembly: AssemblyTitle("Aurora Combat Tracker")]
+[assembly: AssemblyDescription("Launcher for the Aurora Combat Tracker D&D 5e combat sheet and LAN party room")]
+[assembly: AssemblyProduct("Aurora Combat Tracker")]
+[assembly: AssemblyCompany("Aurora Combat Tracker")]
+[assembly: AssemblyCopyright("Personal project")]
+[assembly: AssemblyVersion("0.1.0.0")]
+[assembly: AssemblyFileVersion("0.1.0.0")]
 
 internal sealed class TrackerLauncher : Form
 {
