@@ -25,6 +25,18 @@
     <p id="concentration-last" class="focus-feedback" hidden></p>
   </div>
 </section>
+<dialog id="concentration-reminder" aria-labelledby="concentration-reminder-heading">
+  <div class="dialog-heading"><h2 id="concentration-reminder-heading">Concentration check</h2></div>
+  <p class="reminder-dc"><strong id="concentration-reminder-dc"></strong></p>
+  <p id="concentration-reminder-detail"></p>
+  <p id="concentration-reminder-bonus" class="hint"></p>
+  <p class="hint">Roll the save yourself, then record the result.</p>
+  <div class="focus-form companion-edit-actions">
+    <button type="button" data-reminder-later>Later</button>
+    <button type="button" data-save-result="failure">Lost concentration</button>
+    <button type="button" data-save-result="success">Kept concentration</button>
+  </div>
+</dialog>
 <dialog id="damage-dialog" aria-labelledby="damage-heading">
   <div class="dialog-heading"><h2 id="damage-heading">Record damage</h2><form method="dialog"><button>Cancel</button></form></div>
   <p id="damage-hp"></p>

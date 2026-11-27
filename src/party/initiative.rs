@@ -64,6 +64,9 @@ pub struct AreaTemplate {
     /// caster's colour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub colour: Option<String>,
+    /// Map look, such as "fire" or "mist", which picks the texture and outline style.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look: Option<String>,
     /// The caster's companion the template is centred on, by its sheet ID, such as a
     /// Protector cannon's aura. None centres it on the caster.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -198,6 +201,9 @@ fn valid_template(template: &AreaTemplate) -> bool {
         })
         && template.damage_type.as_deref().is_none_or(|kind| {
             !kind.is_empty() && kind.len() <= 20 && kind.chars().all(|c| c.is_ascii_lowercase())
+        })
+        && template.look.as_deref().is_none_or(|look| {
+            !look.is_empty() && look.len() <= 20 && look.chars().all(|c| c.is_ascii_lowercase())
         })
         && template.colour.as_deref().is_none_or(|colour| {
             colour.len() == 7
@@ -951,6 +957,9 @@ impl Fight {
                 });
                 if let Some(colour) = &template.colour {
                     view["colour"] = json!(colour);
+                }
+                if let Some(look) = &template.look {
+                    view["look"] = json!(look);
                 }
                 Some(view)
             })

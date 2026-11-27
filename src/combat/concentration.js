@@ -192,6 +192,7 @@ const concentrationControls = (() => {
         if (dice && dice.length <= 40) placement.damage = dice;
         if (proposal.damageType) placement.damage_type = proposal.damageType;
         if (/^#[0-9a-f]{6}$/i.test(proposal.colour || "")) placement.colour = proposal.colour;
+        if (/^[a-z]{1,20}$/.test(proposal.look || "")) placement.look = proposal.look;
         const dc = Number(String(proposal.dc || "").match(/\d+/)?.[0]);
         const [ability, branch] = (proposal.spellSave || "").split(" ");
         if (ability && dc >= 1 && dc <= 40) placement.save = {ability, dc, on_success: branch === "half" ? "half" : "none"};
@@ -363,7 +364,8 @@ const concentrationControls = (() => {
       previews: control.dataset.castPreviews?.split("|") || [], effect: tools.dataset.spellEffect,
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
       advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage,
-      damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave, colour: tools.dataset.spellColour};
+      damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave, colour: tools.dataset.spellColour,
+      look: tools.dataset.spellLook};
     proposal.healing = tools.hasAttribute("data-healing-cast");
     const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
     if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady) {
@@ -566,11 +568,40 @@ const concentrationControls = (() => {
     renderReactions();
   });
 
+  // A pop-up reminder when damage asks for a concentration save. The DC is worked out; the
+  // player rolls at the table (or with their own dice) and records the result.
+  const reminder = byId("concentration-reminder");
+  const reminded = new Set();
+  function remind(state) {
+    const current = state.focus.pending[0];
+    if (!current || !state.focus.active) {
+      if (reminder.open) reminder.close();
+      return;
+    }
+    reminder.dataset.promptId = current.id;
+    byId("concentration-reminder-dc").textContent = `Constitution save DC ${current.dc}`;
+    const more = state.focus.pending.length - 1;
+    byId("concentration-reminder-detail").textContent = `You took ${current.damage} damage while concentrating on ${state.focus.active.name}.`
+      + (more > 0 ? ` ${more} more check${more === 1 ? "" : "s"} after this one.` : "");
+    const bonus = document.querySelector('[data-stat="con"]')?.textContent;
+    byId("concentration-reminder-bonus").textContent = bonus && bonus !== "—" ? `Your Constitution save: ${bonus}` : "";
+    if (!reminded.has(current.id) && !reminder.open && sheetSettings.get("concentrationReminder")) {
+      reminded.add(current.id);
+      reminder.show();
+    }
+  }
+  reminder.querySelector("[data-reminder-later]").onclick = () => reminder.close();
+  reminder.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-save-result]");
+    if (button) recordSave(Number(reminder.dataset.promptId), button.dataset.saveResult);
+  });
+  document.addEventListener("preview-encounter-change", () => remind(previewEncounter.current()));
+
   save.addEventListener("click", (event) => {
     const button = event.target.closest("[data-save-result]");
-    if (!button) return;
-    const id = Number(save.dataset.promptId);
-    const result = button.dataset.saveResult;
+    if (button) recordSave(Number(save.dataset.promptId), button.dataset.saveResult);
+  });
+  function recordSave(id, result) {
     previewEncounter.transact((state) => {
       const focus = state.focus;
       const current = focus.pending[0];
@@ -581,7 +612,9 @@ const concentrationControls = (() => {
       status.textContent = result === "success" ? "Concentration maintained." : "Concentration ended.";
       return "recording a concentration save";
     });
-  });
+    if (reminder.open) reminder.close();
+    remind(previewEncounter.current());
+  }
 
   time.addEventListener("submit", (event) => {
     event.preventDefault();

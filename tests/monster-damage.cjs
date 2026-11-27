@@ -206,6 +206,9 @@ module.exports = async function monsterDamage({launch,pageFor,open,api}) {
   assert.equal(applied.damageLogs,1);
   assert.deepEqual(applied.receiptIds,[first]);
   assert.equal(await sheet.locator("#concentration-save-prompt").textContent(),"Constitution save DC 10 · 8 damage");
+  // The damage also pops up a concentration reminder with the DC. Later keeps it pending.
+  await sheet.locator("#concentration-reminder-dc").getByText("Constitution save DC 10",{exact:true}).waitFor();
+  await sheet.locator("#concentration-reminder").getByRole("button",{name:"Later",exact:true}).dispatchEvent("click");
   await status(first,"claimed");
   ack = "allow";
   await status(first,"accepted");

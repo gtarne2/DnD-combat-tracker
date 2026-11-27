@@ -310,7 +310,7 @@ fn players_place_spell_templates_that_follow_their_casting() {
         &mut service,
         room,
         PLAYER,
-        json!({"kind":"place_template","template":{"id":guardians,"spell":"Spirit Guardians","shape":"emanation","size":15,"lasts":"concentration","focus":3,"colour":"#fab005"}}),
+        json!({"kind":"place_template","template":{"id":guardians,"spell":"Spirit Guardians","shape":"emanation","size":15,"lasts":"concentration","focus":3,"colour":"#fab005","look":"radiant"}}),
     );
 
     // Bad shapes and sizes are refused.
@@ -320,6 +320,7 @@ fn players_place_spell_templates_that_follow_their_casting() {
         json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"","shape":"cone","size":15,"lasts":"turn"}}),
         json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"X","shape":"cone","size":15,"lasts":"turn","aim":Uuid::new_v4()}}),
         json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"X","shape":"cone","size":15,"lasts":"turn","colour":"orange"}}),
+        json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"X","shape":"cone","size":15,"lasts":"turn","look":"Fire Ball"}}),
     ] {
         assert!(try_edit(&mut service, room, PLAYER, bad).is_err());
     }
@@ -346,6 +347,9 @@ fn players_place_spell_templates_that_follow_their_casting() {
         .find(|t| t["id"] == json!(guardians))
         .unwrap();
     assert_eq!(aura["colour"], "#fab005");
+    // So does its look, which picks the texture.
+    assert_eq!(aura["look"], "radiant");
+    assert!(cone.get("look").is_none());
     let mine = service.poll(PLAYER, room, 0).unwrap().combat.unwrap();
     assert_eq!(mine["templates"].as_array().unwrap().len(), 2);
     assert_eq!(mine["templates"][1]["focus"], 3);

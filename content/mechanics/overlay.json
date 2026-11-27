@@ -17,6 +17,28 @@
   "slashing": "#ced4da",
   "thunder": "#15aabf"
  },
+ "spell_looks": {
+  "Cloudkill": "poison",
+  "Dark Star": "darkness",
+  "Darkness": "darkness",
+  "Entangle": "nature",
+  "Evard's Black Tentacles": "darkness",
+  "Fog Cloud": "mist",
+  "Hail of Thorns": "nature",
+  "Hunger of Hadar": "darkness",
+  "Hypnotic Pattern": "psychic",
+  "Moonbeam": "radiant",
+  "Plant Growth": "nature",
+  "Shadow of Moil": "darkness",
+  "Sleep": "psychic",
+  "Sleet Storm": "cold",
+  "Spike Growth": "nature",
+  "Spirit Guardians": "radiant",
+  "Stinking Cloud": "poison",
+  "Wall of Thorns": "nature",
+  "Web": "web",
+  "Wind Wall": "mist"
+ },
  "books": {
   "A Zib for Your Thoughts": "AZfyT",
   "Acquisitions Incorporated": "AI",

@@ -51,6 +51,27 @@ fn bundled_overlay_matches_by_name_and_book() {
     assert_eq!(overlay.template_colour(fireball, None), Some(fire.clone()));
     let web = overlay.spell("Web", None);
     assert_ne!(overlay.template_colour(web, Some("fire")), Some(fire));
+
+    // Looks: a named look wins, then the damage type the description names.
+    assert_eq!(
+        overlay.template_look("Web", web, None).as_deref(),
+        Some("web")
+    );
+    assert_eq!(
+        overlay.template_look("Fog Cloud", None, None).as_deref(),
+        Some("mist")
+    );
+    assert_eq!(
+        overlay
+            .template_look("Fireball", fireball, Some("Fire"))
+            .as_deref(),
+        Some("fire")
+    );
+    assert_eq!(
+        overlay.template_look("Fireball", fireball, None).as_deref(),
+        Some("fire")
+    );
+    assert_eq!(overlay.template_look("Not A Real Spell", None, None), None);
 }
 
 #[test]
@@ -142,6 +163,7 @@ fn the_sheet_uses_the_overlay_only_for_matching_imports() {
     let html = render_html(&sheet);
     assert!(html.contains("data-spell-area=\"line 60 1\""));
     assert!(html.contains(&format!("data-spell-colour=\"{}\"", fire.unwrap())));
+    assert!(html.contains("data-spell-look=\"fire\""));
     assert!(html.contains("data-spell-overlay"));
 }
 

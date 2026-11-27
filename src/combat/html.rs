@@ -715,6 +715,7 @@ fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGrou
     }
     roll_attribute(html, "data-damage-type", spell.damage_type);
     roll_attribute(html, "data-spell-colour", spell.colour.as_deref());
+    roll_attribute(html, "data-spell-look", spell.look.as_deref());
     if spell.overlay {
         html.push_str(" data-spell-overlay");
     }

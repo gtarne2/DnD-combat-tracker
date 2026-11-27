@@ -4,7 +4,7 @@
 
 - The Windows launcher, player sheet, LAN room service, and DM dashboard are implemented through P09D. The DM can select Assist for individual strikes while using the same roll records, reaction windows and damage delivery. [P09D results and exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist)
 - Bundled monster actions retain their full rules for table adjudication. Encounter export/import from P10 is implemented and Rust-tested. The full Windows packaging rehearsal remains. [P10 first part](local-multiplayer-plan.md#2026-11-26--p10-first-part--portable-encounter-export-and-import)
-- Owlbear Rodeo link O1 (bridge window, pairing), O2 (tokens on the map), O3 (spell templates), O4 (who is inside) and O5 (area damage) are merged into `dev`, with playtest round one (R65–R67, PR #10) and round two (R68–R70) on `claude/project-thread-k0i2u2`. They still need a Windows build and a real Owlbear check. [Owlbear handoff](#owlbear-rodeo-link-handoff-o1-o5)
+- Owlbear Rodeo link O1 (bridge window, pairing), O2 (tokens on the map), O3 (spell templates), O4 (who is inside) and O5 (area damage) are merged into `dev`, with playtest round one (R65–R67, PR #10) and round two (R68–R70) merged into `dev` (PR #10); turn rings, ring markers and concentration reminders (R74) on `claude/project-thread-k0i2u2`. They still need a Windows build and a real Owlbear check. [Owlbear handoff](#owlbear-rodeo-link-handoff-o1-o5)
 - Spell templates use the bundled mechanics overlay (R71) for imported spells from known books, with spell colours in Owlbear. [Mechanics overlay handoff](#mechanics-overlay-handoff-r71)
 - For multiplayer UI work, start with the [UI handoff](multiplayer-ui.md) for the shipped entry points, state boundaries and targeted browser checks.
 - Physical two-PC Wi-Fi and firewall behavior, physical adapter disconnection, manual Windows picker interaction, and the real clipboard remain unverified in the recorded rehearsals. [Validation and scope of the harness](development.md#validation-matrix)
@@ -18,6 +18,16 @@
 | Modified components | `launcher/TrackerLauncher.cs`, `launcher/RefreshBridge.cs`, `launcher/PartySession.cs`, `src/combat/party.js`, `tests/PartyHarness.cs`, and `tests/party-launcher.cjs`. |
 | Validation | Passed `cargo build --release --locked --offline --bins` with cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`, then `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows`. The shortcut resolves to the updated `target/release`. Passed `node --check src/combat/party.js`, `node --check tests/party-launcher.cjs`, and `git diff --check`. Passed `node tests/party-launcher.cjs --lifecycle` and `node tests/party-launcher.cjs --review-refresh` with Windows Chrome and current-user DPAPI. A packaged duplicate-launch smoke and a native fixture smoke also passed. The native smoke advanced the idle clock and checked wake grace, active host protection, shutdown after room end, and job cleanup while stdin was open. |
 | Next action | During the Windows playtest, close all Aurora tabs after solo or joined play and confirm the launcher exits after five minutes. Also check physical two-PC play with the host dashboard closed and reopened from the tray. |
+
+## Template looks handoff (R73)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-8jt2en`, branched from `claude/project-thread-kxsu4h` (PR #11) at `097f821`. |
+| Completed | R73. Textured and faded spell templates in Owlbear with an outline style per look, the look sent from the sheet, 56 procedural textures, and extension 0.9.0 (merged with PR #12's 0.8.0; PR #12's requirement renumbered R74 because PR #11 already used R71). |
+| Modified components | `owlbear/template-art.js` and `owlbear/effects/` (new), `owlbear/templates.js`, `owlbear/template-sync.js`, `owlbear/manifest.json`, `tools/build-template-art.py` (new), `tools/build-mechanics-overlay.cjs`, `content/mechanics/{curated,overlay}.json`, `src/mechanics.rs`, `src/combat/spell_options.rs`, `src/combat/html.rs`, `src/combat/concentration.js`, `src/party/initiative.rs`, `tests/owlbear-tokens.cjs`, `tests/owlbear_link.rs`, `tests/mechanics_overlay.rs`. |
+| Validation | Linux cloud: `cargo test --locked --offline` and `node tests/owlbear-tokens.cjs` passed. Textures were checked in a canvas mock-up, not in Owlbear. Not run: a real Owlbear room, so image scale, attachment rotation and click-through are unconfirmed there. |
+| Next action | In Owlbear, cast Fireball, Cone of Cold, Lightning Bolt, Spirit Guardians and Fog Cloud. Check each texture lines up with its outline, follows a drag and a rotate, and that clicking the area still selects the outline. Delete one by hand and check its texture goes too. |
 
 ## Mechanics overlay handoff (R71)
 

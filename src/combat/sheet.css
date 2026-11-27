@@ -1008,3 +1008,7 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .option-row .option-execute:not(.show-variants) [data-summon-variant] { display: none; }
 .option-row [data-summon-create] { font-size: 12px; }
 .option-inspector [data-summon-variant] { max-width: 14em; }
+.reminder-dc strong { font-size: 22px; color: var(--gold); }
+#concentration-reminder { width: min(94vw, 440px); }
+/* The concentration reminder floats over the sheet without blocking it. */
+#concentration-reminder[open] { position: fixed; inset: 70px 0 auto; margin: 0 auto; z-index: 50; box-shadow: 0 10px 30px rgba(0, 0, 0, .55); border: 1px solid var(--gold); }

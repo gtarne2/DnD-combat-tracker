@@ -581,6 +581,9 @@ async function main() {
     await compact.goto(layoutUrl);
     await expectText(compact.locator("#round-number"), "Round 3");
     await expectText(compact.locator("#concentration-save-prompt"), "Constitution save DC 10");
+    // The pending check also pops up as a reminder with the DC; Later leaves it in the box.
+    await expectText(compact.locator("#concentration-reminder-dc"), "Constitution save DC 10");
+    await compact.locator("#concentration-reminder").getByRole("button", {name: "Later", exact: true}).click();
     await expectText(compact.locator("#companion-cards summary").filter({hasText: "Force Ballista"}), "1 h left");
     const actionList = compact.locator("#all-options");
     const beforeManage = await actionList.boundingBox();
