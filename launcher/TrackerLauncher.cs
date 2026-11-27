@@ -39,6 +39,7 @@ internal sealed class TrackerLauncher : Form
     private readonly Button down = new Button { Text = "Move down" };
     private readonly Button open = new Button { Text = "Open Combat Sheet" };
     private readonly Label status = new Label();
+    private readonly CheckBox privateDm = new CheckBox { Text = "Private DM window (hidden when casting the screen)" };
     private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 290 };
     private string characterPath;
     private RefreshBridge bridge;
@@ -52,6 +53,7 @@ internal sealed class TrackerLauncher : Form
     private bool checkingHost;
     private readonly NotifyIcon tray = new NotifyIcon { Text = "Aurora Combat Tracker", Icon = SystemIcons.Application };
     private string SettingsPath { get { return Path.Combine(appData, "last-import.txt"); } }
+    private string PrivateDmPath { get { return Path.Combine(appData, "private-dm-window.txt"); } }
 
     [STAThread]
     private static void Main()
@@ -107,6 +109,13 @@ internal sealed class TrackerLauncher : Form
         Place(selection, down, 536, 229, 88, 26);
         Place(this, status, 16, 295, 608, 22);
         Place(this, open, 452, 321, 172, 30);
+        Place(this, privateDm, 16, 325, 420, 24);
+        try { privateDm.Checked = File.Exists(PrivateDmPath) && File.ReadAllText(PrivateDmPath).Trim() == "on"; }
+        catch (IOException) { } catch (UnauthorizedAccessException) { }
+        privateDm.CheckedChanged += delegate {
+            try { Directory.CreateDirectory(appData); File.WriteAllText(PrivateDmPath, privateDm.Checked ? "on" : "off"); }
+            catch (IOException) { } catch (UnauthorizedAccessException) { }
+        };
         var partyButton = new Button { Text = "Party..." };
         Place(selection, partyButton, 536, 259, 88, 26);
         var partyMenu = new ContextMenuStrip();
@@ -122,6 +131,7 @@ internal sealed class TrackerLauncher : Form
         trayMenu.Items.Add("Open launcher", null, delegate { ShowLauncher(); });
         trayMenu.Items.Add("Reopen current session", null, delegate {
             if (bridge == null) return;
+            if (party != null && party.Role == "dm" && DmWindow.Reopen()) { bridge.KeepAlive(); return; }
             try { OpenBrowser(bridge.PreviewPath); bridge.KeepAlive(); }
             catch (Exception error) {
                 MessageBox.Show(error.Message, "Could not reopen session", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -129,6 +139,7 @@ internal sealed class TrackerLauncher : Form
         });
         trayMenu.Items.Add("Reopen DM dashboard", null, delegate {
             if (hostedBridge == null) return;
+            if (DmWindow.Reopen()) { hostedBridge.KeepAlive(); return; }
             try { OpenBrowser(hostedBridge.PreviewPath); hostedBridge.KeepAlive(); }
             catch (Exception error) {
                 MessageBox.Show(error.Message, "Could not reopen the DM dashboard", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -142,6 +153,7 @@ internal sealed class TrackerLauncher : Form
         lifecycle.Start();
         FormClosed += delegate {
             lifecycle.Dispose();
+            DmWindow.CloseCurrent();
             if (bridge != null) bridge.Dispose();
             if (party != null) party.Dispose();
             DisposeHosted();
@@ -209,6 +221,20 @@ internal sealed class TrackerLauncher : Form
         }
         if (!IsDisposed && !Visible && selection.Enabled && currentBridge == bridge &&
             currentParty == party && currentBridge.IsIdle) Close();
+    }
+
+    // R79: the opt-in private window keeps the dashboard out of screen casts; otherwise the browser.
+    private void OpenDashboard(string lobby)
+    {
+        string reason;
+        if (privateDm.Checked && !DmWindow.TryOpen(lobby, Path.Combine(appData, "WebView2"), out reason)) {
+            MessageBox.Show(this, "The private DM window could not open, so the dashboard will open in your browser.\n\n" + reason,
+                "Private DM window unavailable", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            OpenBrowser(lobby);
+        } else if (!privateDm.Checked) {
+            DmWindow.CloseCurrent();
+            OpenBrowser(lobby);
+        }
     }
 
     private static void OpenBrowser(string path)
@@ -362,7 +388,7 @@ internal sealed class TrackerLauncher : Form
                 lobbyBridge = new RefreshBridge(previews, null);
                 var lobby = candidate.WriteLobby(previews, lobbyBridge.Url);
                 lobbyBridge.TrackLobby(lobby);
-                OpenBrowser(lobby);
+                OpenDashboard(lobby);
                 if (bridge != null) bridge.Dispose();
                 bridge = lobbyBridge;
                 lobbyBridge = null;

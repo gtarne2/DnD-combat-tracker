@@ -20,6 +20,12 @@
 | Validation | Passed `cargo build --release --locked --offline --bins` with cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`, then `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows`. The shortcut resolves to the updated `target/release`. Passed `node --check src/combat/party.js`, `node --check tests/party-launcher.cjs`, and `git diff --check`. Passed `node tests/party-launcher.cjs --lifecycle` and `node tests/party-launcher.cjs --review-refresh` with Windows Chrome and current-user DPAPI. A packaged duplicate-launch smoke and a native fixture smoke also passed. The native smoke advanced the idle clock and checked wake grace, active host protection, shutdown after room end, and job cleanup while stdin was open. |
 | Next action | During the Windows playtest, close all Aurora tabs after solo or joined play and confirm the launcher exits after five minutes. Also check physical two-PC play with the host dashboard closed and reopened from the tray. |
 
+## Private DM window handoff (R79, experimental)
+
+- `launcher/DmWindow.cs` hosts the lobby page in WebView2, loaded by reflection from `Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll` and `WebView2Loader.dll` next to the exe, and calls `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`. The launcher compiles without the SDK. `launcher\build.cmd` copies the three DLLs from `launcher\webview2\` (git-ignored) when present; get them from NuGet `Microsoft.Web.WebView2` (lib/net462 and runtimes/win-x64/native). Cloud zips include SDK 1.0.3856.49 plus `WebView2-NOTICE.txt`.
+- The window's dashboard storage (settings, dismissed players) lives in `%LOCALAPPDATA%\Aurora Combat Tracker\WebView2`, separate from the browser's.
+- Only compiled with mcs in the cloud. Not run on Windows: check the window opens, downloads and file pickers work, the Owlbear link still pairs, and a Chromecast "Cast screen" plus a Win+Shift+S screenshot both leave the window out.
+
 ## Playtest round four handoff (R78)
 
 | Field | Record |

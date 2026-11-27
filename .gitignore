@@ -8,3 +8,4 @@
 /local-data/
 *.dnd5e
 !/tests/fixtures/**/*.dnd5e
+/launcher/webview2/
