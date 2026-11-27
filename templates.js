@@ -4,6 +4,7 @@
 //
 // Template metadata holds only the tracker room and template IDs.
 import { buildCurve } from "./obr-sdk-3.1.0.js";
+import { LOOK_NAME, artItems, outlineStyle } from "./template-art.js";
 
 export const TEMPLATE = "com.aurora-tracker/template";
 export const CHANNEL = "com.aurora-tracker/templates";
@@ -83,8 +84,12 @@ export function placement(template, caster, aim, dpi, perFoot) {
 const SHAPE_NAMES = { sphere: "sphere", cylinder: "cylinder", cone: "cone", cube: "cube", line: "line", emanation: "around caster" };
 
 /** Everything a caster's extension needs to draw the template. Plain data, sent by broadcast. */
-export function drawSpec(room, template, place) {
+export function drawSpec(room, template, place, dpi) {
   return {
+    shape: template.shape,
+    // How the area looks: a texture or a fade, and the outline style. See template-art.js.
+    look: LOOK_NAME.test(template.look || "") ? template.look : undefined,
+    dpi,
     room,
     id: template.id,
     name: `${template.spell} · ${template.size} ft ${SHAPE_NAMES[template.shape] || template.shape}`,
@@ -107,6 +112,9 @@ export function validSpec(spec) {
       typeof spec.name === "string" && spec.name.length <= 160 &&
       HEX.test(spec.colour) &&
       (spec.fill === undefined || HEX.test(spec.fill)) &&
+      (spec.shape === undefined || SHAPES.has(spec.shape)) &&
+      (spec.look === undefined || LOOK_NAME.test(spec.look)) &&
+      (spec.dpi === undefined || (finite(spec.dpi) && spec.dpi > 0)) &&
       point(spec.position) && finite(spec.rotation) &&
       Array.isArray(spec.points) && spec.points.length >= 3 && spec.points.length <= MAX_POINTS && spec.points.every(point) &&
       (spec.attachedTo === undefined || (typeof spec.attachedTo === "string" && spec.attachedTo.length <= 64)),
@@ -114,6 +122,7 @@ export function validSpec(spec) {
 }
 
 export function buildTemplate(spec) {
+  const style = outlineStyle(spec.look);
   let builder = buildCurve()
     .points(spec.points)
     .closed(true)
@@ -121,15 +130,24 @@ export function buildTemplate(spec) {
     .position(spec.position)
     .rotation(spec.rotation)
     .fillColor(spec.fill || spec.colour)
-    .fillOpacity(0.25)
+    .fillOpacity(style.fillOpacity)
     .strokeColor(spec.colour)
-    .strokeWidth(4)
+    .strokeWidth(style.strokeWidth)
+    .strokeDash(style.dash)
     .name(spec.name)
     .layer("DRAWING")
+    // Set here so the art drawn under the outline can sit just below it.
+    .zIndex(Date.now())
     .locked(false)
     .metadata({ [TEMPLATE]: { room: spec.room, id: spec.id } });
   if (spec.attachedTo) builder = builder.attachedTo(spec.attachedTo);
   return builder.build();
+}
+
+/** The template outline and the art drawn under it, ready for one addItems call. */
+export function buildTemplateItems(spec) {
+  const curve = buildTemplate(spec);
+  return [curve, ...artItems(spec, curve)];
 }
 
 export function isShape(shape) {

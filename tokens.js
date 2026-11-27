@@ -4,16 +4,21 @@
 // every player, so it holds IDs and the last applied reveal state, never names or stats.
 // Token names are the player-facing alias even while hidden: Owlbear does not show hidden
 // items to players, and the name is what they will see on reveal.
-import OBR, { buildImage } from "./obr-sdk-3.1.0.js";
+import OBR, { buildImage, buildShape } from "./obr-sdk-3.1.0.js";
 
 export const LINK = "com.aurora-tracker/link";
 export const MARKER = "com.aurora-tracker/marker";
 const BASE = new URL(".", import.meta.url).href;
 const ART_KEY = "aurora-obr-art";
 const HIDDEN_NAME = "Enemy";
-/** Marker metadata for the down badge. */
-export const DOWN = "down-badge";
-const BADGE_CELLS = 0.35;
+/** Ring markers, in the style of Owlbear's own Colored Rings extension: whose turn it is
+ * (outermost) and down. Colours come from that extension's palette. */
+export const TURN = "ring-turn";
+export const DOWN = "ring-down";
+export const RINGS = [
+  { kind: TURN, colour: "#ffd433", name: "Current turn" },
+  { kind: DOWN, colour: "#ff4d4d", name: "Down" },
+];
 const CELLS = { tiny: 0.5, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
 
 /** Art is remembered per monster template, player or companion. */
@@ -235,47 +240,78 @@ export async function syncTokens(table) {
 
   // Read the tokens again: the updates above may have changed their visibility.
   const kept = await OBR.scene.items.getItems(linked.filter((item) => rows.has(linkOf(item, room).row)).map((item) => item.id));
-  // Older versions used a large text label. Replace those with the small badge.
-  const outdated = (await markersFor(kept.map((item) => item.id))).filter((marker) => marker.metadata[MARKER] !== DOWN);
-  if (outdated.length) await OBR.scene.items.deleteItems(outdated.map((marker) => marker.id));
-  const markers = await markersFor(kept.map((item) => item.id));
+  await syncRings(kept, rows, room, table.encounter);
+}
+
+// One ring per state, concentric and 10% smaller each, centred on the token's grid footprint.
+function buildRing(token, ring, index, dpi) {
+  const dpiScale = dpi / (token.grid?.dpi || dpi);
+  const width = (token.image?.width || dpi) * dpiScale;
+  const height = (token.image?.height || dpi) * dpiScale;
+  const diameter = Math.min(width, height);
+  const offsetX = token.grid?.offset && token.image?.width ? (token.grid.offset.x / token.image.width) * width : width / 2;
+  const offsetY = token.grid?.offset && token.image?.height ? (token.grid.offset.y / token.image.height) * height : height / 2;
+  const scale = Math.abs(token.scale?.x || 1) * (1 - index * 0.1);
+  return buildShape()
+    .width(diameter)
+    .height(diameter)
+    .scale({ x: scale, y: scale })
+    .position({ x: token.position.x - offsetX + width / 2, y: token.position.y - offsetY + height / 2 })
+    .fillOpacity(0)
+    .strokeColor(ring.colour)
+    .strokeOpacity(1)
+    .strokeWidth(5)
+    .shapeType("CIRCLE")
+    .attachedTo(token.id)
+    .locked(true)
+    .name(ring.name)
+    .metadata({ [MARKER]: ring.kind })
+    .layer("ATTACHMENT")
+    .disableHit(true)
+    .visible(token.visible)
+    .build();
+}
+
+/** Rings follow the tracker: the current turn while the encounter runs, and down rows. */
+async function syncRings(tokens, rows, room, encounter) {
+  const ids = tokens.map((item) => item.id);
+  const markers = await markersFor(ids);
+  // Older versions drew a text label or a skull badge. Those go.
+  const known = new Set(RINGS.map((ring) => ring.kind));
+  const stale = markers.filter((marker) => !known.has(marker.metadata[MARKER]));
   const dpi = await OBR.scene.grid.getDpi();
-  const marked = new Set(markers.map((marker) => marker.attachedTo));
-  const visibility = new Map(kept.map((item) => [item.id, item.visible]));
   const add = [];
-  const remove = [];
-  const restyle = markers.filter((marker) => visibility.has(marker.attachedTo) && marker.visible !== visibility.get(marker.attachedTo)).map((m) => m.id);
-  for (const item of kept) {
-    const row = rows.get(linkOf(item, room).row);
-    if (!row) continue;
-    if (row.down && !marked.has(item.id)) {
-      // A small skull badge on the token's lower right, about a third of a square across.
-      const cells = row.kind === "enemy" ? cellsFor(row.template?.size) : 1;
-      const corner = Math.max(1, cells) * dpi * 0.35;
-      add.push(
-        buildImage(
-          { url: `${BASE}marker-down.svg`, mime: "image/svg+xml", width: 64, height: 64 },
-          { dpi: 64 / BADGE_CELLS, offset: { x: 32, y: 32 } },
-        )
-          .name("Down")
-          .position({ x: item.position.x + corner, y: item.position.y + corner })
-          .attachedTo(item.id)
-          .layer("ATTACHMENT")
-          .locked(true)
-          .disableHit(true)
-          .visible(item.visible)
-          .metadata({ [MARKER]: DOWN })
-          .build(),
-      );
-    }
-    if (!row.down && marked.has(item.id)) remove.push(...markers.filter((m) => m.attachedTo === item.id).map((m) => m.id));
+  const remove = stale.map((marker) => marker.id);
+  const restyle = [];
+  for (const token of tokens) {
+    const row = rows.get(linkOf(token, room).row);
+    const wanted = RINGS.filter((ring) => (ring.kind === TURN ? encounter.running && encounter.current === row.id : Boolean(row.down)));
+    const mine = markers.filter((marker) => marker.attachedTo === token.id && known.has(marker.metadata[MARKER]));
+    for (const marker of mine) if (!wanted.some((ring) => ring.kind === marker.metadata[MARKER])) remove.push(marker.id);
+    wanted.forEach((ring, index) => {
+      const have = mine.filter((marker) => marker.metadata[MARKER] === ring.kind);
+      if (!have.length) {
+        add.push(buildRing(token, ring, index, dpi));
+        return;
+      }
+      const scale = Math.abs(token.scale?.x || 1) * (1 - index * 0.1);
+      for (const [n, marker] of have.entries()) {
+        if (n > 0) remove.push(marker.id);
+        else if (marker.visible !== token.visible || Math.abs((marker.scale?.x || 0) - scale) > 1e-6) restyle.push({ id: marker.id, visible: token.visible, scale });
+      }
+    });
   }
+  if (remove.length) await OBR.scene.items.deleteItems(remove);
   if (restyle.length) {
-    // A marker shows only when its token does.
-    await OBR.scene.items.updateItems(restyle, (drafts) => {
-      for (const draft of drafts) draft.visible = visibility.get(draft.attachedTo);
+    const byId = new Map(restyle.map((r) => [r.id, r]));
+    // A ring shows only when its token does, and keeps its place in the stack.
+    await OBR.scene.items.updateItems(restyle.map((r) => r.id), (drafts) => {
+      for (const draft of drafts) {
+        const change = byId.get(draft.id);
+        draft.visible = change.visible;
+        draft.scale = { x: change.scale, y: change.scale };
+      }
     });
   }
   if (add.length) await OBR.scene.items.addItems(add);
-  if (remove.length) await OBR.scene.items.deleteItems(remove);
 }
