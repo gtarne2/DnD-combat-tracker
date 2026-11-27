@@ -544,3 +544,214 @@ fn map_reports_suggest_targets_and_players_confirm_them() {
         json!([wolves[0], lark])
     );
 }
+
+#[test]
+fn an_area_spell_resolves_through_the_dm_queue() {
+    let db = Database(std::env::temp_dir().join(format!("aurora-obr-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = Uuid::new_v4();
+    let ally = Principal::Paired(Uuid::from_u128(8));
+    service
+        .execute(
+            HOST,
+            &command(
+                room,
+                Create {
+                    mode: HostMode::Dm,
+                    name: "Warden".into(),
+                },
+            ),
+        )
+        .unwrap();
+    for (who, name) in [(PLAYER, "Lark"), (ally, "Wren")] {
+        service
+            .execute(who, &command(room, Join { name: name.into() }))
+            .unwrap();
+        edit(
+            &mut service,
+            room,
+            who,
+            json!({"kind":"submit","score":15,"companions":[]}),
+        );
+    }
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":4,"score":10}),
+    );
+    let rows = board(&service, room)["rows"].as_array().unwrap().clone();
+    let wolves: Vec<Value> = rows
+        .iter()
+        .filter(|r| r.get("enemy").is_some())
+        .map(|r| r["id"].clone())
+        .collect();
+    let wren = rows.iter().find(|r| r["name"] == "Wren").unwrap()["id"].clone();
+    let hp: Vec<u64> = rows
+        .iter()
+        .filter(|r| r.get("enemy").is_some())
+        .map(|r| r["enemy"]["hp"].as_u64().unwrap())
+        .collect();
+
+    let fireball = Uuid::new_v4();
+    let save = json!({"ability":"dexterity","dc":15,"on_success":"half"});
+    // A template without a damage roll cannot be sent.
+    let plain = Uuid::new_v4();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"place_template","template":{"id":plain,"spell":"Fog Cloud","shape":"sphere","size":20,"lasts":"removed"}}),
+    );
+    assert!(try_edit(&mut service, room, PLAYER, json!({"kind":"send_area","request":{"id":Uuid::new_v4(),"template":plain,"amount":5,"targets":[wolves[0]]}})).is_err());
+    // Bad saves are refused.
+    assert!(try_edit(&mut service, room, PLAYER, json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"Fireball","shape":"sphere","size":20,"lasts":"turn","damage":"8d6","save":{"ability":"luck","dc":15,"on_success":"half"}}})).is_err());
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"place_template","template":{"id":fireball,"spell":"Fireball","shape":"sphere","size":20,"lasts":"removed","damage":"8d6","damage_type":"fire","save":save}}),
+    );
+
+    // First confirmation: the caster sends 28 damage to four wolves and an ally.
+    let request = Uuid::new_v4();
+    let mut targets = wolves.clone();
+    targets.push(wren.clone());
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"send_area","request":{"id":request,"template":fireball,"amount":28,"targets":targets}}),
+    );
+    assert!(try_edit(&mut service, room, PLAYER, json!({"kind":"send_area","request":{"id":request,"template":fireball,"amount":28,"targets":[wolves[0]]}})).is_err(), "an ID is used once");
+    let dm = board(&service, room);
+    let queued = &dm["areas"][0];
+    assert_eq!(queued["spell"], "Fireball");
+    assert_eq!(queued["amount"], 28);
+    assert_eq!(queued["save"], save);
+    assert_eq!(queued["damage_type"], "fire");
+    assert!(queued["results"].is_null());
+    assert_eq!(
+        dm["templates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["id"] == json!(fireball))
+            .unwrap()["confirmed"]
+            .as_array()
+            .unwrap()
+            .len(),
+        5
+    );
+    let mine = service.poll(PLAYER, room, 0).unwrap().combat.unwrap();
+    assert_eq!(mine["areas"].as_array().unwrap().len(), 1);
+    assert!(
+        service.poll(ally, room, 0).unwrap().combat.unwrap()["areas"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            PLAYER,
+            json!({"kind":"apply_area","id":request,"results":[]})
+        )
+        .is_err(),
+        "players cannot apply"
+    );
+
+    // Second confirmation: the DM applies full damage to failed saves and half to successes.
+    let results = json!([
+        {"row":wolves[0],"amount":28,"save":"failed"},
+        {"row":wolves[1],"amount":14,"save":"succeeded"},
+        {"row":wolves[2],"amount":28,"save":"failed"},
+        {"row":wolves[3],"amount":0,"save":"table"},
+        {"row":wren,"amount":14,"save":"succeeded"},
+    ]);
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"apply_area","id":request,"results":[{"row":Uuid::new_v4(),"amount":1}]})
+        )
+        .is_err(),
+        "only queued targets"
+    );
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"apply_area","id":request,"results":results}),
+    );
+    let after = board(&service, room);
+    let new_hp: Vec<u64> = after["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r.get("enemy").is_some())
+        .map(|r| r["enemy"]["hp"].as_u64().unwrap())
+        .collect();
+    assert_eq!(
+        new_hp,
+        vec![
+            hp[0].saturating_sub(28),
+            hp[1].saturating_sub(14),
+            hp[2].saturating_sub(28),
+            hp[3]
+        ]
+    );
+    assert_eq!(after["areas"][0]["results"], results);
+    // Wolves at 0 HP show as down to the map.
+    let table = service.table_view(HOST, room).unwrap();
+    assert_eq!(
+        table["encounter"]["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["down"] == true)
+            .count(),
+        new_hp.iter().filter(|hp| **hp == 0).count()
+    );
+    // The ally gets a damage offer; the caster gets none.
+    let offers = service.poll(ally, room, 0).unwrap().offers;
+    let offers = serde_json::to_value(offers).unwrap();
+    assert_eq!(offers.as_array().unwrap().len(), 1);
+    assert_eq!(offers[0]["effect"], json!({"kind":"damage","amount":14}));
+    assert_eq!(offers[0]["source"], "Fireball (area)");
+    assert!(
+        serde_json::to_value(service.poll(PLAYER, room, 0).unwrap().offers)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"apply_area","id":request,"results":results})
+        )
+        .is_err(),
+        "applied once"
+    );
+
+    // The DM can dismiss a pending application instead.
+    let again = Uuid::new_v4();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"send_area","request":{"id":again,"template":fireball,"amount":9,"targets":[wolves[3]]}}),
+    );
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"dismiss_area","id":again}),
+    );
+    assert_eq!(board(&service, room)["areas"].as_array().unwrap().len(), 1);
+}

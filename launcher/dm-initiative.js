@@ -358,6 +358,151 @@ function setupDmInitiative(request, refresh) {
     } else importForm.querySelector("[role=status]").textContent = status.textContent;
   };
 
+  // Area spells (O5). The caster sent rolled damage for confirmed targets. Assist rolls each
+  // target's save, halves or zeroes damage on a success, and applies resistances, immunities and
+  // vulnerabilities to the spell's damage type. The DM checks the table and presses Apply.
+  const areaChoices = new Map();
+  let areasKey;
+  const AREA_ROLLS = "aurora-dm-area-rolls";
+  let areaRolls = {};
+  try { areaRolls = JSON.parse(localStorage.getItem(AREA_ROLLS) || "{}"); } catch {}
+  const title = text => text.charAt(0).toUpperCase() + text.slice(1);
+  function saveBonus(row, ability) {
+    const want = [ability, ability.slice(0, 3)];
+    const find = map => {
+      const key = Object.keys(map || {}).find(k => want.some(w => k.toLowerCase().startsWith(w)));
+      return key === undefined ? null : map[key];
+    };
+    if (row.enemy) {
+      const stats = row.enemy.template?.monster.stats;
+      if (!stats) return null;
+      const save = stats.saves?.[title(ability)];
+      if (Number.isInteger(save)) return save;
+      const score = stats.abilities?.[title(ability)];
+      return Number.isInteger(score) ? Math.floor((score - 10) / 2) : null;
+    }
+    const member = room.members?.find(m => m.member_id === row.damage_recipient);
+    const details = member?.inspection?.details;
+    const save = find(details?.saves);
+    if (Number.isInteger(save)) return save;
+    const score = find(details?.ability_scores);
+    return Number.isInteger(score) ? Math.floor((score - 10) / 2) : null;
+  }
+  function defense(row, type) {
+    const defenses = row.enemy?.template?.monster.stats.defenses;
+    if (!defenses || !type) return {factor: 1, note: ""};
+    const names = text => !text || /nonmagical/i.test(text) ? false : new RegExp("\\b" + type + "\\b", "i").test(text);
+    if (names(defenses.immunities)) return {factor: 0, note: "immune to " + type};
+    if (names(defenses.resistances)) return {factor: .5, note: "resists " + type};
+    if (names(defenses.vulnerabilities)) return {factor: 2, note: "vulnerable to " + type};
+    return {factor: 1, note: ""};
+  }
+  function areaAmount(area, row, outcome) {
+    if (outcome === "table") return 0;
+    let amount = area.amount;
+    if (outcome === "succeeded") amount = area.save?.on_success === "half" ? Math.floor(amount / 2) : 0;
+    return Math.floor(amount * defense(row, area.damage_type).factor);
+  }
+  function renderAreas() {
+    const board = room.combat;
+    const pending = (board.areas || []).filter(area => !area.results);
+    // Zone spells: who starts this turn inside a lasting template.
+    const current = board.running && board.rows.find(row => row.id === board.current);
+    const zones = current ? (board.templates || []).filter(t => t.lasts === "concentration" && (t.inside || []).includes(current.id)) : [];
+    const zoneNote = el("dm-zone-note");
+    zoneNote.hidden = !zones.length;
+    zoneNote.textContent = zones.map(t => {
+      const caster = board.rows.find(row => row.damage_recipient === t.member_id)?.name || "its caster";
+      return current.name + " starts its turn inside " + t.spell + " (" + caster + "). " + caster + " can send it again from their sheet.";
+    }).join(" ");
+    const key = JSON.stringify([pending, board.rows.map(r => [r.id, r.name]), room.members?.map(m => [m.member_id, m.inspection?.details?.saves]), busy]);
+    if (key === areasKey) return;
+    areasKey = key;
+    el("dm-areas").hidden = !pending.length;
+    let rolled = false;
+    el("dm-area-list").replaceChildren(...pending.map(area => {
+      const box = make("article", null, "dm-area");
+      const caster = board.rows.find(row => row.damage_recipient === area.member_id)?.name || "A player";
+      const save = area.save ? " · " + title(area.save.ability) + " save DC " + area.save.dc + (area.save.on_success === "half" ? ", half on success" : ", none on success") : " · no save";
+      box.append(make("p", area.spell + " from " + caster + " · " + area.amount + " " + (area.damage_type || "") + " damage" + save, "dm-area-head"));
+      const table = make("table");
+      const head = make("tr");
+      for (const label of ["Target", "Save", "Outcome", "Damage"]) head.append(make("th", label));
+      table.append(head);
+      const inputs = [];
+      // Four wolves read as Wolf 1 to Wolf 4, in initiative order.
+      const named = board.rows.filter(r => area.targets.includes(r.id));
+      const seen = new Map();
+      const label = new Map(named.map(row => {
+        const twins = named.filter(other => other.name === row.name).length;
+        const n = (seen.get(row.name) || 0) + 1;
+        seen.set(row.name, n);
+        return [row.id, twins > 1 ? row.name + " " + n : row.name];
+      }));
+      for (const row of named) {
+        const target = row.id;
+        const id = area.id + "/" + target;
+        const companion = !row.enemy && !row.damage_recipient;
+        const bonus = area.save ? saveBonus(row, area.save.ability) : null;
+        if (area.save && bonus !== null && !areaRolls[id]) {
+          areaRolls[id] = {d20: monsterAssist.die(20)};
+          rolled = true;
+        }
+        const roll = areaRolls[id];
+        const total = roll && bonus !== null ? roll.d20 + bonus : null;
+        const suggested = companion ? "table" : !area.save ? "failed" : total === null ? "" : total >= area.save.dc ? "succeeded" : "failed";
+        const choice = areaChoices.get(id) || {outcome: suggested, amount: null};
+        areaChoices.set(id, choice);
+        const tr = make("tr");
+        tr.append(make("td", label.get(target) + (row.enemy && !row.enemy.revealed ? " (hidden)" : "")));
+        tr.append(make("td", !area.save ? "—" : total === null ? (companion ? "At the table" : "Unknown bonus") : "d20 " + roll.d20 + (bonus >= 0 ? " + " : " − ") + Math.abs(bonus) + " = " + total));
+        const outcome = document.createElement("select");
+        outcome.setAttribute("aria-label", "Outcome for " + label.get(target));
+        if (!choice.outcome) outcome.append(new Option("Choose…", ""));
+        for (const [value, label] of [["failed", area.save ? "Failed" : "Hit"], ["succeeded", "Succeeded"], ["table", "At the table"]])
+          if (value !== "succeeded" || area.save) outcome.append(new Option(label, value));
+        outcome.value = choice.outcome;
+        const amount = Object.assign(document.createElement("input"), {type: "number", min: 0, max: 100000});
+        amount.setAttribute("aria-label", "Damage to " + label.get(target));
+        const fill = () => { amount.value = choice.outcome ? String(choice.amount ?? areaAmount(area, row, choice.outcome)) : ""; };
+        fill();
+        outcome.onchange = () => { choice.outcome = outcome.value; choice.amount = null; fill(); apply.disabled = !ready(); };
+        amount.onchange = () => { choice.amount = amount.valueAsNumber; };
+        const cell = make("td");
+        cell.append(outcome);
+        const note = defense(row, area.damage_type).note || (companion ? "companion" : "");
+        if (note) cell.append(make("span", " " + note, "dm-area-note"));
+        tr.append(cell);
+        const damage = make("td");
+        damage.append(amount);
+        tr.append(damage);
+        table.append(tr);
+        inputs.push({row: target, choice, amount});
+      }
+      box.append(table);
+      const ready = () => inputs.every(input => input.choice.outcome);
+      const actions = make("div", null, "dm-area-actions");
+      const apply = make("button", "Apply", "dm-primary");
+      apply.type = "button";
+      apply.disabled = busy || !ready();
+      apply.onclick = async () => {
+        const results = inputs.map(({row, choice, amount}) => ({row, amount: Math.max(0, Math.min(100000, Math.floor(amount.valueAsNumber) || 0)), save: choice.outcome}));
+        if (await change({kind: "apply_area", id: area.id, results})) {
+          for (const {row} of inputs) { areaChoices.delete(area.id + "/" + row); delete areaRolls[area.id + "/" + row]; }
+          try { localStorage.setItem(AREA_ROLLS, JSON.stringify(areaRolls)); } catch {}
+        }
+      };
+      const dismiss = make("button", "Dismiss");
+      dismiss.type = "button";
+      dismiss.disabled = busy;
+      dismiss.onclick = () => change({kind: "dismiss_area", id: area.id});
+      actions.append(apply, dismiss);
+      box.append(actions);
+      return box;
+    }));
+    if (rolled) try { localStorage.setItem(AREA_ROLLS, JSON.stringify(areaRolls)); } catch {}
+  }
+
   return async state => {
     room = state;
     panel.hidden = !room?.combat || room.ended;
@@ -375,6 +520,7 @@ function setupDmInitiative(request, refresh) {
       room.members?.map(m => [m.member_id, m.name, m.online, m.inspection?.vitals?.effective_ac]),
       room.offers?.filter(offer => offer.effect.kind === "damage")
     ]);
+    renderAreas();
     if (signature === next) {
       renderTurns();
       if (damageSignature !== damageNext) renderActions(room, selected(), busy);

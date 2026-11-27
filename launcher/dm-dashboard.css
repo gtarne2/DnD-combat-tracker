@@ -495,3 +495,15 @@ article p { white-space: pre-line; overflow-wrap: anywhere; margin: 4px 0; color
   #party-controls .party-feedback { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.dm-zone-note { margin: 6px 0; padding: 7px 10px; border-radius: 8px; background: #2a2140; color: var(--gold); font-size: 13px; }
+.dm-areas { margin-top: 8px; padding: 9px 10px; border: 1px solid #6b4fa8; border-radius: 8px; background: #161227; }
+.dm-areas h3 { margin: 0; font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; }
+.dm-area { margin-top: 8px; border-top: 1px solid #33294d; padding-top: 6px; }
+.dm-area-head { margin: 0 0 4px; font-weight: 600; }
+.dm-area table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dm-area th { text-align: left; color: var(--faint); font-weight: 500; padding: 2px 4px; }
+.dm-area td { padding: 2px 4px; vertical-align: middle; }
+.dm-area td input { width: 5em; }
+.dm-area-note { color: var(--faint); font-size: 11px; }
+.dm-area-actions { display: flex; gap: 6px; margin-top: 6px; }

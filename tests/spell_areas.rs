@@ -104,3 +104,45 @@ fn no_area_when_none_is_named() {
         "sphere 20"
     );
 }
+
+#[test]
+fn saves_and_damage_types_from_descriptions() {
+    use aurora_combat_tracker::combat::{SpellSave, spell_damage_type, spell_save};
+    let fireball = "Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw. A target takes 8d6 fire damage on a failed save, or half as much damage on a successful one.";
+    assert_eq!(
+        spell_save(fireball),
+        Some(SpellSave {
+            ability: "dexterity",
+            half: true
+        })
+    );
+    assert_eq!(spell_damage_type(fireball), Some("fire"));
+    let guardians = "an affected creature's speed is halved in the area, and when the creature enters the area for the first time on a turn or starts its turn there, it must make a Wisdom saving throw. On a failed save, the creature takes 3d8 radiant damage (if you are good or neutral) or 3d8 necrotic damage (if you are evil). On a successful save, the creature takes half as much damage.";
+    assert_eq!(
+        spell_save(guardians),
+        Some(SpellSave {
+            ability: "wisdom",
+            half: true
+        })
+    );
+    assert_eq!(spell_damage_type(guardians), Some("radiant"));
+    let sleep = "Creatures within 20 feet of a point you choose fall unconscious.";
+    assert_eq!(spell_save(sleep), None);
+    let hold =
+        "Choose a humanoid. The target must succeed on a Wisdom saving throw or be paralyzed.";
+    assert_eq!(
+        spell_save(hold),
+        Some(SpellSave {
+            ability: "wisdom",
+            half: false
+        })
+    );
+    assert_eq!(
+        SpellSave {
+            ability: "dexterity",
+            half: true
+        }
+        .attribute(),
+        "dexterity half"
+    );
+}

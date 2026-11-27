@@ -10,6 +10,75 @@ pub struct SpellOptions {
     pub advantage: Option<&'static str>,
     /// The area of effect for a map template, when the range or description names one.
     pub area: Option<SpellArea>,
+    /// The saving throw the spell's targets make, and whether a success halves the damage.
+    pub save: Option<SpellSave>,
+    /// The first damage type the description names, such as "fire".
+    pub damage_type: Option<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpellSave {
+    pub ability: &'static str,
+    /// True when a successful save takes half damage; false when it takes none.
+    pub half: bool,
+}
+
+impl SpellSave {
+    /// Compact form for the sheet, such as `dexterity half`.
+    pub fn attribute(&self) -> String {
+        format!(
+            "{} {}",
+            self.ability,
+            if self.half { "half" } else { "none" }
+        )
+    }
+}
+
+const ABILITIES: [&str; 6] = [
+    "strength",
+    "dexterity",
+    "constitution",
+    "intelligence",
+    "wisdom",
+    "charisma",
+];
+const DAMAGE_TYPES: [&str; 13] = [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "necrotic",
+    "piercing",
+    "poison",
+    "psychic",
+    "radiant",
+    "slashing",
+    "thunder",
+];
+
+/// The first "<ability> saving throw" in a description, and whether a success halves damage.
+pub fn spell_save(description: &str) -> Option<SpellSave> {
+    let lower = description.to_ascii_lowercase();
+    let words = super::words(&lower);
+    let ability = words.windows(3).find_map(|w| {
+        (w[1] == "saving" && w[2] == "throw")
+            .then(|| ABILITIES.iter().find(|a| **a == w[0]).copied())
+            .flatten()
+    })?;
+    let half = lower.contains("half as much damage") || lower.contains("half damage");
+    Some(SpellSave { ability, half })
+}
+
+/// The first damage type named as "<type> damage".
+pub fn damage_type(description: &str) -> Option<&'static str> {
+    let lower = description.to_ascii_lowercase();
+    super::words(&lower).windows(2).find_map(|w| {
+        (w[1] == "damage")
+            .then(|| DAMAGE_TYPES.iter().find(|t| **t == w[0]).copied())
+            .flatten()
+    })
 }
 
 /// A spell's area of effect in feet, for drawing a template on a virtual tabletop.
@@ -228,6 +297,8 @@ impl SpellOptions {
             target_counts,
             advantage,
             area: area(range, &plain),
+            save: spell_save(&plain),
+            damage_type: damage_type(&plain),
         }
     }
 }

@@ -17,7 +17,10 @@ mod spell_options;
 mod spell_scaling;
 
 pub use html::{render_html, render_html_with_profile};
-pub use spell_options::{AreaShape, SpellArea, area as spell_area};
+pub use spell_options::{
+    AreaShape, SpellArea, SpellSave, area as spell_area, damage_type as spell_damage_type,
+    spell_save,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionGroup {

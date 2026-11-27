@@ -227,11 +227,29 @@ const partyInitiative = (() => {
     }
     if (!host) return;
     lastTemplates = templates;
+    lastAreas = state.combat?.areas || [];
     renderTemplates();
   }
   // Who is inside each template (O4): the DM's map suggests rows, and the caster confirms or
   // edits the list. Choices stay on this sheet until confirmed.
-  let lastTemplates = [];
+  let lastTemplates = [], lastAreas = [];
+  // Area damage (O5): roll the template's dice on this sheet. The DM applies saves and defenses.
+  function rollDice(text) {
+    const terms = String(text || "").replace(/\s+/g, "").match(/[+-]?(\d+d\d+|\d+)/gi) || [];
+    let total = 0, dice = false;
+    for (const term of terms) {
+      const sign = term.startsWith("-") ? -1 : 1;
+      const body = term.replace(/^[+-]/, "");
+      const [count, sides] = body.toLowerCase().split("d").map(Number);
+      if (sides) {
+        if (count > 100 || sides > 1000) return null;
+        dice = true;
+        for (let i = 0; i < count; i++) total += sign * (Math.floor(Math.random() * sides) + 1);
+      } else total += sign * count;
+    }
+    return dice ? Math.max(0, total) : null;
+  }
+  const ABILITY = {strength:"STR", dexterity:"DEX", constitution:"CON", intelligence:"INT", wisdom:"WIS", charisma:"CHA"};
   const picks = new Map();
   function rowName(row) { return row.key === "owner" ? "You" : row.name; }
   function pickFor(template) {
@@ -249,8 +267,8 @@ const partyInitiative = (() => {
     // Visible rows only; the server already leaves unrevealed enemies out of the suggestions.
     const rows = (board()?.rows || []).filter(row => row.score !== null || row.key === "owner");
     for (const id of picks.keys()) if (!templates.some(t => t.id === id)) picks.delete(id);
-    const signature = JSON.stringify([templates, rows.map(r => [r.id, rowName(r)]),
-      [...picks].map(([id, p]) => [id, p.key, p.edited, [...p.chosen]])]);
+    const signature = JSON.stringify([templates, lastAreas, rows.map(r => [r.id, rowName(r)]),
+      [...picks].map(([id, p]) => [id, p.key, p.edited, [...p.chosen], p.rolled])]);
     if (host.dataset.signature === signature) return;
     host.dataset.signature = signature;
     host.hidden = !templates.length;
@@ -308,6 +326,11 @@ const partyInitiative = (() => {
         actions.append(reset);
       }
       const chosen = rows.filter(row => pick.chosen.has(row.id)).map(row => row.id);
+      if (template.damage) {
+        card.append(...areaControls(template, pick, chosen, rows));
+        card.append(actions);
+        return card;
+      }
       const same = JSON.stringify(template.confirmed || null) === JSON.stringify(chosen);
       const confirm = Object.assign(document.createElement("button"), {type:"button", textContent: same ? "Targets confirmed" : "Confirm targets", disabled: same});
       confirm.onclick = async () => {
@@ -321,6 +344,54 @@ const partyInitiative = (() => {
       card.append(actions);
       return card;
     }));
+  }
+  // The damage line, the send button and the outcome of the latest application.
+  function areaControls(template, pick, chosen, rows) {
+    const nodes = [];
+    const sent = lastAreas.filter(area => area.template === template.id);
+    const latest = sent[sent.length - 1];
+    if (pick.rolled == null || pick.sentRoll === pick.rolled) {
+      pick.rolled = rollDice(template.damage);
+      pick.sentRoll = undefined;
+    }
+    const line = document.createElement("p");
+    line.className = "party-template-damage";
+    const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
+      + (template.save.on_success === "half" ? ", half on a success" : ", none on a success") : "";
+    const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? ""});
+    amount.setAttribute("aria-label", template.spell + " damage");
+    amount.onchange = () => { pick.rolled = amount.valueAsNumber; };
+    const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button", textContent:"Reroll", title:"Roll " + template.damage + " again"});
+    reroll.onclick = () => { pick.rolled = rollDice(template.damage); renderTemplates(); };
+    line.append("Damage " + template.damage + " = ", amount, " " + (template.damage_type || "") + save + " ", reroll);
+    nodes.push(line);
+    const names = new Map(rows.map(row => [row.id, rowName(row)]));
+    if (latest) {
+      const outcome = document.createElement("p");
+      outcome.className = "party-template-note";
+      outcome.textContent = latest.results
+        ? "Applied by the DM: " + (latest.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
+        : "Sent " + latest.amount + " damage to the DM. Waiting for saves.";
+      nodes.push(outcome);
+    }
+    // Instant spells are sent once. Zone spells can be sent again on later turns.
+    const repeat = template.lasts === "concentration";
+    const pending = latest && !latest.results;
+    const send = Object.assign(document.createElement("button"), {type:"button",
+      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM",
+      disabled: !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled)});
+    send.onclick = async () => {
+      send.disabled = true;
+      try {
+        await templateEdit({kind:"send_area", request:{id:crypto.randomUUID(), template:template.id, amount:pick.rolled, targets:chosen}});
+        pick.edited = true;
+        pick.sentRoll = pick.rolled;
+      } catch (error) { send.disabled = false; send.title = error.message; }
+    };
+    const actions = document.createElement("p");
+    actions.append(send);
+    nodes.push(actions);
+    return nodes;
   }
   const templates = {
     available: () => Boolean(board()?.joined),

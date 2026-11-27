@@ -160,8 +160,8 @@ const concentrationControls = (() => {
         return false;
       }
       const result = proposal.focus ? start(state, proposal.focus) : "casting " + proposal.name;
+      const roll = result ? spellRoll(proposal, method, pool) : "";
       if (result) {
-        const roll = spellRoll(proposal, method, pool);
         const kind = {cantrip: "cantrip", ritual: "ritual", free: "free use", slot: "spell slot"}[method];
         const source = "option:" + proposal.key;
         const active = state.focus.active;
@@ -185,6 +185,13 @@ const concentrationControls = (() => {
       }
       if (result && proposal.map) {
         placement = {...proposal.map, id: crypto.randomUUID(), spell: proposal.name};
+        // What the DM needs to resolve the area: the damage roll, its type and the save.
+        const dice = String(roll || proposal.damage || "").replace(/[^0-9a-zA-Z +-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+        if (/\d+d\d+/i.test(dice)) placement.damage = dice;
+        if (proposal.damageType) placement.damage_type = proposal.damageType;
+        const dc = Number(String(proposal.dc || "").match(/\d+/)?.[0]);
+        const [ability, branch] = (proposal.spellSave || "").split(" ");
+        if (ability && dc >= 1 && dc <= 40) placement.save = {ability, dc, on_success: branch === "half" ? "half" : "none"};
         if (placement.lasts === "concentration") placement.focus = state.focus.active?.id;
         if (placement.focus == null && placement.lasts === "concentration") placement.lasts = "removed";
       }
@@ -344,7 +351,8 @@ const concentrationControls = (() => {
       focus, activeId: active?.id ?? null, key: row.dataset.pin, level, ritual, firearm, timing,
       previews: control.dataset.castPreviews?.split("|") || [], effect: tools.dataset.spellEffect,
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
-      advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage};
+      advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage,
+      damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave};
     proposal.healing = tools.hasAttribute("data-healing-cast");
     const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
     if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady) {

@@ -392,6 +392,31 @@ impl Room {
                     }
                     return self.edit_window(id, cmd, action_id, strike_id, edit);
                 }
+                if let Edit::ApplyArea {
+                    id: area,
+                    ref results,
+                } = cmd.edit
+                {
+                    if !dm {
+                        return Err(Rejection::Forbidden);
+                    }
+                    let (spell, offers) = self.fight.apply_area(cmd, area, results)?;
+                    let source: String = format!("{spell} (area)").chars().take(120).collect();
+                    for (member, amount) in offers {
+                        // One offer per area and player, so a replay cannot send it twice.
+                        let action_id = Uuid::from_u128(area.as_u128() ^ member.as_u128());
+                        let Ok(amount) = amount.try_into() else {
+                            continue;
+                        };
+                        // A player who left still has a row until the DM removes it; skip them.
+                        if let Ok(sent) =
+                            self.send(id, member, action_id, &source, Effect::Damage(amount))
+                        {
+                            change.deliveries.extend(sent.deliveries);
+                        }
+                    }
+                    return Ok(change);
+                }
                 if let Edit::FinalizeDamage {
                     action_id,
                     strike_id,
