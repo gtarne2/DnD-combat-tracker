@@ -39,7 +39,7 @@ struct OverlayFile {
     buffs: Vec<BuffMechanics>,
 }
 
-/// Stat changes a spell puts on its targets, such as Longstrider's +10 feet of speed (R78).
+/// Stat changes a spell puts on its targets, such as Longstrider's +10 feet of speed (R79).
 /// Numbers only; the description still comes from the player's import.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct BuffMechanics {

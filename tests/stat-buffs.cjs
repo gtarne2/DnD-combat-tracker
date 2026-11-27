@@ -1,4 +1,4 @@
-// R78 browser check: a buff spell cast on the sheet's owner changes the header speed, and a
+// R79 browser check: a buff spell cast on the sheet's owner changes the header speed, and a
 // custom effect's stat changes reach AC, attack rolls and saving throws.
 // Run after building combat-sheet: AURORA_TEST_IMPORTER=target/debug/combat-sheet node tests/stat-buffs.cjs
 const assert = require("node:assert/strict");

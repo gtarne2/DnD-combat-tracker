@@ -152,7 +152,7 @@ const overlay = {
   features: curated.features || [],
   summons: curated.summons || [],
   companions: curated.companions || [],
-  // Stat changes of buff spells such as Longstrider (R78), hand-written only.
+  // Stat changes of buff spells such as Longstrider (R79), hand-written only.
   buffs: curated.buffs || [],
 };
 fs.writeFileSync(path.join(here, "overlay.json"), JSON.stringify(overlay, null, 1) + "\n");

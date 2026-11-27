@@ -187,7 +187,7 @@ function initiativeWriter(request) {
         const progress = draft.progress ||= previewEncounter.emptyProgress();
         const {kind, amount} = offer.effect;
         if (buff) {
-          // R78: the caster's buff lands on this sheet as an effect with its stat changes.
+          // R79: the caster's buff lands on this sheet as an effect with its stat changes.
           const mods = effectControls.fromWire(buff);
           if (!mods) return false;
           const sender = (view?.members || []).find(member => member.member_id === offer.sender);
@@ -303,7 +303,7 @@ function initiativeWriter(request) {
     if (hasSheet && !busy) {
       const saved = addressed.find(offer => offer.recipient === state.self_id && offer.status === "claimed"
         && previewEncounter.received(offer.offer_id));
-      // A buff from another player applies itself: there is nothing to choose (R78).
+      // A buff from another player applies itself: there is nothing to choose (R79).
       const buff = !saved && !state.ended && addressed.find(offer => offer.recipient === state.self_id
         && offer.effect.kind === "buff" && offer.status === "pending");
       if (buff) {

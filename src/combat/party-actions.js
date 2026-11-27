@@ -122,7 +122,7 @@ const partyActions = (() => {
     return label;
   }
 
-  // A buff effect on another player's row, such as Longstrider cast on them (R78). Their sheet
+  // A buff effect on another player's row, such as Longstrider cast on them (R79). Their sheet
   // applies it from a buff offer; the offer ends when the effect here ends or changes.
   function buffSource(state, key) {
     const id = Number(key.slice(7));

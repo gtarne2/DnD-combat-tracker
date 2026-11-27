@@ -1,4 +1,4 @@
-// R78: stat changes from active effects on this sheet's owner (Longstrider, Bless, Shield of
+// R79: stat changes from active effects on this sheet's owner (Longstrider, Bless, Shield of
 // Faith, a custom effect), shown on the stats they change. Equipped gear is already part of
 // the imported numbers; these come on top of the imported value or the player's override.
 const statEffects = (() => {

@@ -714,7 +714,7 @@
    }
   }
  ],
- "buffs_about": "Stat changes buff spells put on their targets (R78): speed in feet, AC, attack, damage and save bonuses, a die added once (4 is +1d4), seconds when not concentration, and targets at the spell's level plus per_slot more for each higher slot. Numbers only.",
+ "buffs_about": "Stat changes buff spells put on their targets (R79): speed in feet, AC, attack, damage and save bonuses, a die added once (4 is +1d4), seconds when not concentration, and targets at the spell's level plus per_slot more for each higher slot. Numbers only.",
  "buffs": [
   {
    "name": "Bless",

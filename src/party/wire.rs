@@ -93,7 +93,7 @@ pub enum Effect {
     Damage(NonZeroU32),
     Grant(AttackGrant),
     /// A spell or effect another player puts on this player, such as Longstrider or Bless,
-    /// with the stat changes the recipient's sheet applies while it lasts (R78).
+    /// with the stat changes the recipient's sheet applies while it lasts (R79).
     Buff(StatBuff),
 }
 

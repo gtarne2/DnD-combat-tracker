@@ -177,7 +177,7 @@ const concentrationControls = (() => {
             return false;
           }
         }
-        // R78: a timed buff such as Longstrider goes on each chosen target with its stat changes.
+        // R79: a timed buff such as Longstrider goes on each chosen target with its stat changes.
         if (!proposal.focus && proposal.buff && proposal.targets?.length && !effectControls.applyBuff(state,
             {name: proposal.name, mods: proposal.buff.mods, seconds: proposal.buff.seconds, targets: proposal.targets, source})) {
           status.textContent = "The target list changed. Open the spell again.";

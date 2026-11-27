@@ -98,7 +98,7 @@ const attackModifiers = (() => {
       attack += bonus.attack;
       if (kind === "weapon") damage += bonus.damage;
     }
-    // R78: effects on this sheet's owner, such as Bless (+1d4) or a custom +1 to attacks.
+    // R79: effects on this sheet's owner, such as Bless (+1d4) or a custom +1 to attacks.
     const owner = kind ? effectControls.modsFor(state) : null;
     if (owner) {
       attack += owner.attack;

@@ -1016,7 +1016,7 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 #concentration-reminder { width: min(94vw, 440px); }
 /* The concentration reminder floats over the sheet without blocking it. */
 #concentration-reminder[open] { position: fixed; inset: 70px 0 auto; margin: 0 auto; z-index: 50; box-shadow: 0 10px 30px rgba(0, 0, 0, .55); border: 1px solid var(--gold); }
-/* R78: effect stat changes and boosted stats */
+/* R79: effect stat changes and boosted stats */
 .effect-mod-fields { border: 1px solid var(--line); border-radius: var(--control-round); padding: 4px 8px; }
 .effect-mod-fields[open] { padding-bottom: 8px; }
 .effect-mod-hint { color: var(--muted); font-size: 12px; margin: 4px 0 6px; }

@@ -12,7 +12,7 @@ const effectControls = (() => {
   let activeBefore = new Set();
   let lastRender = "";
 
-  // Stat changes an effect makes on its target (R78): speed in feet, AC, attack and damage
+  // Stat changes an effect makes on its target (R79): speed in feet, AC, attack and damage
   // bonuses, saving throw bonus, and a die added once to attacks or saves (4 is +1d4).
   const MOD_KEYS = ["speed", "ac", "attack", "attackDie", "damage", "save", "saveDie"];
   const DICE = [0, 4, 6, 8, 10, 12];
@@ -187,7 +187,7 @@ const effectControls = (() => {
     return true;
   }
 
-  /** Puts a timed buff spell such as Longstrider on each chosen target (R78). */
+  /** Puts a timed buff spell such as Longstrider on each chosen target (R79). */
   function applyBuff(state, {name, mods, seconds, targets, source}) {
     const names = spellParticipants(state);
     mods = cleanMods(mods);

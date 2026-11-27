@@ -1,4 +1,4 @@
-//! R78: buff spells carry stat changes from the mechanics overlay, and equipped gear rules
+//! R79: buff spells carry stat changes from the mechanics overlay, and equipped gear rules
 //! with an `equipped` condition feed AC and saving throws.
 
 use std::{fs, path::Path};
