@@ -177,7 +177,7 @@ module.exports = async function monsterLibrary({launch,pageFor,open,api}) {
   const before = await readPack(old.info.id);
   await stage(upgraded);
   const conflict = el("#monster-import-preview");
-  await conflict.getByText(/Pack ID conflict.*1.0.*2.0/).waitFor();
+  await conflict.getByText(/This replaces.*1.0.*2.0/).waitFor();
   assert.equal((await readPack(old.info.id)).revision,before.revision);
   await conflict.getByRole("button",{name:"Cancel"}).click();
   assert.equal((await readPack(old.info.id)).revision,before.revision);
@@ -189,7 +189,7 @@ module.exports = async function monsterLibrary({launch,pageFor,open,api}) {
   const alternate = structuredClone(upgraded);
   alternate.info.source_version = "2.1";
   await stage(alternate,otherTab);
-  await otherTab.locator("#monster-import-preview").getByText(/Pack ID conflict.*1.0.*2.1/).waitFor();
+  await otherTab.locator("#monster-import-preview").getByText(/This replaces.*1.0.*2.1/).waitFor();
   await importPack(upgraded,"Replace pack");
   await otherTab.getByRole("button",{name:"Replace pack",exact:true}).click();
   await otherTab.locator("#monster-confirm [role=status]").getByText(/This pack changed/).waitFor();
