@@ -3,7 +3,7 @@
 // it over a BroadcastChannel, because they close often.
 import OBR from "./obr-sdk-3.1.0.js";
 import { BridgeClient } from "./bridge-client.js";
-import { LINK, addTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
+import { LINK, addTokens, adoptPlayerTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
 import { autoMatch } from "./players.js";
 import { insideReports, listenForDraws, syncTemplates } from "./template-sync.js";
 
@@ -15,7 +15,7 @@ let insideTimer = null;
 const POLL_MS = 2000;
 const BASE = new URL(".", import.meta.url).href;
 const channel = new BroadcastChannel("aurora-obr");
-const state = { role: null, connected: false, paired: false, table: null, onMap: {}, error: null, mapError: null, mapNotes: [], checkedAt: null };
+const state = { role: null, connected: false, paired: false, table: null, onMap: {}, error: null, mapError: null, mapNotes: [], checkedAt: null, startedAt: Date.now() };
 let client = null;
 let badge = null;
 let syncing = false;
@@ -40,7 +40,8 @@ async function syncMap() {
   try {
     await syncTokens(state.table);
     state.onMap = await linkedRows(state.table.room_id);
-    autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
+    const matches = autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
+    if (await adoptPlayerTokens(state.table, matches)) state.onMap = await linkedRows(state.table.room_id);
     state.mapNotes = await syncTemplates(state.table);
     await reportInside();
     state.mapError = null;
@@ -61,10 +62,10 @@ async function reportInside() {
   lastInside = { key, at: Date.now() };
 }
 
-// A template or token moved: update the suggestion once things settle for half a second.
+// A template or token moved: update the suggestion once a drag pauses.
 function insideSoon() {
   clearTimeout(insideTimer);
-  insideTimer = setTimeout(() => reportInside().catch(() => {}), 500);
+  insideTimer = setTimeout(() => reportInside().catch(() => {}), 150);
 }
 
 async function refresh() {
