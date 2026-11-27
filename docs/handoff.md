@@ -30,6 +30,16 @@
 | Validation | See the PR #15 description for the exact runs. |
 | Next action | On Windows: start a DM room with no encounter and check a player's rail says "Waiting for the DM"; check players are seated automatically and that removing one keeps them out; open the sheet's ⚙ Settings; add a monster from "All packs". |
 
+## Bestiary import handoff (R42 update)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-wcchls`, branched from `dev` at `eed5708`. |
+| Completed | 5etools import without the pack details form: pack ID, book name and edition from the file (`import_fivetools_file`). The monster library has "Import 5etools files" (several at once) and "Import 5etools folder", reviewed in one dialog. The launcher's first screen has a "5etools bestiary JSON" list (files or folders, saved in `bestiary-sources.txt`) that a DM room loads into the library on start; the library status line reports it. Aurora import and Create pack keep the details form. |
+| Modified components | `src/fivetools.rs`, `src/bin/party_runtime/{mod,monster_library}.rs`, `launcher/{TrackerLauncher,PartySession}.cs`, `launcher/dm-dashboard.html`, `launcher/dm-monsters.js`, `tests/fivetools_import.rs`. |
+| Validation | Linux cloud: `cargo test --locked` passed, including the new `names_packs_from_the_file_without_details` test; the ignored real-file test named `bestiary-mm.json` as Monster Manual (2014) 2014, `bestiary-xmm.json` as Monster Manual (2025) 2024 and `bestiary-vgm.json` as Volo's Guide (7 `_copy` skips). `cargo check --locked --target x86_64-pc-windows-gnu --bins` passed. With the Linux preview helper and Playwright: a launch line listing a folder (MM, VGM, fluff and index files) and a missing path loaded 2 books and reported the missing path; a dashboard folder import of MM + XMM + `legendarygroups.json` reviewed 2 packs (1 replacing) and saved both; a single-file reimport showed Replace pack. Not run: the WinForms launcher layout on Windows. |
+| Next action | On Windows, add a 5etools `data\bestiary` folder on the launcher's first screen, host as DM, and open the monster library to confirm the books load and the launcher layout fits. |
+
 ## Table rules handoff (R75–R77)
 
 | Field | Record |

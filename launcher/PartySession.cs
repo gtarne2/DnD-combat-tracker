@@ -168,7 +168,7 @@ internal sealed class PartySession : IDisposable
     [DllImport("kernel32.dll")]
     private static extern bool AssignProcessToJobObject(SafeFileHandle job, IntPtr process);
 
-    internal static object Choose(Form parent, string mode, string character)
+    internal static object Choose(Form parent, string mode, string character, string[] bestiary)
     {
         bool dm = mode == "dm" || mode == "resume-dm";
         if (!dm && String.IsNullOrEmpty(character)) throw new IOException("Select a character first.");
@@ -210,7 +210,8 @@ internal sealed class PartySession : IDisposable
                 profile = dm ? "dm" : "sheet:" + Path.GetFullPath(character).ToUpperInvariant(),
                 name = name.Text.Trim(),
                 invite = invite.Text.Trim(),
-                bind = address == null ? null : address.ToString()
+                bind = address == null ? null : address.ToString(),
+                bestiary = dm ? bestiary : new string[0]
             };
         }
     }

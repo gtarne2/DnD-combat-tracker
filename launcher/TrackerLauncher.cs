@@ -34,12 +34,20 @@ internal sealed class TrackerLauncher : Form
         HorizontalScrollbar = true,
         IntegralHeight = false
     };
+    // 5etools bestiary files and folders a DM room loads into its monster library on start.
+    private readonly ListBox bestiary = new ListBox
+    {
+        FormattingEnabled = true,
+        HorizontalScrollbar = true,
+        IntegralHeight = false
+    };
+    private readonly Button bestiaryRemove = new Button { Text = "Remove" };
     private readonly Button remove = new Button { Text = "Remove" };
     private readonly Button up = new Button { Text = "Move up" };
     private readonly Button down = new Button { Text = "Move down" };
     private readonly Button open = new Button { Text = "Open Combat Sheet" };
     private readonly Label status = new Label();
-    private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 290 };
+    private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 414 };
     private string characterPath;
     private RefreshBridge bridge;
     private PartySession party;
@@ -52,6 +60,7 @@ internal sealed class TrackerLauncher : Form
     private bool checkingHost;
     private readonly NotifyIcon tray = new NotifyIcon { Text = "Aurora Combat Tracker", Icon = SystemIcons.Application };
     private string SettingsPath { get { return Path.Combine(appData, "last-import.txt"); } }
+    private string BestiaryPath { get { return Path.Combine(appData, "bestiary-sources.txt"); } }
 
     [STAThread]
     private static void Main()
@@ -84,7 +93,7 @@ internal sealed class TrackerLauncher : Form
     private TrackerLauncher(EventWaitHandle activate)
     {
         Text = "Aurora Combat Tracker";
-        ClientSize = new Size(640, 367);
+        ClientSize = new Size(640, 491);
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96, 96);
         StartPosition = FormStartPosition.CenterScreen;
@@ -105,8 +114,15 @@ internal sealed class TrackerLauncher : Form
         Place(selection, remove, 536, 167, 88, 26);
         Place(selection, up, 536, 198, 88, 26);
         Place(selection, down, 536, 229, 88, 26);
-        Place(this, status, 16, 295, 608, 22);
-        Place(this, open, 452, 321, 172, 30);
+        var bestiaryFiles = new Button { Text = "Add files..." };
+        var bestiaryFolder = new Button { Text = "Add folder..." };
+        Place(selection, new Label { Text = "5etools bestiary JSON (optional). Loaded into the monster library when you host as DM." }, 16, 293, 608, 22);
+        Place(selection, bestiary, 16, 318, 510, 88);
+        Place(selection, bestiaryFiles, 536, 318, 88, 26);
+        Place(selection, bestiaryFolder, 536, 349, 88, 26);
+        Place(selection, bestiaryRemove, 536, 380, 88, 26);
+        Place(this, status, 16, 419, 608, 22);
+        Place(this, open, 452, 445, 172, 30);
         var partyButton = new Button { Text = "Party..." };
         Place(selection, partyButton, 536, 259, 88, 26);
         var partyMenu = new ContextMenuStrip();
@@ -151,6 +167,14 @@ internal sealed class TrackerLauncher : Form
         };
 
         browse.Click += delegate { ChooseCharacter(); };
+        bestiaryFiles.Click += delegate { AddBestiaryFiles(); };
+        bestiaryFolder.Click += delegate { AddBestiaryFolder(); };
+        bestiary.Format += delegate(object sender, ListControlConvertEventArgs args)
+        {
+            args.Value = DisplayPath((string)args.ListItem);
+        };
+        bestiary.SelectedIndexChanged += delegate { UpdateButtons(); };
+        bestiaryRemove.Click += delegate { RemoveBestiary(); };
         add.Click += delegate { AddContent(); };
         folder.Click += delegate { AddContentFolder(); };
         content.Format += delegate(object sender, ListControlConvertEventArgs args)
@@ -169,7 +193,67 @@ internal sealed class TrackerLauncher : Form
         down.Click += delegate { MoveContent(1); };
         open.Click += async delegate { await OpenSheet(); };
         RestoreSelections();
+        RestoreBestiary();
         UpdateButtons();
+    }
+
+    private void AddBestiaryFiles()
+    {
+        string directory = bestiary.SelectedItem as string;
+        if (directory != null && !Directory.Exists(directory)) directory = Path.GetDirectoryName(directory);
+        var existing = new HashSet<string>(bestiary.Items.Cast<string>(), StringComparer.OrdinalIgnoreCase);
+        foreach (string path in ChooseFiles("Select 5etools bestiary JSON", "5etools bestiary (*.json)|*.json", directory, true))
+            if (existing.Add(path))
+                bestiary.SelectedIndex = bestiary.Items.Add(path);
+        SaveBestiary();
+    }
+
+    private void AddBestiaryFolder()
+    {
+        using (var dialog = new FolderBrowserDialog
+        {
+            Description = "Select a folder of 5etools bestiary JSON, such as data\\bestiary. Subfolders are included.",
+            SelectedPath = bestiary.SelectedItem as string ?? "",
+            ShowNewFolderButton = false
+        })
+        {
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+            int index = bestiary.Items.Cast<string>().ToList().FindIndex(
+                path => StringComparer.OrdinalIgnoreCase.Equals(path, dialog.SelectedPath));
+            bestiary.SelectedIndex = index >= 0 ? index : bestiary.Items.Add(dialog.SelectedPath);
+        }
+        SaveBestiary();
+    }
+
+    private void RemoveBestiary()
+    {
+        int index = bestiary.SelectedIndex;
+        if (index < 0) return;
+        bestiary.Items.RemoveAt(index);
+        bestiary.SelectedIndex = Math.Min(index, bestiary.Items.Count - 1);
+        SaveBestiary();
+    }
+
+    private void SaveBestiary()
+    {
+        try
+        {
+            Directory.CreateDirectory(appData);
+            File.WriteAllLines(BestiaryPath, bestiary.Items.Cast<string>());
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private void RestoreBestiary()
+    {
+        string[] paths;
+        try { paths = File.ReadAllLines(BestiaryPath); }
+        catch (IOException) { return; }
+        catch (UnauthorizedAccessException) { return; }
+        foreach (string path in paths.Where(path => path.Length > 0))
+            bestiary.Items.Add(path);
     }
 
     private void ShowLauncher()
@@ -310,6 +394,7 @@ internal sealed class TrackerLauncher : Form
     {
         open.Enabled = selection.Enabled && characterPath != null;
         remove.Enabled = content.SelectedIndex >= 0;
+        bestiaryRemove.Enabled = bestiary.SelectedIndex >= 0;
         up.Enabled = content.SelectedIndex > 0;
         down.Enabled = remove.Enabled && content.SelectedIndex < content.Items.Count - 1;
     }
@@ -344,7 +429,7 @@ internal sealed class TrackerLauncher : Form
         PartySession candidate = null;
         RefreshBridge lobbyBridge = null;
         try {
-            var options = PartySession.Choose(this, mode, characterPath);
+            var options = PartySession.Choose(this, mode, characterPath, bestiary.Items.Cast<string>().ToArray());
             if (options == null) return;
             // Resuming a host reuses its LAN port and creates a fresh sheet capability.
             if (mode.StartsWith("resume") && party != null) {

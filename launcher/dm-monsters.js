@@ -165,7 +165,8 @@ function setupMonsterLibrary(request, addToEncounter) {
   const packForm = el("monster-pack-form");
   const templateForm = el("monster-template-form");
   const add = el("monster-add");
-  const loadControls = [packChoice,el("monster-import"),el("monster-aurora"),el("monster-fivetools"),el("monster-new-pack")];
+  const loadControls = [packChoice,el("monster-import"),el("monster-aurora"),el("monster-fivetools"),
+    el("monster-fivetools-folder"),el("monster-new-pack")];
   const filters = [
     [el("monster-type"), s => [s.creature_type]],
     [el("monster-size"), s => s.details?.sizes?.length ? s.details.sizes : [s.size]],
@@ -279,9 +280,31 @@ function setupMonsterLibrary(request, addToEncounter) {
     if (!packs.length) status.textContent = "Import a pack or create one to add monsters.";
   }
 
+  // Bestiary files the launcher lists load in the background when the DM room starts.
+  let launcherBestiary;
+  async function bestiaryReport() {
+    if (launcherBestiary?.done) return;
+    launcherBestiary = await api("bestiary");
+    if (!launcherBestiary) return;
+    if (!launcherBestiary.done) {
+      status.textContent = "Loading 5etools bestiary files from the launcher…";
+      setTimeout(() => { if (library.open && !busy) run(status, async () => { await bestiaryReport(); await reload(); }); }, 1500);
+      return;
+    }
+    const {packs = [], problems = []} = launcherBestiary;
+    const total = packs.reduce((sum, pack) => sum + pack.count, 0);
+    status.textContent = [packs.length
+      ? "Loaded " + packs.length + (packs.length === 1 ? " bestiary book" : " bestiary books")
+        + " from the launcher (" + total.toLocaleString() + " monsters)."
+      : "", ...problems].filter(Boolean).join(" ");
+  }
+
   el("dm-open-library").onclick = () => {
     library.showModal();
-    run(status, () => reload());
+    run(status, async () => {
+      await bestiaryReport().catch(() => {});
+      await reload();
+    });
   };
   packChoice.onchange = () => run(status, () => loadPack());
   search.oninput = () => populateMatches();
@@ -289,7 +312,17 @@ function setupMonsterLibrary(request, addToEncounter) {
   matches.onchange = selection;
 
   async function reviewImport(pack, warnings = []) {
-    const before = await api("validate",pack);
+    return reviewImports([{pack,warnings}]);
+  }
+
+  // One review for any number of packs, such as every book in a 5etools folder.
+  async function reviewImports(imports, problems = []) {
+    const items = [];
+    for (const {pack, warnings = []} of imports)
+      items.push({pack, warnings, before:await api("validate",pack)});
+    const many = items.length > 1;
+    const warnings = [...problems, ...items.flatMap(({pack, warnings}) =>
+      warnings.map(text => many ? pack.info.source + ": " + text : text))];
     const notes = el("monster-import-warnings");
     notes.hidden = !warnings.length;
     notes.querySelector("summary").textContent = warnings.length + " not imported or incomplete";
@@ -298,17 +331,62 @@ function setupMonsterLibrary(request, addToEncounter) {
       item.textContent = text;
       return item;
     }));
-    pendingImport = {pack,expected_revision:before?.revision ?? null};
-    const after = monsterPackLabel(pack.info) + " · " + pack.monsters.length + " templates.";
-    el("monster-import-description").textContent = before
-      ? "Pack ID conflict. This replaces " + monsterPackLabel(before.info) + " (" + before.count + " templates) with " + after
-      : after;
-    el("monster-import-credits").textContent = (before ? [before.info,pack.info] : [pack.info])
-      .map(info => [monsterPackLabel(info),info.attribution,monsterLicense(info.license)].filter(Boolean).join(" · "))
-      .join("\n");
-    el("monster-confirm-save").textContent = before ? "Replace pack" : "Import pack";
+    pendingImport = items.map(({pack, before}) => ({pack,expected_revision:before?.revision ?? null}));
+    const replaced = items.filter(item => item.before);
+    if (many) {
+      const total = items.reduce((sum, {pack}) => sum + pack.monsters.length, 0);
+      el("monster-import-description").textContent = items.length + " packs · " + total.toLocaleString() + " templates."
+        + (replaced.length === 1 ? " 1 replaces the copy already in the library."
+          : replaced.length ? " " + replaced.length + " replace the copies already in the library." : "");
+      el("monster-import-credits").textContent = items.map(({pack}) =>
+        monsterPackLabel(pack.info) + " · " + pack.monsters.length + " templates").join("\n");
+    } else {
+      const [{pack, before}] = items;
+      const after = monsterPackLabel(pack.info) + " · " + pack.monsters.length + " templates.";
+      el("monster-import-description").textContent = before
+        ? "This replaces " + monsterPackLabel(before.info) + " (" + before.count + " templates) with " + after
+        : after;
+      el("monster-import-credits").textContent = (before ? [before.info,pack.info] : [pack.info])
+        .map(info => [monsterPackLabel(info),info.attribution,monsterLicense(info.license)].filter(Boolean).join(" · "))
+        .join("\n");
+    }
+    el("monster-confirm-save").textContent = many ? "Import " + items.length + " packs"
+      : replaced.length ? "Replace pack" : "Import pack";
     confirm.querySelector("[role=status]").textContent = "";
     confirm.closest("dialog").showModal();
+  }
+
+  // Matches the launcher's filter: lore, the index and other lists in a 5etools folder are not bestiaries.
+  const bestiaryFile = file => /\.json$/i.test(file.name) && !/^fluff/i.test(file.name)
+    && !/^(index|foundry|legendarygroups|template)\.json$/i.test(file.name);
+  async function importFiveTools(files) {
+    files = files.filter(bestiaryFile)
+      .sort((a,b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name,"en"));
+    // A whole 5etools data folder also holds adventures and spell lists.
+    if (files.some(file => /^bestiary/i.test(file.name))) files = files.filter(file => /^bestiary/i.test(file.name));
+    if (!files.length) throw new Error("Choose 5etools bestiary JSON files, such as bestiary-mm.json.");
+    const imports = [], problems = [];
+    let other = 0;
+    for (const [index, file] of files.entries()) {
+      status.textContent = "Reading " + file.name + (files.length > 1 ? " (" + (index + 1) + " of " + files.length + ")…" : "…");
+      if (file.size > 16 * 1024 * 1024) { problems.push(file.name + ": 5etools files are limited to 16 MiB."); continue; }
+      const json = await file.text();
+      // Spell, item and other 5etools lists in the same folder have no monster list.
+      if (files.length > 1 && !json.includes('"monster"')) { other++; continue; }
+      try { imports.push(await api("fivetools",{file_name:file.name,json})); }
+      catch (error) { problems.push(file.name + ": " + error.message); }
+    }
+    status.textContent = "";
+    if (!imports.length) throw new Error(problems.join(" ") || "No bestiary files found among " + other + " files.");
+    await reviewImports(imports, problems);
+  }
+  for (const [button, input] of [["monster-fivetools","monster-fivetools-files"],["monster-fivetools-folder","monster-fivetools-dir"]]) {
+    el(button).onclick = () => el(input).click();
+    el(input).onchange = event => {
+      const files = [...event.target.files];
+      event.target.value = "";
+      if (files.length) run(status, () => importFiveTools(files));
+    };
   }
 
   el("monster-import").onchange = event => {
@@ -319,17 +397,24 @@ function setupMonsterLibrary(request, addToEncounter) {
       if (file.size > 16 * 1024 * 1024) throw new Error("Monster packs are limited to 16 MiB.");
       const pack = JSON.parse(await file.text());
       if (pack && pack.schema_version == null && Array.isArray(pack.monster))
-        throw new Error("This looks like a 5etools bestiary. Use Import 5etools JSON instead.");
+        throw new Error("This looks like a 5etools bestiary. Use Import 5etools files instead.");
       await reviewImport(pack);
     });
   };
 
   submit(confirm, async () => {
-    await api("save",pendingImport);
+    const saving = pendingImport;
+    for (const [index, item] of saving.entries()) {
+      try { await api("save",item); }
+      catch (error) {
+        throw new Error((index ? "Imported " + index + " of " + saving.length + " packs. " : "")
+          + item.pack.info.source + ": " + error.message);
+      }
+    }
     confirm.closest("dialog").close();
     search.value = "";
-    await reload(pendingImport.pack.info.id);
-    status.textContent = "Imported " + pendingImport.pack.info.source + ".";
+    await reload(saving[0].pack.info.id);
+    status.textContent = "Imported " + (saving.length > 1 ? saving.length + " packs" : saving[0].pack.info.source) + ".";
   });
 
   el("monster-export").onclick = () => {
@@ -347,21 +432,17 @@ function setupMonsterLibrary(request, addToEncounter) {
     packMode = mode;
     packForm.reset();
     const fields = packForm.elements;
-    const aurora = mode === "aurora", fivetools = mode === "fivetools";
-    fields.id.value = aurora ? "aurora-local" : fivetools ? "5etools-local" : "homebrew-" + crypto.randomUUID();
+    const aurora = mode === "aurora";
+    fields.id.value = aurora ? "aurora-local" : "homebrew-" + crypto.randomUUID();
     fields.edition.value = "2014";
-    fields.source.value = aurora ? "Local Aurora companions" : fivetools ? "Local 5etools bestiary" : "Local homebrew";
-    fields.attribution.value = aurora ? "Imported from local Aurora XML."
-      : fivetools ? "Imported from a local 5etools bestiary file." : "Private homebrew.";
+    fields.source.value = aurora ? "Local Aurora companions" : "Local homebrew";
+    fields.attribution.value = aurora ? "Imported from local Aurora XML." : "Private homebrew.";
     fields.folder.required = aurora;
-    fields.bestiary.required = fivetools;
     el("monster-xml-label").hidden = !aurora;
-    el("monster-fivetools-label").hidden = !fivetools;
     packForm.querySelector("[role=status]").textContent = "";
     packForm.closest("dialog").showModal();
   }
   el("monster-aurora").onclick = () => openPackForm("aurora");
-  el("monster-fivetools").onclick = () => openPackForm("fivetools");
   el("monster-new-pack").onclick = () => openPackForm("create");
 
   submit(packForm, async () => {
@@ -378,13 +459,6 @@ function setupMonsterLibrary(request, addToEncounter) {
       if (xml.reduce((size,file) => size + file.size,0) > 24 * 1024 * 1024)
         throw new Error("Choose an Aurora folder with up to 24 MiB of XML.");
       await reviewImport(await api("aurora",{info,files:await Promise.all(xml.map(file => file.text()))}));
-      packForm.closest("dialog").close();
-    } else if (packMode === "fivetools") {
-      const file = f.bestiary.files[0];
-      if (!file) throw new Error("Choose a 5etools bestiary JSON file.");
-      if (file.size > 16 * 1024 * 1024) throw new Error("5etools files are limited to 16 MiB.");
-      const {pack, warnings} = await api("fivetools",{info,json:await file.text()});
-      await reviewImport(pack, warnings);
       packForm.closest("dialog").close();
     } else {
       packForm.closest("dialog").close();
