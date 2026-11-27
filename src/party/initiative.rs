@@ -60,6 +60,10 @@ pub struct AreaTemplate {
     pub damage_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub save: Option<AreaSave>,
+    /// Fill colour as `#rrggbb`, from the sheet's mechanics overlay. The outline keeps the
+    /// caster's colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colour: Option<String>,
     /// The caster's companion the template is centred on, by its sheet ID, such as a
     /// Protector cannon's aura. None centres it on the caster.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -194,6 +198,11 @@ fn valid_template(template: &AreaTemplate) -> bool {
         })
         && template.damage_type.as_deref().is_none_or(|kind| {
             !kind.is_empty() && kind.len() <= 20 && kind.chars().all(|c| c.is_ascii_lowercase())
+        })
+        && template.colour.as_deref().is_none_or(|colour| {
+            colour.len() == 7
+                && colour.starts_with('#')
+                && colour[1..].chars().all(|c| c.is_ascii_hexdigit())
         })
         && template.save.as_ref().is_none_or(|save| {
             ABILITY_NAMES.contains(&save.ability.as_str()) && (1..=40).contains(&save.dc)
@@ -935,11 +944,15 @@ impl Fight {
                             .id
                     }
                 };
-                Some(json!({
+                let mut view = json!({
                     "id": template.id, "caster": caster, "member_id": t.member,
                     "spell": template.spell, "shape": template.shape, "size": template.size,
                     "width": template.width, "lasts": template.lasts, "aim": template.aim,
-                }))
+                });
+                if let Some(colour) = &template.colour {
+                    view["colour"] = json!(colour);
+                }
+                Some(view)
             })
             .collect();
         json!({"id":self.id,"revision":self.revision,"running":self.running,

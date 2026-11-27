@@ -14,6 +14,10 @@ pub struct SpellOptions {
     pub save: Option<SpellSave>,
     /// The first damage type the description names, such as "fire".
     pub damage_type: Option<&'static str>,
+    /// Template fill colour as `#rrggbb`, from the mechanics overlay.
+    pub colour: Option<String>,
+    /// True when the tracker's mechanics overlay matched this imported spell.
+    pub overlay: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -209,6 +213,21 @@ fn line_width(rest: &[&str]) -> Option<u32> {
 }
 
 impl SpellOptions {
+    /// Applies the tracker's mechanics overlay to a spell read from the player's import.
+    /// A reviewed or structured area replaces the one read from the text; the colour comes
+    /// from the overlay or the damage type.
+    pub(super) fn apply_overlay(&mut self, name: &str, source: Option<&str>) {
+        let overlay = crate::mechanics::overlay();
+        let entry = overlay.spell(name, source);
+        if let Some(entry) = entry {
+            self.overlay = true;
+            if let Some(area) = &entry.area {
+                self.area = Some(area.spell_area());
+            }
+        }
+        self.colour = overlay.template_colour(entry, self.damage_type);
+    }
+
     pub(super) fn read(
         text: &str,
         range: Option<&str>,
@@ -317,6 +336,8 @@ impl SpellOptions {
             area: area(range, &plain),
             save: spell_save(&plain),
             damage_type: damage_type(&plain),
+            colour: None,
+            overlay: false,
         }
     }
 }

@@ -191,6 +191,7 @@ const concentrationControls = (() => {
         const dice = String(roll || proposal.damage || "").match(/\d+d\d+(?:\s*[+-]\s*\d+(?:d\d+)?)*/i)?.[0].replace(/\s+/g, "");
         if (dice && dice.length <= 40) placement.damage = dice;
         if (proposal.damageType) placement.damage_type = proposal.damageType;
+        if (/^#[0-9a-f]{6}$/i.test(proposal.colour || "")) placement.colour = proposal.colour;
         const dc = Number(String(proposal.dc || "").match(/\d+/)?.[0]);
         const [ability, branch] = (proposal.spellSave || "").split(" ");
         if (ability && dc >= 1 && dc <= 40) placement.save = {ability, dc, on_success: branch === "half" ? "half" : "none"};
@@ -362,7 +363,7 @@ const concentrationControls = (() => {
       previews: control.dataset.castPreviews?.split("|") || [], effect: tools.dataset.spellEffect,
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
       advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage,
-      damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave};
+      damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave, colour: tools.dataset.spellColour};
     proposal.healing = tools.hasAttribute("data-healing-cast");
     const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
     if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady) {

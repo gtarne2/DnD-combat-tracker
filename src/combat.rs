@@ -710,6 +710,13 @@ impl CombatSheet {
                 setter(mechanics, "school"),
                 setter(mechanics, "materialComponent").as_deref(),
             );
+            let spell = linked_spell.or(definition);
+            option.spell_options.apply_overlay(
+                spell
+                    .and_then(|spell| spell.name.as_deref())
+                    .unwrap_or(name),
+                spell.and_then(|spell| spell.source.as_deref()),
+            );
             option.detail("School", option.spell_options.school.clone());
             option.detail("Trigger", option.spell_options.trigger.clone());
         }

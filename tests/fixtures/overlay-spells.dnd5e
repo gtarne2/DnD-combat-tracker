@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character>
+  <display-properties><level>7</level></display-properties>
+  <build>
+    <input><name>Overlay Fixture</name></input>
+    <abilities><strength>8</strength><dexterity>14</dexterity><constitution>12</constitution><intelligence>18</intelligence><wisdom>12</wisdom><charisma>10</charisma></abilities>
+    <magic><spellcasting name="Test Magic" ability="Intelligence" attack="7" dc="15">
+      <slots s1="4" s2="3" s3="3" s4="1"/>
+      <spells><spell id="ID_TEST_SPELL_WALL_OF_FIRE" level="4" prepared="true"/><spell id="ID_TEST_SPELL_FIREBALL" level="3" prepared="true"/><spell id="ID_TEST_SPELL_WEB" level="2" prepared="true"/><spell id="ID_TEST_SPELL_SHATTER" level="2" prepared="true"/></spells>
+    </spellcasting></magic>
+  </build>
+</character>
