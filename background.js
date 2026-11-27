@@ -19,6 +19,8 @@ const state = { role: null, connected: false, paired: false, table: null, onMap:
 let client = null;
 let badge = null;
 let syncing = false;
+// Rows seen in this encounter, so a monster or companion added mid-fight gets a token.
+let seen = null;
 
 function publish() {
   state.connected = Boolean(client && client.connected);
@@ -38,6 +40,7 @@ async function syncMap() {
   if (!state.table || syncing) return;
   syncing = true;
   try {
+    await placeNewRows(state.table);
     await syncTokens(state.table);
     state.onMap = await linkedRows(state.table.room_id);
     const matches = autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
@@ -49,6 +52,31 @@ async function syncMap() {
     state.mapError = error.message || String(error);
   } finally {
     syncing = false;
+  }
+}
+
+// Once the encounter is running, a monster added to the tracker is put on the map, hidden
+// until the DM reveals it, and a companion summoned mid-fight (such as an Eldritch Cannon) is
+// put beside its owner's token. Rows that were there when the link started are left to the DM.
+async function placeNewRows(table) {
+  const encounter = table.encounter;
+  const key = `${table.room_id}/${encounter.id}`;
+  const ids = encounter.rows.filter((row) => row.kind !== "player").map((row) => row.id);
+  if (!seen || seen.key !== key) {
+    seen = { key, ids: new Set(ids) };
+    return;
+  }
+  const fresh = encounter.rows.filter((row) => row.kind !== "player" && !seen.ids.has(row.id));
+  if (!fresh.length) return;
+  for (const row of fresh) seen.ids.add(row.id);
+  if (!encounter.running || !(await OBR.scene.isReady())) return;
+  const enemies = fresh.filter((row) => row.kind === "enemy").map((row) => row.id);
+  if (enemies.length) await addTokens(table, enemies, { hidden: true });
+  const onMap = await linkedRows(table.room_id);
+  for (const row of fresh.filter((r) => r.kind === "companion")) {
+    const owner = encounter.rows.find((r) => r.kind === "player" && r.member_id === row.member_id);
+    const token = owner && onMap[owner.id] ? (await OBR.scene.items.getItems([onMap[owner.id]]))[0] : null;
+    await addTokens(table, [row.id], { near: token?.position });
   }
 }
 

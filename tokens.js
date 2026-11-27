@@ -60,12 +60,12 @@ function placeholder(kind) {
   };
 }
 
-function buildToken(row, room, position, art) {
+function buildToken(row, room, position, art, forceHidden = false) {
   const chosen = art[artKey(row)] || placeholder(row.kind);
   const cells = row.kind === "enemy" ? cellsFor(row.template?.size) : 1;
   const base = chosen.scale || { x: 1, y: 1 };
   const name = publicName(row);
-  const hidden = row.kind === "enemy" && !row.revealed;
+  const hidden = row.kind === "enemy" && (forceHidden || !row.revealed);
   return buildImage(chosen.image, chosen.grid)
     .name(name)
     .plainText(name)
@@ -96,7 +96,7 @@ export async function linkedRows(room) {
 }
 
 /** Put tokens for the given rows in a row of cells around the DM's view centre. */
-export async function addTokens(table, rowIds) {
+export async function addTokens(table, rowIds, { hidden = false, near = null } = {}) {
   if (!(await OBR.scene.isReady())) throw new Error("Open a scene in Owlbear first.");
   const room = table.room_id;
   const onMap = await linkedRows(room);
@@ -105,7 +105,8 @@ export async function addTokens(table, rowIds) {
   const dpi = await OBR.scene.grid.getDpi();
   const width = await OBR.viewport.getWidth();
   const height = await OBR.viewport.getHeight();
-  const centre = await OBR.viewport.inverseTransformPoint({ x: width / 2, y: height / 2 });
+  // Beside a given token (one square to its right), or in the middle of the DM's view.
+  const centre = near ? { x: near.x + dpi, y: near.y } : await OBR.viewport.inverseTransformPoint({ x: width / 2, y: height / 2 });
   const art = loadArt();
   const sizes = rows.map((row) => (row.kind === "enemy" ? cellsFor(row.template?.size) : 1));
   const span = sizes.reduce((sum, cells) => sum + Math.max(1, cells), 0) * dpi;
@@ -115,7 +116,7 @@ export async function addTokens(table, rowIds) {
     const cells = Math.max(1, sizes[index]);
     const odd = cells % 2 === 1;
     const spot = await OBR.scene.grid.snapPosition({ x: x + (cells * dpi) / 2, y: centre.y }, 1, !odd, odd);
-    items.push(buildToken(row, room, spot, art));
+    items.push(buildToken(row, room, spot, art, hidden));
     x += cells * dpi;
   }
   await OBR.scene.items.addItems(items);
