@@ -284,6 +284,12 @@ async fn local_action(s: &Local, action: &str, body: &[u8]) -> Result<Value, Err
                     )
                     .await?);
             }
+            "token" => {
+                let look = serde_json::from_slice(body).map_err(|_| "Invalid token look")?;
+                return Ok(peer
+                    .call(Uuid::new_v4(), lan::Request::Token { look })
+                    .await?);
+            }
             "leave" => {
                 peer.call(Uuid::new_v4(), lan::Request::Leave).await?;
             }

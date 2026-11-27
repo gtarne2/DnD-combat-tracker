@@ -57,6 +57,8 @@ pub(super) struct Presence {
     pub inspection: Option<Publication>,
     pub publication_session: Uuid,
     pub publication_revision: u64,
+    /// The player's map token look, while they are connected.
+    pub token: Option<TokenLook>,
 }
 
 // Indexed by (room, member). Ephemeral even when the SQLite database is durable.

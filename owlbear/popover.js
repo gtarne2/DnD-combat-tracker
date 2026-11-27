@@ -2,7 +2,7 @@
 // opens the bridge window, which needs a click from the DM.
 import OBR from "./obr-sdk-3.1.0.js";
 import { DEFAULT_PORT, bridgeUrl, savePort, savedPort } from "./bridge-client.js";
-import { artKey, loadArt, saveArt } from "./tokens.js";
+import { STANDARD_CONDITIONS, artKey, artSearch, chooseArt as rememberArt, conditionKey, encounterConditions, groupKey, loadArt, loadConditionArt, saveArt, saveConditionArt } from "./tokens.js";
 import { loadMatches, saveMatch } from "./players.js";
 import { KIND, rowLabel } from "./labels.js";
 
@@ -42,16 +42,62 @@ function button(label, onClick, title) {
   return b;
 }
 
+// Owlbear's asset picker opens on the creature type or class, which matches its built-in
+// Characters art (Dragon, Beast, Artificer and so on).
 async function chooseArt(row) {
   try {
-    const search = row.kind === "enemy" ? row.template?.name || "" : row.name || "";
-    const picked = await OBR.assets.downloadImages(false, search, "CHARACTER");
+    const picked = await OBR.assets.downloadImages(false, artSearch(row), "CHARACTER");
     if (picked && picked[0]) {
-      saveArt(artKey(row), picked[0]);
+      rememberArt(row, picked[0]);
+      ask("art", { row: row.id });
+    }
+  } catch (error) {
+    showError(error.message || String(error));
+  }
+}
+
+function forgetArt(row) {
+  saveArt(artKey(row), null);
+  ask("art", { row: row.id });
+}
+
+async function chooseConditionArt(name) {
+  try {
+    const picked = await OBR.assets.downloadImages(false, name, "ATTACHMENT");
+    if (picked && picked[0]) {
+      saveConditionArt(name, picked[0]);
       render();
     }
   } catch (error) {
     showError(error.message || String(error));
+  }
+}
+
+function renderConditions(table) {
+  const list = $("conditions");
+  list.replaceChildren();
+  const art = loadConditionArt();
+  const inFight = encounterConditions(table);
+  const names = [...inFight];
+  for (const name of STANDARD_CONDITIONS) if (!names.some((n) => conditionKey(n) === conditionKey(name))) names.push(name);
+  const missing = inFight.filter((name) => !art[conditionKey(name)]);
+  // Open the list when an enemy has a condition without a marker yet.
+  if (missing.length && !$("condition-art").dataset.seen) {
+    $("condition-art").open = true;
+    $("condition-art").dataset.seen = "1";
+  }
+  for (const name of names) {
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.className = "name";
+    label.textContent = name + (inFight.includes(name) ? " · in this fight" : "");
+    const actions = document.createElement("span");
+    actions.className = "actions";
+    const has = Boolean(art[conditionKey(name)]);
+    actions.append(button(has ? "Marker ✓" : "Pick…", () => chooseConditionArt(name), `Pick the ${name} marker from Owlbear's attachments`));
+    if (has) actions.append(button("Clear", () => { saveConditionArt(name, null); render(); }));
+    item.append(label, actions);
+    list.append(item);
   }
 }
 
@@ -82,8 +128,11 @@ function renderRows(table) {
     const actions = document.createElement("span");
     actions.className = "actions";
     const hasArt = Boolean(art[artKey(row)]);
-    const artTitle = row.kind === "enemy" && row.template ? `Art for every ${row.template.name}` : "Token art";
+    const group = groupKey(row);
+    const shared = group ? ` New ${group.slice(group.indexOf(":") + 1)} tokens use it too, until you pick another.` : "";
+    const artTitle = (row.kind === "enemy" && row.template ? `Art for every ${row.template.name}.` : "Token art.") + shared;
     actions.append(button(hasArt ? "Art ✓" : "Art…", () => chooseArt(row), artTitle));
+    if (hasArt) actions.append(button("×", () => forgetArt(row), "Go back to the default art"));
     if (onMap[row.id]) {
       const mark = document.createElement("span");
       mark.className = "on-map";
@@ -139,6 +188,7 @@ function render() {
   if (state.table) {
     renderRows(state.table);
     renderPlayers(state.table);
+    renderConditions(state.table);
   }
   const mapText = state.mapError ? `Map: ${state.mapError}` : (state.mapNotes || []).join(" ");
   $("map-error").hidden = !mapText;

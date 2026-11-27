@@ -231,6 +231,43 @@ pub struct CharacterDetails {
     pub resources: BTreeMap<String, u32>,
 }
 
+/// How a player's map token looks: their class, for the default icon, and an optional small
+/// portrait the sheet renders for the token. Kept apart from `Publication`, because the token is
+/// shown to the whole table whatever the player shares with the DM.
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct TokenLook {
+    pub class: String,
+    /// A `data:image/webp` or `data:image/png` or `data:image/jpeg` URL, at most
+    /// [`TokenLook::MAX_PORTRAIT`] bytes.
+    pub portrait: Option<String>,
+}
+
+impl TokenLook {
+    pub const MAX_PORTRAIT: usize = 48 * 1024;
+    pub const MAX_CLASS: usize = 40;
+
+    /// True when the look is small enough to relay and the portrait is an inline raster image.
+    pub fn valid(&self) -> bool {
+        self.class.chars().count() <= Self::MAX_CLASS
+            && !self.class.chars().any(char::is_control)
+            && self.portrait.as_ref().is_none_or(|url| {
+                url.len() <= Self::MAX_PORTRAIT
+                    && [
+                        "data:image/webp;base64,",
+                        "data:image/png;base64,",
+                        "data:image/jpeg;base64,",
+                    ]
+                    .iter()
+                    .any(|prefix| url.starts_with(prefix))
+                    && url.split_once(',').is_some_and(|(_, data)| {
+                        data.bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b))
+                    })
+            })
+    }
+}
+
 /// Each publication replaces the whole previous value, including on downgrade.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "sharing", rename_all = "snake_case", deny_unknown_fields)]
