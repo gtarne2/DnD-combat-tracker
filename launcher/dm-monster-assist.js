@@ -59,5 +59,38 @@ const monsterAssist = (() => {
     return branch === "full" ? raw : null;
   }
 
-  return {die, damageTerms, rollDamage, armor, compare, branch, amount};
+  // Imported damage defenses, such as "cold; bludgeoning, piercing, and slashing from
+  // nonmagical attacks". A clause with a qualifier (nonmagical, silvered, adamantine) applies only
+  // when the damage is not magical, which the caller says. Immunity wins; resistance and
+  // vulnerability are applied in that order, so together they cancel apart from rounding.
+  const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
+  const QUALIFIED = /magic|silver|adamantine|that aren|not made|isn't|aren't/i;
+  function defenseClauses(text, type) {
+    if (!text || !type) return [];
+    const word = new RegExp("\\b" + type + "\\b", "i");
+    return String(text).split(/;/).map(part => part.trim()).filter(part => word.test(part))
+      .map(part => ({text: part, qualified: QUALIFIED.test(part)}));
+  }
+  function defense(defenses, type, {magical = false} = {}) {
+    const none = {factor: 1, note: "", qualified: false, apply: amount => amount};
+    if (!defenses || !type) return none;
+    const read = key => defenseClauses(defenses[key], type);
+    const lists = {immune: read("immunities"), resist: read("resistances"), vulnerable: read("vulnerabilities")};
+    const qualified = Object.values(lists).some(list => list.some(c => c.qualified));
+    const has = list => list.some(c => !c.qualified || !magical);
+    const immune = has(lists.immune), resist = has(lists.resist), vulnerable = has(lists.vulnerable);
+    if (immune) return {factor: 0, note: "immune to " + type, qualified, apply: () => 0};
+    const notes = [];
+    if (resist) notes.push("resists " + type);
+    if (vulnerable) notes.push("vulnerable to " + type);
+    const apply = amount => {
+      let value = amount;
+      if (resist) value = Math.floor(value / 2);
+      if (vulnerable) value *= 2;
+      return value;
+    };
+    return {factor: (resist ? .5 : 1) * (vulnerable ? 2 : 1), note: notes.join(", "), qualified, apply};
+  }
+
+  return {die, damageTerms, rollDamage, armor, compare, branch, amount, defense, DAMAGE_TYPES};
 })();

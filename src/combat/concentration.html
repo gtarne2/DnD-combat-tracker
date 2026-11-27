@@ -82,6 +82,12 @@
       </details>
       <p id="cast-map-note" class="hint"></p>
     </fieldset>
+    <fieldset id="cast-save-field" hidden><legend>Saving throws by the DM</legend>
+      <p id="cast-save-rule" class="hint"></p>
+      <div id="cast-save-targets"></div>
+      <label>Damage total <input name="saveDamage" type="number" min="0" max="100000" placeholder="Rolled on confirm"></label>
+      <p class="hint">Tick each creature the spell affects. The DM rolls their saves and applies full or half damage, with resistances, in one step.</p>
+    </fieldset>
     <label id="cast-firearm-field" class="firearm-toggle" hidden><input type="checkbox" name="firearm"> Cast through Arcane Firearm <small>+1d8 to one damage roll</small></label>
     <div class="focus-form companion-edit-actions">
       <button id="cancel-cast" type="button">Cancel</button>

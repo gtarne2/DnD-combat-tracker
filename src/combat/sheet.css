@@ -342,6 +342,9 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 #cast-roll-preview { margin-top: 5px; color: var(--teal); font-weight: 650; }
 .reaction-trigger { grid-column: 1 / -1; color: var(--muted); font-size: 11px; font-weight: 500; }
 #spell-filter-form > label, #cast-targets label, #ongoing-spell-targets label { display: block; margin-top: 4px; }
+#cast-save-targets { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 8px; }
+#cast-save-field > label { display: block; }
+#cast-save-field input[name=saveDamage] { width: 140px; margin-left: 6px; }
 #cast-target-field { max-height: 24vh; overflow: auto; border: 1px solid var(--line); }
 #cast-map-field { border: 1px solid var(--line); }
 #cast-map-field .cast-map-options { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; }
@@ -353,6 +356,7 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 .party-template p { margin: 2px 0; }
 .party-template > p:first-child { display: flex; align-items: center; gap: 4px; }
 .party-template > p:first-child button { margin-left: auto; }
+.party-template > p.party-template-sent { display: block; }
 .party-template button { font-size: .85em; }
 .party-template-note { font-size: .85em; opacity: .8; }
 .party-template-targets { display: grid; gap: 2px; }

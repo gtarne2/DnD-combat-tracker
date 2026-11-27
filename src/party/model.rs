@@ -401,7 +401,7 @@ impl Room {
                         return Err(Rejection::Forbidden);
                     }
                     let (spell, offers) = self.fight.apply_area(cmd, area, results)?;
-                    let source: String = format!("{spell} (area)").chars().take(120).collect();
+                    let source: String = spell.chars().take(120).collect();
                     for (member, amount) in offers {
                         // One offer per area and player, so a replay cannot send it twice.
                         let action_id = Uuid::from_u128(area.as_u128() ^ member.as_u128());

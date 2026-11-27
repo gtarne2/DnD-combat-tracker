@@ -333,8 +333,25 @@ const partyInitiative = (() => {
       const again = [...host.querySelectorAll("[aria-label]")].find(node => node.getAttribute("aria-label") === focusLabel);
       again?.focus();
     });
-    host.hidden = !templates.length;
-    host.replaceChildren(...templates.map(template => {
+    // Save spells sent from the cast dialog have no template. Show the latest three.
+    const NIL = "00000000-0000-0000-0000-000000000000";
+    const direct = lastAreas.filter(area => area.template === NIL).slice(-3);
+    const names = new Map(rows.map(row => [row.id, rowName(row)]));
+    host.hidden = !templates.length && !direct.length;
+    const sends = direct.map(area => {
+      const card = document.createElement("div");
+      card.className = "party-template";
+      const line = document.createElement("p");
+      line.className = "party-template-note party-template-sent";
+      const head = document.createElement("strong");
+      head.textContent = area.spell;
+      line.append(head, " · " + (area.results
+        ? "Applied by the DM: " + (area.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
+        : "Sent " + area.amount + " damage to the DM. Waiting for saves."));
+      card.append(line);
+      return card;
+    });
+    host.replaceChildren(...sends, ...templates.map(template => {
       const card = document.createElement("div");
       card.className = "party-template";
       const title = document.createElement("p");
@@ -474,6 +491,9 @@ const partyInitiative = (() => {
     // Rows a cone or line can point at. Hidden enemies are left out.
     targets: () => (board()?.rows || []).filter(row => row.key !== "owner" && row.score !== null).map(row => ({id:row.id, name:row.name})),
     place: template => templateEdit({kind:"place_template", template}),
+    // A save spell aimed from the cast dialog without a template (R76).
+    sendSpell: request => templateEdit({kind:"send_spell", request}),
+    rollDice,
     auraTargets,
   };
   // The shared encounter as this player sees it, whether or not they have joined it yet.

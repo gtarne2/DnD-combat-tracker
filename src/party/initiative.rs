@@ -22,6 +22,40 @@ pub struct Enemy {
     pub notes: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub template: Option<Box<Snapshot>>,
+    /// Conditions that count down by turns, kept apart from the free-text conditions.
+    /// The DM adds and removes them with their own edits, so Edit::Enemy keeps them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timers: Vec<ConditionTimer>,
+}
+
+/// A condition on an enemy that ends after a number of turn starts or ends, like the
+/// player sheet's turn-start and turn-end effects.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConditionTimer {
+    /// Chosen by the dashboard, so a retried request replaces rather than repeats.
+    pub id: Uuid,
+    pub name: String,
+    /// Matching turn boundaries left. Zero means it has ended and waits for the DM to clear it.
+    pub remaining: u32,
+    pub ends: TurnEdge,
+    /// Row whose turn counts. None counts the enemy's own turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<Uuid>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnEdge {
+    Start,
+    End,
+}
+
+/// Timed conditions one enemy may carry.
+const MAX_TIMERS: usize = 20;
+
+fn valid_timer(timer: &ConditionTimer) -> bool {
+    label(&timer.name) && timer.name.chars().count() <= 60 && timer.remaining <= 1000
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -108,6 +142,22 @@ pub struct AreaRequest {
     /// Damage rolled on the caster's sheet, before saves and defenses.
     pub amount: u32,
     pub targets: Vec<Uuid>,
+}
+
+/// A caster's request to resolve a save spell without a map template: the sheet names the
+/// targets itself. It joins the same DM queue as area spells.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpellRequest {
+    pub id: Uuid,
+    pub spell: String,
+    /// Damage rolled on the caster's sheet, before saves and defenses.
+    pub amount: u32,
+    pub targets: Vec<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub save: Option<AreaSave>,
 }
 
 /// One target's final damage, decided on the DM dashboard.
@@ -240,6 +290,11 @@ pub enum Edit {
     SendArea {
         request: AreaRequest,
     },
+    /// A player sends a save spell's rolled damage for targets they picked on the sheet,
+    /// with no map template.
+    SendSpell {
+        request: SpellRequest,
+    },
     /// The DM applies an area: enemies lose HP, players get damage offers.
     ApplyArea {
         id: Uuid,
@@ -274,6 +329,16 @@ pub enum Edit {
     },
     Duplicate {
         id: Uuid,
+    },
+    /// The DM adds or replaces a timed condition on an enemy.
+    AddTimer {
+        id: Uuid,
+        timer: ConditionTimer,
+    },
+    /// The DM clears a timed condition, ended or not.
+    RemoveTimer {
+        id: Uuid,
+        timer: Uuid,
     },
     MonsterAction {
         id: Uuid,
@@ -388,6 +453,8 @@ fn valid_enemy(enemy: &Enemy) -> bool {
         && (!enemy.revealed || label(&enemy.alias))
         && enemy.notes.len() <= 16000
         && enemy.conditions.len() <= 2000
+        && enemy.timers.len() <= MAX_TIMERS
+        && enemy.timers.iter().all(valid_timer)
         && !enemy.hp.zip(enemy.max_hp).is_some_and(|(hp, max)| hp > max)
 }
 
@@ -1091,7 +1158,13 @@ impl Fight {
         {
             return Err(Rejection::InvalidInput);
         }
-        let spell = area.spell.clone();
+        // The offer's source on the player's sheet: an area from the map, or a spell aimed
+        // from the sheet.
+        let spell = if area.request.template.is_nil() {
+            format!("{} (spell)", area.spell)
+        } else {
+            format!("{} (area)", area.spell)
+        };
         let mut offers = Vec::new();
         for result in results {
             let Some(row) = self.position.rows.iter_mut().find(|r| r.id == result.row) else {
@@ -1215,6 +1288,7 @@ impl Fight {
                     | Edit::ClearTemplate { .. }
                     | Edit::ConfirmTemplate { .. }
                     | Edit::SendArea { .. }
+                    | Edit::SendSpell { .. }
             )
         {
             return Err(Rejection::Forbidden);
@@ -1356,6 +1430,90 @@ impl Fight {
                     results: None,
                 });
             }
+            Edit::SendSpell { request } => {
+                let unique: BTreeSet<Uuid> = request.targets.iter().copied().collect();
+                if request.targets.is_empty()
+                    || unique.len() != request.targets.len()
+                    || request.targets.len() > MAX_TEMPLATE_TARGETS
+                    || request.amount > 100_000
+                    || !label(&request.spell)
+                    || request.spell.chars().count() > 80
+                    || request.damage_type.as_deref().is_some_and(|kind| {
+                        kind.is_empty()
+                            || kind.len() > 20
+                            || !kind.chars().all(|c| c.is_ascii_lowercase())
+                    })
+                    || request.save.as_ref().is_some_and(|save| {
+                        !ABILITY_NAMES.contains(&save.ability.as_str())
+                            || !(1..=40).contains(&save.dc)
+                    })
+                    || !rows.iter().any(|r| r.player() == Some(actor))
+                    || !request
+                        .targets
+                        .iter()
+                        .all(|t| rows.iter().any(|r| r.id == *t))
+                    || self.areas.iter().any(|a| a.request.id == request.id)
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                self.areas.push(QueuedArea {
+                    member: actor,
+                    spell: request.spell.clone(),
+                    request: AreaRequest {
+                        id: request.id,
+                        template: Uuid::nil(),
+                        amount: request.amount,
+                        targets: request.targets.clone(),
+                    },
+                    damage_type: request.damage_type.clone(),
+                    save: request.save.clone(),
+                    round: self.position.round,
+                    results: None,
+                });
+            }
+            Edit::AddTimer { id, timer } => {
+                if !valid_timer(timer)
+                    || timer.remaining == 0
+                    || timer
+                        .anchor
+                        .is_some_and(|a| !rows.iter().any(|r| r.id == a))
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                let row = rows
+                    .iter_mut()
+                    .find(|r| r.id == *id)
+                    .ok_or(Rejection::InvalidInput)?;
+                let Participant::Enemy(enemy) = &mut row.actor else {
+                    return Err(Rejection::InvalidInput);
+                };
+                let mut timer = timer.clone();
+                timer.name = timer.name.trim().to_string();
+                if timer.anchor == Some(*id) {
+                    timer.anchor = None;
+                }
+                if let Some(old) = enemy.timers.iter_mut().find(|t| t.id == timer.id) {
+                    *old = timer;
+                } else if enemy.timers.len() >= MAX_TIMERS {
+                    return Err(Rejection::InvalidInput);
+                } else {
+                    enemy.timers.push(timer);
+                }
+            }
+            Edit::RemoveTimer { id, timer } => {
+                let row = rows
+                    .iter_mut()
+                    .find(|r| r.id == *id)
+                    .ok_or(Rejection::InvalidInput)?;
+                let Participant::Enemy(enemy) = &mut row.actor else {
+                    return Err(Rejection::InvalidInput);
+                };
+                let before = enemy.timers.len();
+                enemy.timers.retain(|t| t.id != *timer);
+                if enemy.timers.len() == before {
+                    return Err(Rejection::InvalidInput);
+                }
+            }
             Edit::DismissArea { id } => {
                 let before = self.areas.len();
                 self.areas
@@ -1399,6 +1557,7 @@ impl Fight {
                     };
                     let mut updated = enemy.clone();
                     updated.template = previous.template.clone();
+                    updated.timers = previous.timers.clone();
                     row.actor = Participant::Enemy(updated);
                 } else {
                     rows.push(Row {
@@ -1406,6 +1565,7 @@ impl Fight {
                         score: *score,
                         actor: Participant::Enemy(Enemy {
                             template: None,
+                            timers: vec![],
                             ..enemy.clone()
                         }),
                         actions: Actions::default(),
@@ -1444,6 +1604,7 @@ impl Fight {
                             conditions: String::new(),
                             notes: String::new(),
                             template: Some(template.clone()),
+                            timers: vec![],
                         }),
                         actions: Actions::default(),
                     });
@@ -1653,6 +1814,32 @@ impl Fight {
                     && self.position.current == Some(row.id)
                 {
                     row.actions.boundary(template, Reset::Start);
+                }
+            }
+        }
+        // Timed enemy conditions count the turn boundaries of their anchor row (the enemy itself
+        // unless the DM picked another), and every round of advanced time.
+        let ended = (phase == Phase::Step)
+            .then(|| previous.as_ref().map(|r| r.id))
+            .flatten();
+        let started = matches!(phase, Phase::Enter | Phase::Step)
+            .then_some(self.position.current)
+            .flatten();
+        let ids: BTreeSet<Uuid> = self.position.rows.iter().map(|r| r.id).collect();
+        for row in &mut self.position.rows {
+            let own = row.id;
+            if let Participant::Enemy(enemy) = &mut row.actor {
+                for timer in &mut enemy.timers {
+                    let anchor = timer.anchor.filter(|a| ids.contains(a)).unwrap_or(own);
+                    let edge = match timer.ends {
+                        TurnEdge::Start => started,
+                        TurnEdge::End => ended,
+                    };
+                    let mut spent = rounds;
+                    if edge == Some(anchor) {
+                        spent = spent.saturating_add(1);
+                    }
+                    timer.remaining = timer.remaining.saturating_sub(spent);
                 }
             }
         }

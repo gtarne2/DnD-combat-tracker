@@ -143,7 +143,7 @@ const concentrationControls = (() => {
   }
 
   function finishCast(proposal, method, pool = "") {
-    let placement = null;
+    let placement = null, spellSend = null;
     const done = previewEncounter.transact((state) => {
       if (!playbook.isPrepared(proposal.key, state) && method !== "ritual") {
         status.textContent = "This spell is unprepared. Choose a prepared spell or a ritual.";
@@ -199,12 +199,33 @@ const concentrationControls = (() => {
         if (placement.lasts === "concentration") placement.focus = state.focus.active?.id;
         if (placement.focus == null && placement.lasts === "concentration") placement.lasts = "removed";
       }
+      // A save spell aimed from the sheet, without a map template (R76): the DM resolves
+      // each target's save from the same queue as area spells.
+      if (result && !proposal.map && proposal.saveTargets?.length) {
+        const dice = String(roll || proposal.damage || "").match(/\d+d\d+(?:\s*[+-]\s*\d+(?:d\d+)?)*/i)?.[0].replace(/\s+/g, "");
+        const amount = Number.isInteger(proposal.saveDamage) ? proposal.saveDamage : partyInitiative.templates.rollDice(dice);
+        const dc = Number(String(proposal.dc || "").match(/\d+/)?.[0]);
+        const [ability, branch] = (proposal.spellSave || "").split(" ");
+        if (Number.isInteger(amount) && ability && dc >= 1 && dc <= 40) {
+          spellSend = {id: crypto.randomUUID(), spell: proposal.name, amount: Math.min(100000, amount), targets: proposal.saveTargets,
+            save: {ability, dc, on_success: branch === "half" ? "half" : "none"}};
+          if (/^[a-z]{1,20}$/.test(proposal.damageType || "")) spellSend.damage_type = proposal.damageType;
+        }
+      }
       if (!proposal.focus) status.textContent = `Cast ${proposal.name}.`;
       if (proposal.advantageSelected) status.textContent += " Advantage on this attack.";
       if (proposal.firearm && (!proposal.focus || result)) status.textContent += " " + attackModifiers.firearmHint + ".";
       return result;
     });
     Promise.resolve(done).then(async () => {
+      if (spellSend) {
+        try {
+          await partyInitiative.templates.sendSpell(spellSend);
+          status.textContent += " Sent " + spellSend.amount + " damage to the DM for saves.";
+        } catch (error) {
+          status.textContent += " The damage was not sent to the DM: " + error.message;
+        }
+      }
       if (!placement) return;
       try {
         await partyInitiative.templates.place(placement);
@@ -298,6 +319,8 @@ const concentrationControls = (() => {
     const form = castForm.elements;
     const shape = form.mapShape.value;
     castForm.querySelector(".cast-map-options").hidden = !form.mapPlace.checked;
+    // A placed template sends its damage from the combat rail instead.
+    byId("cast-save-field").hidden = !saveReady || (!byId("cast-map-field").hidden && form.mapPlace.checked);
     byId("cast-map-size-label").textContent = SIZE_LABEL[shape];
     byId("cast-map-width").hidden = shape !== "line";
     byId("cast-map-aim").hidden = !["cone", "line", "cube"].includes(shape);
@@ -343,6 +366,25 @@ const concentrationControls = (() => {
     return map;
   }
 
+  // Save spells with damage can go to the DM with targets picked here, map or not.
+  let saveReady = false;
+  function openSave(proposal) {
+    const [ability, branch] = (proposal.spellSave || "").split(" ");
+    const targets = partyInitiative.templates.available() ? partyInitiative.templates.targets() : [];
+    saveReady = Boolean(ability && proposal.dc && proposal.damage && targets.length);
+    byId("cast-save-field").hidden = !saveReady;
+    castForm.elements.saveDamage.value = "";
+    if (!saveReady) { byId("cast-save-targets").replaceChildren(); return; }
+    byId("cast-save-rule").textContent = ability.charAt(0).toUpperCase() + ability.slice(1) + " save DC " + String(proposal.dc).match(/\d+/)?.[0]
+      + (branch === "half" ? ", half damage on a success" : ", no damage on a success") + (proposal.damageType ? " · " + proposal.damageType : "");
+    byId("cast-save-targets").replaceChildren(...targets.map(row => {
+      const label = document.createElement("label");
+      const box = Object.assign(document.createElement("input"), {type: "checkbox", name: "saveTarget", value: row.id});
+      label.append(box, " " + row.name);
+      return label;
+    }));
+  }
+
   function openCast(control, fromReaction = false) {
     if (!control || (!fromReaction && control.disabled)) return;
     const row = control.closest("article");
@@ -368,7 +410,8 @@ const concentrationControls = (() => {
       look: tools.dataset.spellLook};
     proposal.healing = tools.hasAttribute("data-healing-cast");
     const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
-    if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady) {
+    const saveSpell = partyInitiative.templates.available() && Boolean(proposal.spellSave && proposal.dc && proposal.damage);
+    if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady && !saveSpell) {
       finishCast(proposal, "cantrip");
       return;
     }
@@ -417,6 +460,7 @@ const concentrationControls = (() => {
     castForm.elements.freePool.replaceChildren(new Option("No tracked resource", ""), ...encounterTracker.resources(state)
       .filter((pool) => !/^(Spell slot|Pact Magic slot):/.test(pool.key) && (state.progress?.used[pool.key] || 0) < pool.capacity)
       .map((pool) => new Option(pool.name, pool.key)));
+    openSave(proposal);
     openMap(tools, Boolean(focus));
     renderCost();
     castDialog.showModal();
@@ -456,6 +500,8 @@ const concentrationControls = (() => {
         castForm.elements.mapSize.reportValidity();
         return;
       }
+      proposal.saveTargets = byId("cast-save-field").hidden ? [] : new FormData(castForm).getAll("saveTarget");
+      proposal.saveDamage = castForm.elements.saveDamage.value === "" ? null : castForm.elements.saveDamage.valueAsNumber;
       proposal.targets = new FormData(castForm).getAll("target");
       if (proposal.targets.length > targetLimit(proposal, method, pool)) {
         byId("cast-target-feedback").textContent = "Too many targets for this slot.";
