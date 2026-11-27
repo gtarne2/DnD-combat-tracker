@@ -28,13 +28,13 @@ function setupPartySharing(panel, request) {
     if (mode === "party_name_only") return {sharing: mode};
     const hp = encounterTracker.hp(state, layoutPreferences.sharedStat("hp"));
     const effects = effectControls.entries(state).filter(effect => effect.target === "owner" && effectControls.active(effect));
-    const ac = integer(layoutPreferences.sharedStat("ac"));
+    const ac = statEffects.shared(state, "ac");
     const unsigned = value => Number.isInteger(value) && value >= 0 && value <= 0xffffffff ? value : null;
     const vitals = {
       current_hp: unsigned(hp?.current),
       max_hp: unsigned(hp?.max),
       temporary_hp: hp ? unsigned(hp.temporary ?? 0) : null,
-      effective_ac: ac === null ? null : integer(ac + (effects.some(effect => effect.shield) ? 5 : 0)),
+      effective_ac: ac === null ? null : integer(ac),
       initiative: integer(state.progress?.partyClock ? partyInitiative.rows(state).find(row => row.key === "owner")?.score : state.companions?.owner),
       conditions: effects.filter(effect => effect.category === "condition").map(effect => effect.name),
       concentration: state.focus.active?.name ?? null,
@@ -51,7 +51,7 @@ function setupPartySharing(panel, request) {
       ability_scores: numbers(".ability-score-list button", row => row.firstElementChild?.textContent,
         row => row.querySelector("b")?.textContent),
       saves: numbers("#roll-saves [data-roll-save]", row => row.dataset.rollName,
-        row => layoutPreferences.sharedStat(row.dataset.rollSave)),
+        row => statEffects.shared(state, row.dataset.rollSave)),
       skills: numbers("#roll-skills [data-roll-name]", row => row.dataset.rollName,
         row => row.querySelector("summary > strong")?.textContent),
       attacks: [], spells: [], features: [], inventory: [],

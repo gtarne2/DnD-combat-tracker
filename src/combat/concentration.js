@@ -165,15 +165,23 @@ const concentrationControls = (() => {
         const kind = {cantrip: "cantrip", ritual: "ritual", free: "free use", slot: "spell slot"}[method];
         const source = "option:" + proposal.key;
         const active = state.focus.active;
-        if (proposal.focus && ["bless", "moonbeam"].includes(proposal.effect)) {
+        if (proposal.focus && (["bless", "moonbeam"].includes(proposal.effect) || proposal.buff)) {
           const limit = targetLimit(proposal, method, pool);
+          const mods = proposal.buff?.mods || (proposal.effect === "bless" ? {attackDie: 4, saveDie: 4} : null);
           const notes = proposal.effect === "bless" ? "+1d4 to attack rolls and saving throws."
-            : ["At start of turn: Constitution save", proposal.dc ? "DC " + proposal.dc : "", roll || proposal.damage].filter(Boolean).join(" · ");
-          active.trackedSpell = {kind: proposal.effect, limit, notes, source};
+            : proposal.effect === "moonbeam" ? ["At start of turn: Constitution save", proposal.dc ? "DC " + proposal.dc : "", roll || proposal.damage].filter(Boolean).join(" · ")
+            : effectControls.describeMods(mods);
+          active.trackedSpell = {kind: proposal.effect || "buff", limit, notes, source, ...(mods ? {mods} : {})};
           if (!effectControls.setSpellTargets(state, active, proposal.targets || [])) {
             status.textContent = "The target list changed. Open the spell again.";
             return false;
           }
+        }
+        // R78: a timed buff such as Longstrider goes on each chosen target with its stat changes.
+        if (!proposal.focus && proposal.buff && proposal.targets?.length && !effectControls.applyBuff(state,
+            {name: proposal.name, mods: proposal.buff.mods, seconds: proposal.buff.seconds, targets: proposal.targets, source})) {
+          status.textContent = "The target list changed. Open the spell again.";
+          return false;
         }
         if (proposal.healing && !partyActions.applyHp(state, proposal.recipients, proposal.amount, "healing", proposal.name)) {
           status.textContent = "Healing recipient unavailable. Open the spell again.";
@@ -278,7 +286,15 @@ const concentrationControls = (() => {
   }
   function targetLimit(proposal, method, pool) {
     return proposal.effect === "moonbeam" ? Number.MAX_SAFE_INTEGER
-      : proposal.targetCounts[slotLevel(proposal, method, pool) - 1] || 0;
+      : proposal.targetCounts[slotLevel(proposal, method, pool) - 1] || (proposal.buff ? 1 : 0);
+  }
+  /** Stat changes from the sheet's `data-spell-buff`, such as `speed=10,seconds=3600`. */
+  function readBuff(text) {
+    if (!text) return null;
+    const values = Object.fromEntries(text.split(",").map((part) => part.split("=")).filter(([, value]) => /^-?\d+$/.test(value || ""))
+      .map(([key, value]) => [key, Number(value)]));
+    const mods = effectControls.cleanMods(values);
+    return mods ? {mods, seconds: values.seconds > 0 ? values.seconds : null} : null;
   }
   function targetFields(host, state, selected = []) {
     host.replaceChildren(...[...effectControls.spellParticipants(state)].map(([key, name]) => {
@@ -302,13 +318,15 @@ const concentrationControls = (() => {
     const kind = method.includes(":") ? "slot" : method;
     const count = directCast.targetCounts[slotLevel(directCast, kind, method) - 1];
     const advantage = directCast.advantage && castForm.elements.situational.checked ? "Advantage on this attack" : "";
-    const preview = [spellRoll(directCast, kind, method), count ? "Up to " + count + " targets" : "", advantage].filter(Boolean).join(" · ");
+    const preview = [spellRoll(directCast, kind, method), count ? "Up to " + count + (count === 1 ? " target" : " targets") : "", advantage].filter(Boolean).join(" · ");
     const roll = byId("cast-roll-preview");
     roll.hidden = !preview;
     roll.textContent = preview || "";
+    const changes = directCast.buff ? effectControls.describeMods(directCast.buff.mods) + " · " : "";
     byId("cast-target-feedback").textContent = directCast.effect === "moonbeam"
       ? "Select creatures currently in the beam. Update the list as they move."
-      : count ? "Choose up to " + count + " targets." : "";
+      : count ? changes + "Choose up to " + count + " target" + (count === 1 ? "." : "s.")
+      : directCast.buff ? changes + "Choose one target." : "";
   }
   castForm.elements.slot.onchange = renderCost;
   castForm.elements.freePool.onchange = renderCost;
@@ -407,11 +425,11 @@ const concentrationControls = (() => {
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
       advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage,
       damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave, colour: tools.dataset.spellColour,
-      look: tools.dataset.spellLook};
+      look: tools.dataset.spellLook, buff: readBuff(tools.dataset.spellBuff)};
     proposal.healing = tools.hasAttribute("data-healing-cast");
     const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
     const saveSpell = partyInitiative.templates.available() && Boolean(proposal.spellSave && proposal.dc && proposal.damage);
-    if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady && !saveSpell) {
+    if (level === 0 && !proposal.healing && !proposal.buff && !active && !ritualOnly && !proposal.advantage && !mapReady && !saveSpell) {
       finishCast(proposal, "cantrip");
       return;
     }
@@ -437,9 +455,10 @@ const concentrationControls = (() => {
       label.append(box, " " + target.name);
       return label;
     }));
-    const tracking = Boolean(focus && ["bless", "moonbeam"].includes(proposal.effect));
+    const tracking = Boolean(focus && ["bless", "moonbeam"].includes(proposal.effect) || proposal.buff);
     byId("cast-target-field").hidden = !tracking;
-    if (tracking) targetFields(byId("cast-targets"), state);
+    // A buff defaults to the caster; the player ticks anyone else it lands on.
+    if (tracking) targetFields(byId("cast-targets"), state, proposal.buff ? ["owner"] : []);
     else byId("cast-targets").replaceChildren();
     const field = byId("cast-slot-field");
     field.hidden = level === 0;
@@ -544,7 +563,7 @@ const concentrationControls = (() => {
     editingFocus = active.id;
     const chosen = effectControls.entries(state).filter((effect) => effectControls.active(effect) && effect.linkedFocus === active.id).map((effect) => effect.target);
     targetFields(byId("ongoing-spell-targets"), state, chosen);
-    byId("spell-target-feedback").textContent = active.trackedSpell.kind === "bless" ? "Choose up to " + active.trackedSpell.limit + " targets." : "";
+    byId("spell-target-feedback").textContent = active.trackedSpell.kind !== "moonbeam" ? "Choose up to " + active.trackedSpell.limit + " targets." : "";
     targetDialog.showModal();
   };
   byId("cancel-spell-targets").onclick = () => targetDialog.close();

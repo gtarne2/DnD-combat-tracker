@@ -12,6 +12,66 @@ const effectControls = (() => {
   let activeBefore = new Set();
   let lastRender = "";
 
+  // Stat changes an effect makes on its target (R78): speed in feet, AC, attack and damage
+  // bonuses, saving throw bonus, and a die added once to attacks or saves (4 is +1d4).
+  const MOD_KEYS = ["speed", "ac", "attack", "attackDie", "damage", "save", "saveDie"];
+  const DICE = [0, 4, 6, 8, 10, 12];
+  function cleanMods(source) {
+    if (!source || typeof source !== "object") return null;
+    const mods = {};
+    for (const key of MOD_KEYS) {
+      const value = Number(source[key]) || 0;
+      if (!Number.isInteger(value) || !value) continue;
+      if (key.endsWith("Die") ? DICE.includes(value) : Math.abs(value) <= 100) mods[key] = value;
+    }
+    return Object.keys(mods).length ? mods : null;
+  }
+  const signed = (value) => (value >= 0 ? "+" : "") + value;
+  function describeMods(mods) {
+    mods = cleanMods(mods);
+    if (!mods) return "";
+    const roll = (bonus, die) => [bonus ? signed(bonus) : "", die ? "+1d" + die : ""].filter(Boolean).join(" ");
+    const parts = [];
+    if (mods.speed) parts.push(signed(mods.speed) + " ft. speed");
+    if (mods.ac) parts.push(signed(mods.ac) + " AC");
+    const both = (mods.attack || mods.attackDie) && mods.attack === mods.save && mods.attackDie === mods.saveDie;
+    if (both) parts.push(roll(mods.attack, mods.attackDie) + " to attack rolls and saving throws");
+    else if (mods.attack || mods.attackDie) parts.push(roll(mods.attack, mods.attackDie) + " to attack rolls");
+    if (mods.damage) parts.push(signed(mods.damage) + " weapon damage");
+    if (!both && (mods.save || mods.saveDie)) parts.push(roll(mods.save, mods.saveDie) + " to saving throws");
+    return parts.join(" · ");
+  }
+  function effectMods(effect) {
+    return cleanMods(effect.mods) || (effect.shield ? {ac: 5} : null);
+  }
+  /** The stat changes active effects make on a participant. The same spell twice counts once. */
+  function modsFor(state, target = "owner") {
+    const total = {speed: 0, ac: 0, attack: 0, attackDie: 0, damage: 0, save: 0, saveDie: 0, sources: {}};
+    const seen = new Set();
+    for (const effect of entries(state)) {
+      const mods = active(effect) && effect.target === target && effectMods(effect);
+      const name = String(effect.name || "").trim().toLowerCase();
+      if (!mods || seen.has(name)) continue;
+      seen.add(name);
+      for (const [key, value] of Object.entries(mods)) {
+        total[key] = key.endsWith("Die") ? Math.max(total[key], value) : total[key] + value;
+        (total.sources[key] ||= []).push(effect.name);
+      }
+    }
+    return total;
+  }
+  /** The stat changes as a party buff offer carries them. */
+  function wireBuff(effect) {
+    const mods = cleanMods(effect.mods);
+    if (!mods) return null;
+    return {speed: mods.speed || 0, ac: mods.ac || 0, attack: mods.attack || 0, attack_die: mods.attackDie || 0,
+      damage: mods.damage || 0, save: mods.save || 0, save_die: mods.saveDie || 0};
+  }
+  function fromWire(amount) {
+    return cleanMods({speed: amount.speed, ac: amount.ac, attack: amount.attack, attackDie: amount.attack_die,
+      damage: amount.damage, save: amount.save, saveDie: amount.save_die});
+  }
+
   function entries(state) {
     return Array.isArray(state.progress?.effects) ? state.progress.effects : [];
   }
@@ -96,6 +156,8 @@ const effectControls = (() => {
       ...(state.progress?.partyClock
         ? partyInitiative.rows(state).filter(row => row.key?.startsWith("party:")).map(row => [row.key,row.name])
         : (state.progress?.actors || []).map(actor => [`actor:${actor.id}`, actor.name])),
+      // Other players in the party room, so buffs can reach their sheets outside a fight too.
+      ...partyActions.members().map(member => [partyActions.memberKey(member), partyActions.memberLabel(member)]),
     ]);
   }
 
@@ -120,7 +182,22 @@ const effectControls = (() => {
       if (current.some((effect) => effect.target === target)) continue;
       progress.effects.push({id: ++progress.sequence, name: focus.name, notes: focus.trackedSpell.notes, target,
         kind: "manual", category: "effect", linkedFocus: focus.id, spellKind: focus.trackedSpell.kind,
-        source: focus.trackedSpell.source});
+        source: focus.trackedSpell.source, ...(cleanMods(focus.trackedSpell.mods) ? {mods: cleanMods(focus.trackedSpell.mods)} : {})});
+    }
+    return true;
+  }
+
+  /** Puts a timed buff spell such as Longstrider on each chosen target (R78). */
+  function applyBuff(state, {name, mods, seconds, targets, source}) {
+    const names = spellParticipants(state);
+    mods = cleanMods(mods);
+    if (!mods || targets.some((target) => !names.has(target))) return false;
+    const progress = state.progress ||= previewEncounter.emptyProgress();
+    progress.effects ||= [];
+    for (const target of new Set(targets)) {
+      const timedBuff = Number.isInteger(seconds) && seconds > 0;
+      progress.effects.push({id: ++progress.sequence, name, notes: describeMods(mods), target, category: "effect",
+        kind: timedBuff ? "seconds" : "manual", remaining: timedBuff ? seconds : null, mods, source});
     }
     return true;
   }
@@ -142,7 +219,7 @@ const effectControls = (() => {
     const prior = effects.find((effect) => active(effect) && effect.shield);
     if (prior) prior.ended = true;
     effects.push({id: ++progress.sequence, name, target: "owner", category: "effect", kind: "start", anchor: "owner",
-      remaining: 1, clockLimit: 6, shield: true, source, notes: "+5 AC, including against the triggering attack. Check whether the hit still lands before recording damage."});
+      remaining: 1, clockLimit: 6, shield: true, mods: {ac: 5}, source, notes: "+5 AC, including against the triggering attack. Check whether the hit still lands before recording damage."});
   }
 
   function boundary(state, phase, current) {
@@ -214,7 +291,8 @@ const effectControls = (() => {
 
   function deadline(effect, state, names, order) {
     if (effect.ended) return effect.targetRemoved ? "Target removed" : effect.anchorRemoved ? "Turn participant removed"
-      : effect.endedByConcentration ? "Concentration ended" : effect.endedByRest ? "Ended on a rest" : "Ended manually";
+      : effect.endedByConcentration ? "Concentration ended" : effect.endedBySource ? "Ended by its caster"
+      : effect.endedByRest ? "Ended on a rest" : "Ended manually";
     if (!active(effect)) return "Expired";
     if (effect.linkedFocus != null) return "While concentrating";
     switch (effect.kind) {
@@ -267,6 +345,12 @@ const effectControls = (() => {
       result.append(node("h3", effect.name), tags);
       if (showTarget) result.append(node("p", names.get(effect.target) || "Unavailable participant"));
       result.append(node("strong", remaining(effect)));
+      const changes = describeMods(effectMods(effect));
+      if (changes && !String(effect.notes || "").startsWith(changes)) {
+        const line = node("p", changes);
+        line.className = "effect-mods";
+        result.append(line);
+      }
       if (effect.notes) {
         const notes = node("p", effect.notes);
         notes.className = "effect-notes";
@@ -357,6 +441,9 @@ const effectControls = (() => {
     form.elements.kind.value = effect?.kind || "manual";
     form.elements.remaining.value = Math.max(1, effect?.remaining || 1);
     form.elements.unit.value = "1";
+    const mods = cleanMods(effect?.mods) || {};
+    for (const key of MOD_KEYS) form.elements["mod-" + key].value = mods[key] ? String(mods[key]) : key.endsWith("Die") ? "0" : "";
+    byId("effect-mod-fields").open = Boolean(effect?.mods);
     formFields();
   }
 
@@ -392,7 +479,8 @@ const effectControls = (() => {
       form.elements.remaining.setCustomValidity("");
       return;
     }
-    return { name, notes: data.get("notes").trim(), target: data.get("target"),
+    const mods = cleanMods(Object.fromEntries(MOD_KEYS.map((key) => [key, Number(data.get("mod-" + key)) || 0])));
+    return { name, notes: data.get("notes").trim(), target: data.get("target"), mods,
       category: data.get("category") === "condition" ? "condition" : "effect",
       anchor: ["start", "end"].includes(kind) ? data.get("anchor") : "", kind, remaining,
       ended: false, endedByRest: false, targetRemoved: false, anchorRemoved: false };
@@ -491,5 +579,6 @@ const effectControls = (() => {
   document.addEventListener("preview-encounter-undo", () => { feedback.textContent = ""; });
   render();
   return { boundary, advanceRounds, advanceTime, tickRoundEffects, displayTime, endForRemovedTarget, removeParticipant, indicators,
-    view, entries, active, spellParticipants, setSpellTargets, recordShield };
+    view, entries, active, spellParticipants, setSpellTargets, recordShield, applyBuff, cleanMods, describeMods, modsFor,
+    wireBuff, fromWire };
 })();

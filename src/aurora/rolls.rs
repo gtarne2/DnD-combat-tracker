@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    ABILITIES, ContentDefinition, ContentElement, SavedReference, profile::stat_requirement,
+    ABILITIES, ContentDefinition, ContentElement, SavedReference,
+    profile::{WornGear, equipped_requirement, stat_requirement},
 };
 
 pub const SKILLS: [(&str, usize); 18] = [
@@ -97,6 +98,7 @@ pub(super) fn read_rolls(
     summary: &[SavedReference<'_, '_>],
     definitions: &BTreeMap<String, Option<ContentDefinition>>,
     active: &BTreeSet<&str>,
+    gear: WornGear,
     level: Option<i32>,
     abilities: [Option<i32>; 6],
 ) -> RollBonuses {
@@ -105,7 +107,11 @@ pub(super) fn read_rolls(
         .iter()
         .filter_map(|id| definitions.get(*id)?.as_ref())
         .flat_map(ContentDefinition::rules)
-        .filter(|rule| rule.tag == "stat" && stat_requirement(rule, active) != Some(false))
+        .filter(|rule| {
+            rule.tag == "stat"
+                && stat_requirement(rule, active) != Some(false)
+                && equipped_requirement(rule, gear) != Some(false)
+        })
     {
         if let Some(name) = rule.attributes.get("name") {
             stats.entry(name).or_default().push(rule);
@@ -114,6 +120,7 @@ pub(super) fn read_rolls(
     let rules = RollRules {
         stats,
         active,
+        gear,
         abilities,
         proficiency: level.map(|level| 2 + (level - 1) / 4),
     };
@@ -234,6 +241,7 @@ pub(super) fn read_rolls(
 struct RollRules<'a> {
     stats: BTreeMap<&'a str, Vec<&'a ContentElement>>,
     active: &'a BTreeSet<&'a str>,
+    gear: WornGear,
     abilities: [Option<i32>; 6],
     proficiency: Option<i32>,
 }
@@ -242,7 +250,7 @@ impl RollRules<'_> {
     fn applicable(&self, rule: &ContentElement) -> bool {
         stat_requirement(rule, self.active) == Some(true)
             && !rule.attributes.contains_key("level")
-            && !rule.attributes.contains_key("equipped")
+            && equipped_requirement(rule, self.gear) == Some(true)
     }
 
     fn training(&self, key: &str, proficient: bool) -> RollProficiency {

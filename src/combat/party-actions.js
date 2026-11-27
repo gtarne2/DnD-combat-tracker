@@ -122,8 +122,33 @@ const partyActions = (() => {
     return label;
   }
 
+  // A buff effect on another player's row, such as Longstrider cast on them (R78). Their sheet
+  // applies it from a buff offer; the offer ends when the effect here ends or changes.
+  function buffSource(state, key) {
+    const id = Number(key.slice(7));
+    const effect = effectControls.entries(state).find(entry => entry.id === id);
+    if (!room || room.ended || !effect || !effectControls.active(effect)) return;
+    const prefix = "party:" + room.room_id + ":";
+    const recipient = effect.target?.startsWith(prefix) && effect.target.slice(prefix.length);
+    const spec = recipient && effectControls.wireBuff(effect);
+    return spec ? {...spec, recipient} : undefined;
+  }
+
+  function buffSends(state, current) {
+    if (!room || room.ended || epoch !== previewEncounter.restoreEpoch()) return [];
+    const present = new Set(members().map(member => member.member_id));
+    return effectControls.entries(state).flatMap(effect => {
+      const key = "effect:" + effect.id;
+      const spec = !current.sources?.[key] && buffSource(state, key);
+      if (!spec || !present.has(spec.recipient)) return [];
+      const seconds = effect.kind === "seconds" ? effect.remaining : effect.kind === "rounds" ? effect.remaining * 6 : null;
+      return [{effect, key, spec, seconds: Number.isInteger(seconds) && seconds > 0 && seconds <= 0xffffffff ? seconds : null}];
+    });
+  }
+
   function endedSources(state, current) {
-    return Object.values(current.sources || {}).filter(binding =>
+    return Object.values(current.sources || {}).filter(binding => binding.key.startsWith("effect:")
+      ? JSON.stringify(buffSource(state, binding.key)) !== JSON.stringify(binding.spec) :
       state.progress?.partyAssignments?.[binding.key] !== binding.grant_id ||
       JSON.stringify(sourceGrant(state, binding.key, binding.spec.category)) !== JSON.stringify(binding.spec));
   }
@@ -131,7 +156,8 @@ const partyActions = (() => {
   function prepareDelivery(state, current) {
     const additions = staged.get(state) || [];
     const ended = endedSources(state, current);
-    if (!additions.length && !ended.length) return current;
+    const buffs = buffSends(state, current);
+    if (!additions.length && !ended.length && !buffs.length) return current;
     const ledger = {...current, sources: {...current.sources}, outbox: {...current.outbox}};
     for (const {key, room, sender, grant_id} of ended) {
       delete ledger.sources[key];
@@ -142,9 +168,18 @@ const partyActions = (() => {
       ledger.outbox[crypto.randomUUID()] = {room, sender, command};
       if (binding) ledger.sources[binding.key] = binding;
     }
+    for (const {effect, key, spec, seconds} of buffs) {
+      const grant_id = crypto.randomUUID();
+      const {recipient, ...amount} = spec;
+      const label = String(effect.name).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").trim();
+      ledger.outbox[crypto.randomUUID()] = {room: room.room_id, sender: room.self_id, command: {kind: "send",
+        action_id: crypto.randomUUID(), recipient, source: Array.from(label).slice(0, 120).join("") || "Buff",
+        effect: {kind: "buff", amount: {...amount, grant_id, seconds}}}};
+      ledger.sources[key] = {key, grant_id, spec, recipient, room: room.room_id, sender: room.self_id};
+    }
     return ledger;
   }
 
-  return {setRoom, members, memberLabel, targets, applyHp, grantControl, prepareDelivery,
-    hasEndedSource: (state, ledger) => endedSources(state, ledger).length > 0};
+  return {setRoom, members, memberLabel, memberKey: member => remoteKey(member.member_id), targets, applyHp, grantControl, prepareDelivery,
+    hasEndedSource: (state, ledger) => endedSources(state, ledger).length > 0 || buffSends(state, ledger).length > 0};
 })();

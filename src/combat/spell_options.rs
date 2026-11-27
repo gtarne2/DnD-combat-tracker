@@ -21,6 +21,9 @@ pub struct SpellOptions {
     pub look: Option<String>,
     /// True when the tracker's mechanics overlay matched this imported spell.
     pub overlay: bool,
+    /// Stat changes the spell puts on its targets, from the mechanics overlay, such as
+    /// `speed=10,seconds=3600` for Longstrider.
+    pub buff: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,8 +222,16 @@ impl SpellOptions {
     /// Applies the tracker's mechanics overlay to a spell read from the player's import.
     /// A reviewed or structured area replaces the one read from the text; the colour comes
     /// from the overlay or the damage type.
-    pub(super) fn apply_overlay(&mut self, name: &str, source: Option<&str>) {
+    pub(super) fn apply_overlay(&mut self, name: &str, source: Option<&str>, level: Option<u8>) {
         let overlay = crate::mechanics::overlay();
+        if let Some(buff) = overlay.buff(name, source) {
+            self.buff = Some(buff.attribute()).filter(|value| !value.is_empty());
+            if self.target_counts.is_empty()
+                && let Some(level) = level.filter(|level| (1..=9).contains(level))
+            {
+                self.target_counts = buff.target_counts(level);
+            }
+        }
         let entry = overlay.spell(name, source);
         if let Some(entry) = entry {
             self.overlay = true;
@@ -343,6 +354,7 @@ impl SpellOptions {
             colour: None,
             look: None,
             overlay: false,
+            buff: None,
         }
     }
 }

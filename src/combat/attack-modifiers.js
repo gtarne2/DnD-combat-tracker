@@ -98,16 +98,23 @@ const attackModifiers = (() => {
       attack += bonus.attack;
       if (kind === "weapon") damage += bonus.damage;
     }
+    // R78: effects on this sheet's owner, such as Bless (+1d4) or a custom +1 to attacks.
+    const owner = kind ? effectControls.modsFor(state) : null;
+    if (owner) {
+      attack += owner.attack;
+      if (kind === "weapon") damage += owner.damage;
+    }
+    const die = hasAttack && owner?.attackDie ? "+1d" + owner.attackDie : "";
     if (!hasAttack) attack = 0;
     const baseDamage = data.baseDamage || "";
-    const attackRoll = attack ? data.baseAttack.replace(/^[+-]?\d+/, (value) => signed(Number(value) + attack)) : data.baseAttack;
+    const attackRoll = attack || die ? data.baseAttack.replace(/^[+-]?\d+/, (value) => signed(Number(value) + attack) + die) : data.baseAttack;
     const damageRoll = damage && baseDamage
       ? baseDamage.replace(/^(\d+d\d+)(?:\s*([+-])\s*(\d+))?(?=\s+[a-z]+(?:\s+damage)?$|$)/i, (_, dice, sign, amount) => {
         const total = damage + (sign === "-" ? -1 : 1) * Number(amount || 0);
         return dice + (total ? signed(total) : "");
       }) : baseDamage;
     const firearmActive = data.firearmEligible !== undefined && firearmEnabled(state);
-    const adjustment = [attack ? signed(attack) + " to hit" : "", damage ? signed(damage) + " damage" : "",
+    const adjustment = [attack || die ? [attack ? signed(attack) : "", die].filter(Boolean).join(" ") + " to hit" : "", damage ? signed(damage) + " damage" : "",
       firearmActive ? firearmHint : ""].filter(Boolean).join(" · ");
     return {attackRoll, damageRoll, adjustment, firearmActive, flatDamage: damage};
   }

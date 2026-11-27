@@ -289,6 +289,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("quick-actions.js"));
     html.push_str(include_str!("reference-pages.js"));
     html.push_str(include_str!("rolls.js"));
+    html.push_str(include_str!("stat-effects.js"));
     html.push_str(include_str!("sheet-reference.js"));
     html.push_str(include_str!("feature-groups.js"));
     html.push_str(include_str!("dashboard.js"));
@@ -716,6 +717,7 @@ fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGrou
     roll_attribute(html, "data-damage-type", spell.damage_type);
     roll_attribute(html, "data-spell-colour", spell.colour.as_deref());
     roll_attribute(html, "data-spell-look", spell.look.as_deref());
+    roll_attribute(html, "data-spell-buff", spell.buff.as_deref());
     if spell.overlay {
         html.push_str(" data-spell-overlay");
     }
