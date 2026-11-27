@@ -1,0 +1,4003 @@
+{
+ "schema": 1,
+ "about": "Aurora Combat Tracker mechanics overlay. Names, book codes and measurements only; no rules text. Used only for spells the player has imported.",
+ "generated_from": "5etools-src data/spells (structure only) and content/mechanics/curated.json",
+ "damage_colours": {
+  "acid": "#82c91e",
+  "bludgeoning": "#868e96",
+  "cold": "#74c0fc",
+  "fire": "#fd7e14",
+  "force": "#845ef7",
+  "lightning": "#4c6ef5",
+  "necrotic": "#5f3dc4",
+  "piercing": "#adb5bd",
+  "poison": "#40c057",
+  "psychic": "#e64980",
+  "radiant": "#fab005",
+  "slashing": "#ced4da",
+  "thunder": "#15aabf"
+ },
+ "books": {
+  "A Zib for Your Thoughts": "AZfyT",
+  "Acquisitions Incorporated": "AI",
+  "Adventure Atlas: The Mortuary": "AATM",
+  "Adventure with Muk": "AWM",
+  "Adventurers League": "AL",
+  "Adventures in the Forgotten Realms: A Verdant Tomb": "AitFR-AVT",
+  "Adventures in the Forgotten Realms: Deepest Night": "AitFR-DN",
+  "Adventures in the Forgotten Realms: From Cyan Depths": "AitFR-FCD",
+  "Adventures in the Forgotten Realms: In Scarlet Flames": "AitFR-ISF",
+  "Adventures in the Forgotten Realms: The Hidden Page": "AitFR-THP",
+  "Arcana Unleashed": "AU",
+  "Arcana Unleashed: Deadfall": "AUD",
+  "Astarion's Book of Hungers": "ABH",
+  "Astral Adventurer's Guide": "AAG",
+  "Baldur's Gate: Descent Into Avernus": "BGDIA",
+  "Bigby Presents: Glory of the Giants": "BGG",
+  "Boo's Astral Menagerie": "BAM",
+  "Borderlands Quest: Dagger Danger!": "BQDD",
+  "Borderlands Quest: Goblin Trouble": "BQGT",
+  "Candlekeep Mysteries": "CM",
+  "Chains of Asmodeus": "CoA",
+  "Critical Role: Call of the Netherdeep": "CRCotN",
+  "Crochet: A Book of Many Patterns": "CaBoMP",
+  "Curse of Strahd": "CoS",
+  "Descent into the Lost Caverns of Tsojcanth": "DitLCoT",
+  "Domains of Delight": "DoD",
+  "Dragon Delves: A Copper for a Song": "DrDe-ACfaS",
+  "Dragon Delves: Baker's Doesn't": "DrDe-BD",
+  "Dragon Delves: Before the Storm": "DrDe-BtS",
+  "Dragon Delves: Death at Sunset": "DrDe-DaS",
+  "Dragon Delves: Dragons of the Sandstone City": "DrDe-DotSC",
+  "Dragon Delves: For Whom the Void Calls": "DrDe-FWtVC",
+  "Dragon Delves: Shivering Death": "DrDe-SD",
+  "Dragon Delves: The Dragon of Najkir": "DrDe-TDoN",
+  "Dragon Delves: The Forbidden Vale": "DrDe-TFV",
+  "Dragon Delves: The Will of Orcus": "DrDe-TWoO",
+  "Dragonlance: Shadow of the Dragon Queen": "DSotDQ",
+  "Dragons of Stormwreck Isle": "DoSI",
+  "Dungeon Master's Guide": "DMG",
+  "Dungeon Master's Guide (2014)": "DMG",
+  "Dungeon Master's Guide (2024)": "XDMG",
+  "Dungeon Master's Screen": "Screen",
+  "Dungeon Master's Screen (2024)": "XScreen",
+  "Dungeon Master's Screen; Ravenloft: The Horrors Within": "XScreenRHW",
+  "Dungeon Master's Screen: Dungeon Kit": "ScreenDungeonKit",
+  "Dungeon Master's Screen: Spelljammer": "ScreenSpelljammer",
+  "Dungeon Master's Screen: Wilderness Kit": "ScreenWildernessKit",
+  "Dungeons & Dragons vs. Rick and Morty: Basic Rules": "RMR",
+  "Eberron: Forge of the Artificer": "EFA",
+  "Eberron: Forgotten Relics": "EFR",
+  "Eberron: Rising from the Last War": "ERLW",
+  "Elemental Evil Player's Companion": "EEPC",
+  "Essentials Kit: Divine Contention": "DC",
+  "Essentials Kit: Dragon of Icespire Peak": "DIP",
+  "Essentials Kit: Sleeping Dragon's Wake": "SDW",
+  "Essentials Kit: Storm Lord's Wrath": "SLW",
+  "Explorer's Guide to Wildemount": "EGW",
+  "Fated Flight of the Recluse": "FFotR",
+  "Fizban's Treasury of Dragons": "FTD",
+  "Forgotten Realms: Adventures in Faerûn": "FRAiF",
+  "Forgotten Realms: Heroes of Faerûn": "FRHoF",
+  "Ghosts of Saltmarsh": "GoS",
+  "Giants of the Star Forge": "GotSF",
+  "Guildmasters' Guide to Ravnica": "GGR",
+  "Heroes of the Borderlands": "HotB",
+  "Heroes' Feast": "HF",
+  "Heroes' Feast Flavors of the Multiverse": "HFFotM",
+  "Heroes' Feast Legends of the Table": "HFLotT",
+  "Heroes' Feast: Saving the Children's Menu": "HFStCM",
+  "Hoard of the Dragon Queen": "HotDQ",
+  "Hold Back The Dead": "HBTD",
+  "Hunt for the Thessalhydra": "HftT",
+  "Icewind Dale: Rime of the Frostmaiden": "IDRotF",
+  "Infernal Machine Rebuild": "IMR",
+  "Journeys through the Radiant Citadel": "JttRC",
+  "Keys from the Golden Vault": "KftGV",
+  "Krenko's Way": "KKW",
+  "Light of Xaryxis": "LoX",
+  "Lightning Keep": "LK",
+  "Locathah Rising": "LR",
+  "Lorwyn: First Light": "LFL",
+  "Lost Laboratory of Kwalish": "LLK",
+  "Lost Mine of Phandelver": "LMoP",
+  "Minsc and Boo's Journal of Villainy": "MaBJoV",
+  "Monster Manual": "MM",
+  "Monster Manual (2014)": "MM",
+  "Monster Manual (2025)": "XMM",
+  "Monstrous Compendium Volume 1: Spelljammer Creatures": "MCV1SC",
+  "Monstrous Compendium Volume 4: Eldraine Creatures": "MCV4EC",
+  "Mordenkainen Presents: Monsters of the Multiverse": "MPMM",
+  "Mordenkainen's Tome of Foes": "MTF",
+  "Morte's Planar Parade": "MPP",
+  "Muk's Guide to Everything He Learned From Tasha": "MGELFT",
+  "Mythic Odysseys of Theros": "MOT",
+  "NERDS Restoring Harmony: A Sticky Situation": "NRH-ASS",
+  "NERDS Restoring Harmony: A Voice in the Wilderness": "NRH-AVitW",
+  "NERDS Restoring Harmony: A Web of Lies": "NRH-AWoL",
+  "NERDS Restoring Harmony: Adventure Together": "NRH-AT",
+  "NERDS Restoring Harmony: Circus of Illusion": "NRH-CoI",
+  "NERDS Restoring Harmony: The Candy Mountain Caper": "NRH-TCMC",
+  "NERDS Restoring Harmony: The Lost Tomb": "NRH-TLT",
+  "Netheril's Fall": "NF",
+  "One Grung Above": "OGA",
+  "Out of the Abyss": "OotA",
+  "Peril in Pinebrook": "PiP",
+  "Phandelver and Below: The Shattered Obelisk": "PaBTSO",
+  "Plane Shift: Amonkhet": "PSA",
+  "Plane Shift: Dominaria": "PSD",
+  "Plane Shift: Innistrad": "PSI",
+  "Plane Shift: Ixalan": "PSX",
+  "Plane Shift: Kaladesh": "PSK",
+  "Plane Shift: Zendikar": "PSZ",
+  "Player's Handbook": "PHB",
+  "Player's Handbook (2014)": "PHB",
+  "Player's Handbook (2024)": "XPHB",
+  "Player's Handbook 2024": "XPHB",
+  "Princes of the Apocalypse": "PotA",
+  "Project_Lamordia": "PL",
+  "Puncheons and Flagons": "PaF",
+  "Quests from the Infinite Staircase": "QftIS",
+  "Ravenloft: The Horrors Within": "RHW",
+  "Ravenloft: The House of Lament": "HoL",
+  "Red Dragon's Tale: A LEGO Adventure": "LRDT",
+  "Red Wizards' Gambit": "RWG",
+  "Return to the Glory": "RtG",
+  "Rise of Tiamat": "RoT",
+  "Sage Advice Compendium": "SAC",
+  "Sage Advice Compendium (2014)": "SAC",
+  "Sage Advice Compendium (2025)": "XSAC",
+  "Scions of Elemental Evil": "ScoEE",
+  "Shadows of Sithicus": "SoS",
+  "Sigil and the Outlands": "SatO",
+  "Spelljammer Academy": "SjA",
+  "Storm King's Thunder": "SKT",
+  "Stranger Things: Welcome to the Hellfire Club": "WttHC",
+  "Strixhaven: A Curriculum of Chaos": "SCC",
+  "Strixhaven: A Reckoning in Ruins": "SCC-ARiR",
+  "Strixhaven: Campus Kerfuffle": "SCC-CK",
+  "Strixhaven: Hunt for Mage Tower": "SCC-HfMT",
+  "Strixhaven: The Magister's Masquerade": "SCC-TMM",
+  "Sword Coast Adventurer's Guide": "SCAG",
+  "Tales from the Yawning Portal: Against the Giants": "TftYP-AtG",
+  "Tales from the Yawning Portal: Dead in Thay": "TftYP-DiT",
+  "Tales from the Yawning Portal: The Forge of Fury": "TftYP-TFoF",
+  "Tales from the Yawning Portal: The Hidden Shrine of Tamoachan": "TftYP-THSoT",
+  "Tales from the Yawning Portal: The Sunless Citadel": "TftYP-TSC",
+  "Tales from the Yawning Portal: Tomb of Horrors": "TftYP-ToH",
+  "Tales from the Yawning Portal: White Plume Mountain": "TftYP-WPM",
+  "Tarot Deck": "TD",
+  "Tasha's Cauldron of Everything": "TCE",
+  "The Book of Many Things": "BMT",
+  "The Deck of Many Things: Card Reference Guide": "DMTCRG",
+  "The Lost Dungeon of Rickedness: Big Rick Energy": "RMBRE",
+  "The Lost Kenku": "TLK",
+  "The Lost Library of Lethchauntos": "FRAiF",
+  "The Orrery of the Wanderer": "OoW",
+  "The Tortle Package": "TTP",
+  "The Wild Beyond the Witchlight": "WBtW",
+  "Theros: No Silent Secret": "MOT",
+  "Thieves' Gallery": "HAT-TG",
+  "Tomb of Annihilation": "ToA",
+  "Turn of Fortune's Wheel": "ToFW",
+  "Uni and the Hunt for the Lost Horn": "UtHftLH",
+  "Van Richten's Guide to Ravenloft": "VRGR",
+  "Vecna: Eve of Ruin": "VEoR",
+  "Vecna: Nest of the Eldritch Eye": "VNotEE",
+  "Volo's Guide to Monsters": "VGM",
+  "Waterdeep: Dragon Heist": "WDH",
+  "Waterdeep: Dungeon of the Mad Mage": "WDMM",
+  "Wildemount: Dangerous Designs": "DD",
+  "Wildemount: Frozen Sick": "FS",
+  "Wildemount: Tide of Retribution": "ToR",
+  "Wildemount: Unwelcome Spirits": "US",
+  "World of Warcraft: Deadmines Dungeon": "DDE",
+  "World of Warcraft: Icecrown Citadel": "ICC",
+  "X Marks the Spot": "XMtS",
+  "Xanathar's Guide to Everything": "XGE"
+ },
+ "spells": [
+  {
+   "name": "Abi-Dalzim's Horrid Wilting",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 30
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Aganazzar's Scorcher",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "damage_types": [
+    "fire"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Alarm",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   }
+  },
+  {
+   "name": "Alarm",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   }
+  },
+  {
+   "name": "Alustriel's Mooncloak",
+   "edition": "2024",
+   "sources": [
+    "FRHoF"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 20
+   }
+  },
+  {
+   "name": "Antilife Shell",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Antilife Shell",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Antimagic Field",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   }
+  },
+  {
+   "name": "Antimagic Field",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Antipathy/Sympathy",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 200
+   }
+  },
+  {
+   "name": "Arms of Hadar",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Arms of Hadar",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Aura of Evasion",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Aura of Life",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Aura of Life",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Aura of Purity",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Aura of Purity",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Aura of Vitality",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Aura of Vitality",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Blade Barrier",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "slashing"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Blade Barrier",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "force"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Burning Hands",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Burning Hands",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Cacophonic Shield",
+   "edition": "2024",
+   "sources": [
+    "FRHoF"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "damage_types": [
+    "thunder"
+   ]
+  },
+  {
+   "name": "Call Lightning",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 5
+   },
+   "damage_types": [
+    "lightning"
+   ],
+   "reviewed": true
+  },
+  {
+   "name": "Call Lightning",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 5
+   },
+   "damage_types": [
+    "lightning"
+   ],
+   "reviewed": true
+  },
+  {
+   "name": "Calm Emotions",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   }
+  },
+  {
+   "name": "Calm Emotions",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   }
+  },
+  {
+   "name": "Circle of Death",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Circle of Death",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Circle of Power",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Circle of Power",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Cloud of Daggers",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "slashing"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Cloud of Daggers",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   },
+   "damage_types": [
+    "slashing"
+   ],
+   "reviewed": true
+  },
+  {
+   "name": "Cloudkill",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "poison"
+   ],
+   "colour": "#82c91e",
+   "reviewed": true
+  },
+  {
+   "name": "Cloudkill",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "poison"
+   ],
+   "colour": "#82c91e",
+   "reviewed": true
+  },
+  {
+   "name": "Color Spray",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   }
+  },
+  {
+   "name": "Color Spray",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   }
+  },
+  {
+   "name": "Cone of Cold",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Cone of Cold",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Confusion",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   }
+  },
+  {
+   "name": "Confusion",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   }
+  },
+  {
+   "name": "Conjure Animals",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "slashing"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Conjure Barrage",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   }
+  },
+  {
+   "name": "Conjure Barrage",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Conjure Celestial",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Conjure Minor Elementals",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 15
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning"
+   ]
+  },
+  {
+   "name": "Conjure Volley",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 40
+   }
+  },
+  {
+   "name": "Conjure Volley",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 40
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Control Flames",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Control Water",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 100
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Control Water",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 100
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Control Winds",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 100
+   }
+  },
+  {
+   "name": "Cordon of Arrows",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "piercing"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Cordon of Arrows",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "piercing"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Create Bonfire",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Create or Destroy Water",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 30
+   }
+  },
+  {
+   "name": "Create or Destroy Water",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 30
+   }
+  },
+  {
+   "name": "Crusader's Mantle",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Crusader's Mantle",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Dark Star",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "damage_types": [
+    "force"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 40
+   },
+   "colour": "#212529",
+   "reviewed": true
+  },
+  {
+   "name": "Darkness",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 15
+   },
+   "colour": "#212529",
+   "reviewed": true
+  },
+  {
+   "name": "Darkness",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 15
+   },
+   "colour": "#212529",
+   "reviewed": true
+  },
+  {
+   "name": "Dawn",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 30
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Daylight",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   }
+  },
+  {
+   "name": "Daylight",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   }
+  },
+  {
+   "name": "Delayed Blast Fireball",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Delayed Blast Fireball",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Destructive Wave",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   },
+   "damage_types": [
+    "necrotic",
+    "radiant",
+    "thunder"
+   ]
+  },
+  {
+   "name": "Destructive Wave",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   },
+   "damage_types": [
+    "necrotic",
+    "radiant",
+    "thunder"
+   ]
+  },
+  {
+   "name": "Detonate",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 60
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Dirge",
+   "edition": "2024",
+   "sources": [
+    "FRHoF"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 60
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Disruptive Tune",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   }
+  },
+  {
+   "name": "Distorted Distance",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Doomtide",
+   "edition": "2024",
+   "sources": [
+    "FRHoF"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Dragon's Breath",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison"
+   ]
+  },
+  {
+   "name": "Dragon's Breath",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison"
+   ]
+  },
+  {
+   "name": "Druid Grove",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 30
+   }
+  },
+  {
+   "name": "Dueling Ground",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 15
+   }
+  },
+  {
+   "name": "Earth Tremor",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Earthquake",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 100
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Earthquake",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 100
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Elementalism",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Entangle",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "colour": "#2f9e44",
+   "reviewed": true
+  },
+  {
+   "name": "Entangle",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "colour": "#2f9e44",
+   "reviewed": true
+  },
+  {
+   "name": "Erupting Earth",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Evard's Black Tentacles",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "colour": "#343a40",
+   "reviewed": true
+  },
+  {
+   "name": "Evard's Black Tentacles",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "colour": "#343a40",
+   "reviewed": true
+  },
+  {
+   "name": "Faerie Fire",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "colour": "#cc5de8",
+   "reviewed": true
+  },
+  {
+   "name": "Faerie Fire",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "colour": "#cc5de8",
+   "reviewed": true
+  },
+  {
+   "name": "Fear",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 30
+   }
+  },
+  {
+   "name": "Fear",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 30
+   }
+  },
+  {
+   "name": "Festering Blast",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 10
+   },
+   "damage_types": [
+    "necrotic",
+    "poison"
+   ]
+  },
+  {
+   "name": "Fire Storm",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 10
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Fire Storm",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 10
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Fireball",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Fireball",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Flame Strike",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   },
+   "damage_types": [
+    "fire",
+    "radiant"
+   ]
+  },
+  {
+   "name": "Flame Strike",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   },
+   "damage_types": [
+    "fire",
+    "radiant"
+   ]
+  },
+  {
+   "name": "Flaming Sphere",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Flaming Sphere",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Fog Cloud",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#adb5bd",
+   "reviewed": true
+  },
+  {
+   "name": "Fog Cloud",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#adb5bd",
+   "reviewed": true
+  },
+  {
+   "name": "Forcecage",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Forcecage",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Frost Fingers",
+   "edition": "2014",
+   "sources": [
+    "IDRotF"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Globe of Invulnerability",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Globe of Invulnerability",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Glyph of Warding",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "thunder"
+   ]
+  },
+  {
+   "name": "Glyph of Warding",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "thunder"
+   ]
+  },
+  {
+   "name": "Grave Ground",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 10
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Gravity Fissure",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 5
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Gravity Sinkhole",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Grease",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 10
+   },
+   "colour": "#e8b04a",
+   "reviewed": true
+  },
+  {
+   "name": "Grease",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 10
+   },
+   "colour": "#e8b04a",
+   "reviewed": true
+  },
+  {
+   "name": "Guards and Wards",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Guards and Wards",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 50
+   }
+  },
+  {
+   "name": "Gust of Wind",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 10
+   }
+  },
+  {
+   "name": "Gust of Wind",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 10
+   }
+  },
+  {
+   "name": "Hail of Thorns",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "piercing"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Hail of Thorns",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "piercing"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Hallucinatory Terrain",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 150
+   }
+  },
+  {
+   "name": "Hallucinatory Terrain",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 150
+   }
+  },
+  {
+   "name": "Healing Spirit",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Heroes' Feast",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 10
+   }
+  },
+  {
+   "name": "Holy Aura",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   }
+  },
+  {
+   "name": "Holy Aura",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 30
+   }
+  },
+  {
+   "name": "Hunger of Hadar",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "acid",
+    "cold"
+   ],
+   "colour": "#212529",
+   "reviewed": true
+  },
+  {
+   "name": "Hunger of Hadar",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "acid",
+    "cold"
+   ],
+   "colour": "#212529",
+   "reviewed": true
+  },
+  {
+   "name": "Hypnotic Pattern",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 30
+   },
+   "colour": "#f783ac",
+   "reviewed": true
+  },
+  {
+   "name": "Hypnotic Pattern",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 30
+   },
+   "colour": "#f783ac",
+   "reviewed": true
+  },
+  {
+   "name": "Ice Storm",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 20
+   },
+   "damage_types": [
+    "bludgeoning",
+    "cold"
+   ]
+  },
+  {
+   "name": "Ice Storm",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 20
+   },
+   "damage_types": [
+    "bludgeoning",
+    "cold"
+   ]
+  },
+  {
+   "name": "Illusory Dragon",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "necrotic",
+    "poison"
+   ]
+  },
+  {
+   "name": "Illusory Dragon",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "necrotic",
+    "poison"
+   ]
+  },
+  {
+   "name": "Incendiary Cloud",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Incendiary Cloud",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Insect Plague",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "piercing"
+   ]
+  },
+  {
+   "name": "Insect Plague",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "piercing"
+   ]
+  },
+  {
+   "name": "Investiture of Flame",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "damage_types": [
+    "fire"
+   ]
+  },
+  {
+   "name": "Investiture of Ice",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 15
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Investiture of Stone",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 15
+   }
+  },
+  {
+   "name": "Investiture of Wind",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 15
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Jallarzi's Storm of Radiance",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   },
+   "damage_types": [
+    "radiant",
+    "thunder"
+   ]
+  },
+  {
+   "name": "Laeral's Silver Lance",
+   "edition": "2024",
+   "sources": [
+    "FRHoF"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 120,
+    "width": 5
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Leomund's Tiny Hut",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   }
+  },
+  {
+   "name": "Leomund's Tiny Hut",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Lightning Arrow",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "lightning"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Lightning Arrow",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "lightning"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Lightning Bolt",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 5
+   },
+   "damage_types": [
+    "lightning"
+   ]
+  },
+  {
+   "name": "Lightning Bolt",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 5
+   },
+   "damage_types": [
+    "lightning"
+   ]
+  },
+  {
+   "name": "Lightning Ring",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "damage_types": [
+    "lightning",
+    "thunder"
+   ]
+  },
+  {
+   "name": "Maddening Darkness",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Maelstrom",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Magic Circle",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   }
+  },
+  {
+   "name": "Magic Circle",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   }
+  },
+  {
+   "name": "Magnify Gravity",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Mass Cure Wounds",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   }
+  },
+  {
+   "name": "Mass Cure Wounds",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   }
+  },
+  {
+   "name": "Melf's Minute Meteors",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "damage_types": [
+    "fire"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Meteor Swarm",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 40
+   },
+   "damage_types": [
+    "bludgeoning",
+    "fire"
+   ]
+  },
+  {
+   "name": "Meteor Swarm",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 40
+   },
+   "damage_types": [
+    "bludgeoning",
+    "fire"
+   ]
+  },
+  {
+   "name": "Mold Earth",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Moonbeam",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 5
+   },
+   "damage_types": [
+    "radiant"
+   ],
+   "colour": "#dee2e6",
+   "reviewed": true
+  },
+  {
+   "name": "Moonbeam",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 5
+   },
+   "damage_types": [
+    "radiant"
+   ],
+   "colour": "#dee2e6",
+   "reviewed": true
+  },
+  {
+   "name": "Mordenkainen's Private Sanctum",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 100
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Mordenkainen's Private Sanctum",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 100
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Move Earth",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 40
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Move Earth",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 40
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Otiluke's Freezing Sphere",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Otiluke's Freezing Sphere",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Prismatic Spray",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison"
+   ]
+  },
+  {
+   "name": "Prismatic Spray",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   },
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison"
+   ]
+  },
+  {
+   "name": "Prismatic Wall",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "poison"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 90,
+    "width": 1
+   },
+   "colour": "#be4bdb",
+   "reviewed": true
+  },
+  {
+   "name": "Prismatic Wall",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "acid",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "poison"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 90,
+    "width": 1
+   },
+   "colour": "#be4bdb",
+   "reviewed": true
+  },
+  {
+   "name": "Pulse Wave",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 30
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Purify Food and Drink",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   }
+  },
+  {
+   "name": "Purify Food and Drink",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   }
+  },
+  {
+   "name": "Pyrotechnics",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Ravenous Void",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Reverse Gravity",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 50
+   }
+  },
+  {
+   "name": "Reverse Gravity",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 50
+   }
+  },
+  {
+   "name": "Rime's Binding Ice",
+   "edition": "2014",
+   "sources": [
+    "FTD"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 30
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Shadow of Moil",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "damage_types": [
+    "necrotic"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "colour": "#212529",
+   "reviewed": true
+  },
+  {
+   "name": "Shape Water",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC",
+    "EGW"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Shatter",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   },
+   "damage_types": [
+    "thunder"
+   ]
+  },
+  {
+   "name": "Shatter",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   },
+   "damage_types": [
+    "thunder"
+   ]
+  },
+  {
+   "name": "Sickening Radiance",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Silence",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#748ffc",
+   "reviewed": true
+  },
+  {
+   "name": "Silence",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#748ffc",
+   "reviewed": true
+  },
+  {
+   "name": "Sleep",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#9775fa",
+   "reviewed": true
+  },
+  {
+   "name": "Sleep",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   }
+  },
+  {
+   "name": "Sleet Storm",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 40
+   },
+   "colour": "#a5d8ff",
+   "reviewed": true
+  },
+  {
+   "name": "Sleet Storm",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 20
+   },
+   "colour": "#a5d8ff",
+   "reviewed": true
+  },
+  {
+   "name": "Slow",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 40
+   }
+  },
+  {
+   "name": "Slow",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 40
+   }
+  },
+  {
+   "name": "Snilloc's Snowball Swarm",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   },
+   "damage_types": [
+    "cold"
+   ]
+  },
+  {
+   "name": "Spellfire Storm",
+   "edition": "2024",
+   "sources": [
+    "FRHoF"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 20
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Spike Growth",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "piercing"
+   ]
+  },
+  {
+   "name": "Spike Growth",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "piercing"
+   ]
+  },
+  {
+   "name": "Spirit Guardians",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 15
+   },
+   "damage_types": [
+    "necrotic",
+    "radiant"
+   ],
+   "colour": "#fab005",
+   "reviewed": true
+  },
+  {
+   "name": "Spirit Guardians",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 15
+   },
+   "damage_types": [
+    "necrotic",
+    "radiant"
+   ],
+   "colour": "#fab005",
+   "reviewed": true
+  },
+  {
+   "name": "Stinking Cloud",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#94d82d",
+   "reviewed": true
+  },
+  {
+   "name": "Stinking Cloud",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#94d82d",
+   "reviewed": true
+  },
+  {
+   "name": "Storm of Vengeance",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "lightning",
+    "thunder"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 360
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Storm of Vengeance",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "lightning",
+    "thunder"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 360
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Storm Sphere",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "bludgeoning",
+    "lightning"
+   ]
+  },
+  {
+   "name": "Sunbeam",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Sunbeam",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Sunburst",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Sunburst",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "radiant"
+   ]
+  },
+  {
+   "name": "Sword Burst",
+   "edition": "2014",
+   "sources": [
+    "TCE",
+    "SCAG"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 5
+   },
+   "damage_types": [
+    "force"
+   ]
+  },
+  {
+   "name": "Symbol",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Symbol",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 60
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Synaptic Static",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Synaptic Static",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Thunder Step",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "damage_types": [
+    "thunder"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Thunderclap",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "damage_types": [
+    "thunder"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 5
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Thunderclap",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 5
+   },
+   "damage_types": [
+    "thunder"
+   ]
+  },
+  {
+   "name": "Thunderwave",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 15
+   },
+   "damage_types": [
+    "thunder"
+   ]
+  },
+  {
+   "name": "Thunderwave",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 15
+   },
+   "damage_types": [
+    "thunder"
+   ]
+  },
+  {
+   "name": "Tidal Wave",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 10
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Transmute Rock",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 40
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Tsunami",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 300,
+    "width": 50
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Tsunami",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 300,
+    "width": 50
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Vitriolic Sphere",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "acid"
+   ]
+  },
+  {
+   "name": "Vitriolic Sphere",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "damage_types": [
+    "acid"
+   ]
+  },
+  {
+   "name": "Wall of Fire",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "fire"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 1
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Fire",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "fire"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 1
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Force",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "colour": "#845ef7",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Force",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "colour": "#845ef7",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Ice",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "cold"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Ice",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "cold"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Light",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "damage_types": [
+    "radiant"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "colour": "#fab005",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Sand",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 10
+   },
+   "colour": "#e8b04a",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Stone",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "colour": "#868e96",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Stone",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "colour": "#868e96",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Thorns",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "piercing",
+    "slashing"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "colour": "#2f9e44",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Thorns",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "piercing",
+    "slashing"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "colour": "#2f9e44",
+   "reviewed": true
+  },
+  {
+   "name": "Wall of Water",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC",
+    "VGM",
+    "MOT"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 1
+   },
+   "colour": "#228be6",
+   "reviewed": true
+  },
+  {
+   "name": "Watery Sphere",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   }
+  },
+  {
+   "name": "Waves of Exhaustion",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "cone",
+    "size": 60
+   }
+  },
+  {
+   "name": "Web",
+   "edition": "2014",
+   "sources": [
+    "PHB",
+    "RMR"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ],
+   "colour": "#f1f3f5",
+   "reviewed": true
+  },
+  {
+   "name": "Web",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "damage_types": [
+    "fire"
+   ],
+   "colour": "#f1f3f5",
+   "reviewed": true
+  },
+  {
+   "name": "Weird",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Weird",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Whirlwind",
+   "edition": "2014",
+   "sources": [
+    "XGE",
+    "EEPC"
+   ],
+   "area": {
+    "shape": "cylinder",
+    "size": 10
+   },
+   "damage_types": [
+    "bludgeoning"
+   ]
+  },
+  {
+   "name": "Wind Wall",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 50,
+    "width": 1
+   },
+   "colour": "#c5f6fa",
+   "reviewed": true
+  },
+  {
+   "name": "Wind Wall",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "damage_types": [
+    "bludgeoning"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 50,
+    "width": 1
+   },
+   "colour": "#c5f6fa",
+   "reviewed": true
+  },
+  {
+   "name": "Wither and Bloom",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   },
+   "damage_types": [
+    "necrotic"
+   ]
+  },
+  {
+   "name": "Wrath of Nature",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "cube",
+    "size": 60
+   },
+   "damage_types": [
+    "bludgeoning",
+    "slashing"
+   ]
+  },
+  {
+   "name": "Yolande's Regal Presence",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "damage_types": [
+    "psychic"
+   ]
+  },
+  {
+   "name": "Zone of Amicability",
+   "edition": "2024",
+   "sources": [
+    "AU"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 60
+   }
+  },
+  {
+   "name": "Zone of Truth",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 15
+   }
+  },
+  {
+   "name": "Zone of Truth",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 15
+   }
+  }
+ ],
+ "features": [
+  {
+   "name": "Second Wind",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Rage",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Bardic Inspiration",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Cunning Action",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Flurry of Blows",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Patient Defense",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Step of the Wind",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Wild Shape",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Wild Shape",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Lay on Hands",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Lay on Hands",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Channel Divinity",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Uncanny Dodge",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Deflect Missiles",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Deflect Attacks",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Action Surge",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "none"
+  },
+  {
+   "name": "Healing Light",
+   "sources": [
+    "XGE"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Eldritch Cannon",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "activation": "action"
+  }
+ ],
+ "summons": [
+  {
+   "name": "Eldritch Cannon",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "kind": "Construct",
+   "armor_class": "18",
+   "hp": {
+    "base": 0,
+    "per_level": 5,
+    "class": "Artificer"
+   },
+   "speed": "15 ft. (walk or climb with legs)",
+   "command": "Bonus action while within 60 ft: activate one option and move it up to 15 ft.",
+   "duration": "1 hour",
+   "variants": [
+    {
+     "name": "Flamethrower",
+     "summary": "15-ft cone from the cannon · Dexterity save against your spell save DC · 2d8 fire, half on a success",
+     "attack": false
+    },
+    {
+     "name": "Force Ballista",
+     "summary": "Ranged spell attack, 120 ft · 2d8 force · a creature hit is pushed 5 ft away",
+     "attack": true
+    },
+    {
+     "name": "Protector",
+     "summary": "The cannon and creatures you choose within 10 ft gain 1d8 + your Intelligence modifier temporary HP (minimum 1)",
+     "attack": false
+    }
+   ]
+  }
+ ],
+ "companions": [
+  {
+   "name": "Steel Defender",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "hp": {
+    "base": 2,
+    "per_level": 5,
+    "class": "Artificer",
+    "ability": "intelligence"
+   }
+  },
+  {
+   "name": "Homunculus Servant",
+   "sources": [
+    "TCE",
+    "EFA"
+   ],
+   "hp": {
+    "base": 1,
+    "per_level": 1,
+    "class": "Artificer",
+    "ability": "intelligence"
+   }
+  },
+  {
+   "name": "Beast of the Land",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Beast of the Sea",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Beast of the Sky",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 4,
+    "per_level": 4,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Drake Companion",
+   "sources": [
+    "FTD"
+   ],
+   "hp": {
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Wildfire Spirit",
+   "sources": [
+    "TCE"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Druid"
+   }
+  }
+ ]
+}

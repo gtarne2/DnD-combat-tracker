@@ -12,6 +12,8 @@ const SHAPES = new Set(["sphere", "cylinder", "cone", "cube", "line", "emanation
 const CIRCLE_POINTS = 48;
 const MAX_POINTS = 64;
 
+const HEX = /^#[0-9a-f]{6}$/i;
+
 /** One colour per caster, so a table can tell whose template is whose. */
 export function colourFor(memberId) {
   let hash = 0;
@@ -87,6 +89,8 @@ export function drawSpec(room, template, place) {
     id: template.id,
     name: `${template.spell} · ${template.size} ft ${SHAPE_NAMES[template.shape] || template.shape}`,
     colour: colourFor(template.member_id),
+    // The spell's own colour fills the area; the outline stays the caster's.
+    fill: HEX.test(template.colour || "") ? template.colour : colourFor(template.member_id),
     ...place,
   };
 }
@@ -101,7 +105,8 @@ export function validSpec(spec) {
       typeof spec.room === "string" && spec.room.length <= 64 &&
       typeof spec.id === "string" && spec.id.length <= 64 &&
       typeof spec.name === "string" && spec.name.length <= 160 &&
-      /^#[0-9a-f]{6}$/i.test(spec.colour) &&
+      HEX.test(spec.colour) &&
+      (spec.fill === undefined || HEX.test(spec.fill)) &&
       point(spec.position) && finite(spec.rotation) &&
       Array.isArray(spec.points) && spec.points.length >= 3 && spec.points.length <= MAX_POINTS && spec.points.every(point) &&
       (spec.attachedTo === undefined || (typeof spec.attachedTo === "string" && spec.attachedTo.length <= 64)),
@@ -115,7 +120,7 @@ export function buildTemplate(spec) {
     .tension(0)
     .position(spec.position)
     .rotation(spec.rotation)
-    .fillColor(spec.colour)
+    .fillColor(spec.fill || spec.colour)
     .fillOpacity(0.25)
     .strokeColor(spec.colour)
     .strokeWidth(4)

@@ -5,6 +5,7 @@
 - The Windows launcher, player sheet, LAN room service, and DM dashboard are implemented through P09D. The DM can select Assist for individual strikes while using the same roll records, reaction windows and damage delivery. [P09D results and exact checks](local-multiplayer-plan.md#2026-11-25--p09d--bounded-assist)
 - Bundled monster actions retain their full rules for table adjudication. Encounter export/import from P10 is implemented and Rust-tested. The full Windows packaging rehearsal remains. [P10 first part](local-multiplayer-plan.md#2026-11-26--p10-first-part--portable-encounter-export-and-import)
 - Owlbear Rodeo link O1 (bridge window, pairing), O2 (tokens on the map), O3 (spell templates), O4 (who is inside) and O5 (area damage) are merged into `dev`, with playtest round one (R65–R67, PR #10) and round two (R68–R70) on `claude/project-thread-k0i2u2`. They still need a Windows build and a real Owlbear check. [Owlbear handoff](#owlbear-rodeo-link-handoff-o1-o5)
+- Spell templates use the bundled mechanics overlay (R71) for imported spells from known books, with spell colours in Owlbear. [Mechanics overlay handoff](#mechanics-overlay-handoff-r71)
 - For multiplayer UI work, start with the [UI handoff](multiplayer-ui.md) for the shipped entry points, state boundaries and targeted browser checks.
 - Physical two-PC Wi-Fi and firewall behavior, physical adapter disconnection, manual Windows picker interaction, and the real clipboard remain unverified in the recorded rehearsals. [Validation and scope of the harness](development.md#validation-matrix)
 
@@ -17,6 +18,16 @@
 | Modified components | `launcher/TrackerLauncher.cs`, `launcher/RefreshBridge.cs`, `launcher/PartySession.cs`, `src/combat/party.js`, `tests/PartyHarness.cs`, and `tests/party-launcher.cjs`. |
 | Validation | Passed `cargo build --release --locked --offline --bins` with cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`, then `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows`. The shortcut resolves to the updated `target/release`. Passed `node --check src/combat/party.js`, `node --check tests/party-launcher.cjs`, and `git diff --check`. Passed `node tests/party-launcher.cjs --lifecycle` and `node tests/party-launcher.cjs --review-refresh` with Windows Chrome and current-user DPAPI. A packaged duplicate-launch smoke and a native fixture smoke also passed. The native smoke advanced the idle clock and checked wake grace, active host protection, shutdown after room end, and job cleanup while stdin was open. |
 | Next action | During the Windows playtest, close all Aurora tabs after solo or joined play and confirm the launcher exits after five minutes. Also check physical two-PC play with the host dashboard closed and reopened from the tray. |
+
+## Mechanics overlay handoff (R71)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-kxsu4h`, branched from `dev` at `85d47e9`. |
+| Completed | R72. Overlay sections for feature timing, Eldritch Cannon (any listed book, variants filled or added) and companion HP formulas. R71. A bundled mechanics overlay of spell template shapes, sizes and colours keyed by name, edition and book, used only for spells the player imported from a listed book. Generated from 5etools-src structure plus hand-reviewed entries. Owlbear templates are filled with the spell's colour. |
+| Modified components | `src/mechanics.rs` (new), `content/mechanics/{overlay,curated}.json` (new), `tools/build-mechanics-overlay.cjs` (new), `src/combat.rs`, `src/combat/spell_options.rs`, `src/combat/html.rs`, `src/combat/concentration.js`, `src/party/initiative.rs`, `owlbear/templates.js`, `src/companion.rs`, `src/combat/companions.js`, `tests/mechanics_overlay.rs` and `tests/fixtures/overlay-{spells,features}.{dnd5e,xml}` (new), `tests/owlbear_link.rs`. |
+| Validation | Linux cloud: `cargo test --locked` passed, including 4 new `mechanics_overlay` tests (74 tests in all) and the colour checks in `owlbear_link`. `cargo fmt -- --check` passed. `node --check` passed for the changed scripts. The Windows target build and package were made in the cloud. Not run: a real Owlbear session, and matching against Grant's own Aurora library (book names are assumed to be the printed titles). |
+| Next action | In a Windows session, import a character with Wall of Fire, Fireball or Spirit Guardians from Aurora content, cast with the Owlbear extension loaded, and check the template's size and fill colour. Also check that an Artillerist's Create cannon control and a Steel Defender's or primal beast's HP come out right from your own content. If a spell from an official book doesn't match, add its Aurora book name to `book_aliases` in `curated.json` and rebuild. |
 
 ## Owlbear Rodeo link handoff (O1-O5)
 
