@@ -190,7 +190,8 @@ pub fn api_origin_allowed(origin: Option<&str>, port: u16) -> bool {
 }
 
 /// Paths the bridge page may forward. Everything else is refused by the page and the helper.
-pub const BRIDGE_ACTIONS: &[&str] = &["pair", "status", "table"];
+/// `inside` is the only write: the DM's extension reports which rows each template covers.
+pub const BRIDGE_ACTIONS: &[&str] = &["pair", "status", "table", "inside"];
 
 /// The bridge page with its origin allowlist filled in.
 pub fn bridge_page() -> String {

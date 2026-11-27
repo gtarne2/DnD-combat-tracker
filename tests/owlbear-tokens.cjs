@@ -46,7 +46,7 @@ const pick = (filter) => [...scene.values()].filter((item) => Array.isArray(filt
 export default {
   scene: {
     isReady: async () => true,
-    grid: { getScale: async () => ({ parsed: { multiplier: 5, unit: "ft" } }), getDpi: async () => 150, snapPosition: async (p) => ({ x: Math.round(p.x / 75) * 75, y: Math.round(p.y / 75) * 75 }) },
+    grid: { getType: async () => party.gridType || "SQUARE", getScale: async () => ({ parsed: { multiplier: 5, unit: "ft" } }), getDpi: async () => 150, snapPosition: async (p) => ({ x: Math.round(p.x / 75) * 75, y: Math.round(p.y / 75) * 75 }) },
     items: {
       getItems: async (filter) => copy(pick(filter)),
       addItems: async (items) => { for (const item of items) scene.set(item.id, copy(item)); },
@@ -80,7 +80,7 @@ const table = (rows) => ({ room_id: ROOM, encounter: { id: "e", revision: 1, run
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aurora-obr-tokens-"));
   try {
-    for (const name of ["tokens.js", "players.js", "templates.js", "template-sync.js"]) fs.copyFileSync(path.join(extension, name), path.join(dir, name));
+    for (const name of ["tokens.js", "players.js", "templates.js", "template-sync.js", "inside.js"]) fs.copyFileSync(path.join(extension, name), path.join(dir, name));
     fs.writeFileSync(path.join(dir, "obr-sdk-3.1.0.js"), SDK);
     fs.writeFileSync(path.join(dir, "package.json"), '{"type":"module"}');
     const sdk = await import(pathToFileURL(path.join(dir, "obr-sdk-3.1.0.js")).href);
@@ -241,6 +241,60 @@ async function main() {
     assert(notes.length === 1 && /token/.test(notes[0]), "note for a caster without a token");
     await ts.syncTemplates(withTemplates([]), 31000);
     assert(templateItems().length === 0, "templates the room dropped are removed");
+
+
+    // Who is inside (O4): hand counts by the half-square rule on a 150 px, 5 ft grid.
+    const ins = await import(pathToFileURL(path.join(dir, "inside.js")).href);
+    const keys = (set) => [...set].sort();
+    const circle20 = { position: { x: 0, y: 0 }, rotation: 0, points: tp.placement({ shape: "sphere", size: 20 }, at, { x: 0, y: 0 }, 150, 30).points };
+    // A 20 ft radius on a grid intersection: 4, 4, 3 and 2 squares per quadrant row.
+    assert(ins.countedSquares(ins.outline(circle20), 150).size === 52, "20 ft sphere on an intersection counts 52 squares");
+    assert(ins.countedSquares(ins.outline(circle20), 150).has("3,0") && !ins.countedSquares(ins.outline(circle20), 150).has("3,2"), "sphere edge squares");
+    // A 15 ft cone east from the edge of a creature in square 0,0: the first column is exactly
+    // half covered, the second only in the middle, the third in three squares.
+    const caster0 = { id: "c", position: { x: 75, y: 75 }, cells: 1 };
+    const coneEast = { ...tp.placement({ shape: "cone", size: 15 }, caster0, { x: 600, y: 75 }, 150, 30) };
+    assert(JSON.stringify(keys(ins.countedSquares(ins.outline(coneEast), 150))) === JSON.stringify(["1,0", "2,0", "3,-1", "3,0", "3,1"]), "15 ft cone hand count");
+    // A 30 ft line east covers six squares in its row and none beside it.
+    const lineEast = tp.placement({ shape: "line", size: 30, width: 5 }, caster0, { x: 900, y: 75 }, 150, 30);
+    assert(JSON.stringify(keys(ins.countedSquares(ins.outline(lineEast), 150))) === JSON.stringify(["1,0", "2,0", "3,0", "4,0", "5,0", "6,0"]), "30 ft line hand count");
+    // A 5 ft line along a diagonal counts the diagonal squares only (about 91% each; the
+    // squares beside it are about 25% covered).
+    const diagonal = { position: { x: 0, y: 0 }, rotation: 45, points: [{ x: 0, y: -75 }, { x: 4 * 150 * Math.SQRT2, y: -75 }, { x: 4 * 150 * Math.SQRT2, y: 75 }, { x: 0, y: 75 }] };
+    assert(JSON.stringify(keys(ins.countedSquares(ins.outline(diagonal), 150))) === JSON.stringify(["0,0", "1,1", "2,2", "3,3"]), "diagonal line hand count");
+    // Scale on the drawing is applied (a resized template).
+    assert(ins.countedSquares(ins.outline({ ...circle20, scale: { x: 0.5, y: 0.5 } }), 150).size === 12, "a scaled template shrinks");
+    // A 5 ft radius on the corner of four squares covers each by about 79%. A large creature
+    // touching one of them is inside; a medium creature two squares away is not.
+    const small = { position: { x: 750, y: 750 }, rotation: 0, points: tp.placement({ shape: "sphere", size: 5 }, at, { x: 0, y: 0 }, 150, 30).points };
+    const creatures = [
+      { row: "ogre", position: { x: 600, y: 600 }, cells: 2 },
+      { row: "far", position: { x: 975, y: 975 }, cells: 1 },
+      { row: "near", position: { x: 825, y: 825 }, cells: 1 },
+      { row: "sprite", position: { x: 700, y: 700 }, cells: 0.5 },
+    ];
+    assert(JSON.stringify(ins.rowsInside(ins.outline(small), creatures, 150).sort()) === JSON.stringify(["near", "ogre", "sprite"]), "large and tiny creatures by their spaces");
+    assert(JSON.stringify(ins.space({ x: 600, y: 600 }, 2, 150).sort()) === JSON.stringify(["3,3", "3,4", "4,3", "4,4"]), "a large creature's space");
+    const ring = { position: { x: 75, y: 75 }, rotation: 0, points: tp.placement({ shape: "emanation", size: 5 }, caster0, null, 150, 30).points };
+    const nearby = [{ row: "me", position: { x: 75, y: 75 }, cells: 1, caster: true }, { row: "ally", position: { x: 225, y: 75 }, cells: 1 }, { row: "out", position: { x: 375, y: 75 }, cells: 1 }];
+    assert(JSON.stringify(ins.rowsInside(ins.outline(ring), nearby, 150, { skipCaster: true })) === JSON.stringify(["ally"]), "an emanation leaves out its caster");
+
+    // Reports from the scene: drawn templates against linked tokens, square grids only.
+    scene.clear();
+    memory.clear();
+    sdk.party.players = [];
+    const tokensTable = table([casterRow, target]);
+    await t.addTokens(tokensTable, ["p1", "w1"]);
+    const aimed = { id: "t9", caster: "p1", member_id: "m1", spell: "Fireball", shape: "sphere", size: 20, lasts: "removed", aim: "w1" };
+    const withAimed = { ...tokensTable, encounter: { ...tokensTable.encounter, templates: [aimed] } };
+    await ts.syncTemplates(withAimed, 50000);
+    const result = await ts.insideReports(withAimed);
+    assert(result.reports.length === 1 && result.reports[0].template === "t9", "one report per drawn template");
+    assert(JSON.stringify(result.reports[0].rows) === JSON.stringify(["p1", "w1"]), "a fireball on the adjacent wolf catches the caster too: " + JSON.stringify(result.reports[0].rows));
+    sdk.party.gridType = "HEX_VERTICAL";
+    const hex = await ts.insideReports(withAimed);
+    assert(hex.reports.length === 0 && /square grids/.test(hex.note), "hex grids are not supported yet");
+    sdk.party.gridType = "SQUARE";
 
     console.log("owlbear-tokens: all checks passed");
   } finally {

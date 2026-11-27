@@ -4,7 +4,7 @@
 //! and a small token-gated API. See `aurora_combat_tracker::owlbear` for the reasoning and
 //! the pairing rules. It never binds to a LAN address.
 use aurora_combat_tracker::owlbear::{self, Pairing};
-use aurora_combat_tracker::party::{Principal, RoomService};
+use aurora_combat_tracker::party::{InsideReport, Principal, RoomService};
 use axum::{
     Json, Router,
     body::Bytes,
@@ -117,6 +117,8 @@ struct ApiRequest {
     token: String,
     #[serde(default)]
     code: String,
+    #[serde(default)]
+    reports: Vec<InsideReport>,
 }
 
 async fn api(
@@ -152,10 +154,15 @@ async fn api(
             "Not paired. Enter the code from the DM dashboard.",
         );
     }
-    let host = link.host.lock().await;
+    let mut host = link.host.lock().await;
     let result = match action.as_str() {
         "status" => Ok(json!({"room_id": link.room, "role": "dm", "paired": true})),
         "table" => table(&host.service, link.room),
+        "inside" => host
+            .service
+            .report_inside(Principal::LocalHost, link.room, request.reports)
+            .map(|()| json!({"ok": true}))
+            .map_err(Error::from),
         _ => return refuse(StatusCode::NOT_FOUND, "Unknown request."),
     };
     match result {

@@ -226,24 +226,101 @@ const partyInitiative = (() => {
       templateEdit({kind:"clear_template", id:template.id}).catch(() => clearing.delete(template.id));
     }
     if (!host) return;
-    const signature = JSON.stringify(templates.map(t => [t.id, t.spell, t.shape, t.size]));
+    lastTemplates = templates;
+    renderTemplates();
+  }
+  // Who is inside each template (O4): the DM's map suggests rows, and the caster confirms or
+  // edits the list. Choices stay on this sheet until confirmed.
+  let lastTemplates = [];
+  const picks = new Map();
+  function rowName(row) { return row.key === "owner" ? "You" : row.name; }
+  function pickFor(template) {
+    const suggested = template.inside || [];
+    const key = JSON.stringify(suggested);
+    let pick = picks.get(template.id);
+    if (!pick) pick = {key, chosen:new Set(template.confirmed || suggested), edited:Boolean(template.confirmed)};
+    if (pick.key !== key && !pick.edited) Object.assign(pick, {key, chosen:new Set(suggested)});
+    picks.set(template.id, pick);
+    return pick;
+  }
+  function renderTemplates() {
+    const host = document.getElementById("party-templates");
+    const templates = lastTemplates;
+    // Visible rows only; the server already leaves unrevealed enemies out of the suggestions.
+    const rows = (board()?.rows || []).filter(row => row.score !== null || row.key === "owner");
+    for (const id of picks.keys()) if (!templates.some(t => t.id === id)) picks.delete(id);
+    const signature = JSON.stringify([templates, rows.map(r => [r.id, rowName(r)]),
+      [...picks].map(([id, p]) => [id, p.key, p.edited, [...p.chosen]])]);
     if (host.dataset.signature === signature) return;
     host.dataset.signature = signature;
     host.hidden = !templates.length;
-    host.replaceChildren(...(templates.length ? [Object.assign(document.createElement("span"), {textContent:"On the map:"})] : []),
-      ...templates.map(template => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "quiet-button";
-        button.textContent = template.spell + " · " + template.size + " ft " + SHAPES[template.shape] + " ✕";
-        button.title = "Remove this template from Owlbear";
-        button.onclick = async () => {
-          button.disabled = true;
-          try { await templateEdit({kind:"clear_template", id:template.id}); }
-          catch (error) { button.disabled = false; button.title = error.message; }
+    host.replaceChildren(...templates.map(template => {
+      const card = document.createElement("div");
+      card.className = "party-template";
+      const title = document.createElement("p");
+      const name = document.createElement("strong");
+      name.textContent = template.spell;
+      const remove = document.createElement("button");
+      Object.assign(remove, {type:"button", className:"quiet-button", textContent:"✕", title:"Remove this template from Owlbear"});
+      remove.setAttribute("aria-label", "Remove " + template.spell + " template");
+      remove.onclick = async () => {
+        remove.disabled = true;
+        try { await templateEdit({kind:"clear_template", id:template.id}); }
+        catch (error) { remove.disabled = false; remove.title = error.message; }
+      };
+      title.append(name, " · " + template.size + " ft " + SHAPES[template.shape] + " ", remove);
+      card.append(title);
+      const pick = pickFor(template);
+      const suggested = new Set(template.inside || []);
+      const note = document.createElement("p");
+      note.className = "party-template-note";
+      note.textContent = template.inside === undefined ? "Waiting for the DM's map to say who is inside."
+        : suggested.size ? "Inside on the map:" : "Nobody is inside on the map.";
+      card.append(note);
+      const list = document.createElement("div");
+      list.className = "party-template-targets";
+      const box = row => {
+        const label = document.createElement("label");
+        const input = Object.assign(document.createElement("input"), {type:"checkbox", checked:pick.chosen.has(row.id)});
+        input.onchange = () => {
+          if (input.checked) pick.chosen.add(row.id); else pick.chosen.delete(row.id);
+          pick.edited = true;
+          renderTemplates();
         };
-        return button;
-      }));
+        label.append(input, " " + rowName(row) + (suggested.has(row.id) ? "" : " (not on the map's list)"));
+        return label;
+      };
+      const listed = rows.filter(row => suggested.has(row.id) || pick.chosen.has(row.id));
+      list.append(...listed.map(box));
+      const others = rows.filter(row => !suggested.has(row.id) && !pick.chosen.has(row.id));
+      if (others.length) {
+        const more = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = "Add someone else";
+        more.append(summary, ...others.map(box));
+        list.append(more);
+      }
+      card.append(list);
+      const actions = document.createElement("p");
+      if (pick.edited && pick.key !== JSON.stringify(template.inside || [])) {
+        const reset = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button", textContent:"Use the map's list"});
+        reset.onclick = () => { Object.assign(pick, {key:JSON.stringify(template.inside || []), chosen:new Set(template.inside || []), edited:false}); renderTemplates(); };
+        actions.append(reset);
+      }
+      const chosen = rows.filter(row => pick.chosen.has(row.id)).map(row => row.id);
+      const same = JSON.stringify(template.confirmed || null) === JSON.stringify(chosen);
+      const confirm = Object.assign(document.createElement("button"), {type:"button", textContent: same ? "Targets confirmed" : "Confirm targets", disabled: same});
+      confirm.onclick = async () => {
+        confirm.disabled = true;
+        try {
+          await templateEdit({kind:"confirm_template", id:template.id, targets:chosen});
+          pick.edited = true;
+        } catch (error) { confirm.disabled = false; confirm.title = error.message; }
+      };
+      actions.append(confirm);
+      card.append(actions);
+      return card;
+    }));
   }
   const templates = {
     available: () => Boolean(board()?.joined),

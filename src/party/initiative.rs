@@ -82,7 +82,13 @@ pub enum Lasting {
 struct PlacedTemplate {
     member: Uuid,
     template: AreaTemplate,
+    /// Rows the caster confirmed, for applying the effect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    confirmed: Option<Vec<Uuid>>,
 }
+
+/// Most rows one template can name.
+const MAX_TEMPLATE_TARGETS: usize = 100;
 
 /// Templates one player may have on the map at once. Placing another drops the oldest.
 pub const MAX_TEMPLATES: usize = 6;
@@ -111,6 +117,11 @@ pub enum Edit {
     /// A player removes one of their templates.
     ClearTemplate {
         id: Uuid,
+    },
+    /// A player confirms which rows a template affects, after checking the map's suggestion.
+    ConfirmTemplate {
+        id: Uuid,
+        targets: Vec<Uuid>,
     },
     /// The owner of the current row ends that turn. Same effect as the DM's Next.
     EndTurn {
@@ -624,7 +635,16 @@ impl Fight {
             self.templates
                 .iter()
                 .filter(|t| dm || t.member == viewer)
-                .map(|t| &t.template)
+                .map(|t| {
+                    let mut view = json!(&t.template);
+                    if let Some(confirmed) = &t.confirmed {
+                        view["confirmed"] = json!(confirmed);
+                    }
+                    if dm {
+                        view["member_id"] = json!(t.member);
+                    }
+                    view
+                })
                 .collect::<Vec<_>>()
         );
         view
@@ -787,6 +807,18 @@ impl Fight {
         Err(Rejection::InvalidInput)
     }
 
+    /// IDs of the templates on the map.
+    pub(super) fn template_ids(&self) -> BTreeSet<Uuid> {
+        self.templates.iter().map(|t| t.template.id).collect()
+    }
+
+    /// False for an enemy the DM has not revealed. Players never learn such a row is in an area.
+    pub(super) fn shown_to_players(&self, id: Uuid) -> bool {
+        self.position.rows.iter().any(|row| {
+            row.id == id && !matches!(&row.actor, Participant::Enemy(enemy) if !enemy.revealed)
+        })
+    }
+
     pub(super) fn has_row(&self, id: Uuid) -> bool {
         self.position.rows.iter().any(|row| row.id == id)
     }
@@ -808,6 +840,7 @@ impl Fight {
                     | Edit::EndTurn { .. }
                     | Edit::PlaceTemplate { .. }
                     | Edit::ClearTemplate { .. }
+                    | Edit::ConfirmTemplate { .. }
             )
         {
             return Err(Rejection::Forbidden);
@@ -904,7 +937,23 @@ impl Fight {
                 self.templates.push(PlacedTemplate {
                     member: actor,
                     template: template.clone(),
+                    confirmed: None,
                 });
+            }
+            Edit::ConfirmTemplate { id, targets } => {
+                let unique: BTreeSet<Uuid> = targets.iter().copied().collect();
+                if unique.len() != targets.len()
+                    || targets.len() > MAX_TEMPLATE_TARGETS
+                    || !targets.iter().all(|t| rows.iter().any(|r| r.id == *t))
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                let placed = self
+                    .templates
+                    .iter_mut()
+                    .find(|t| t.member == actor && t.template.id == *id)
+                    .ok_or(Rejection::InvalidInput)?;
+                placed.confirmed = Some(targets.clone());
             }
             Edit::ClearTemplate { id } => {
                 self.templates

@@ -224,7 +224,7 @@ fn bridge_checks_pin_the_loopback_origin_and_host() {
     assert!(!owlbear::api_origin_allowed(None, 47831));
     let page = owlbear::bridge_page();
     assert!(page.contains("const ORIGINS = [\"https://gtarne2.github.io\"]"));
-    assert!(page.contains("const ACTIONS = [\"pair\",\"status\",\"table\"]"));
+    assert!(page.contains("const ACTIONS = [\"pair\",\"status\",\"table\",\"inside\"]"));
     assert!(!page.contains("__ORIGINS__") && !page.contains("__ACTIONS__"));
 }
 
@@ -391,4 +391,156 @@ fn players_place_spell_templates_that_follow_their_casting() {
     // So does leaving.
     edit(&mut service, room, PLAYER, json!({"kind":"leave"}));
     assert_eq!(count(&service), 0);
+}
+
+#[test]
+fn map_reports_suggest_targets_and_players_confirm_them() {
+    use aurora_combat_tracker::party::InsideReport;
+    let db = Database(std::env::temp_dir().join(format!("aurora-obr-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = Uuid::new_v4();
+    service
+        .execute(
+            HOST,
+            &command(
+                room,
+                Create {
+                    mode: HostMode::Dm,
+                    name: "Warden".into(),
+                },
+            ),
+        )
+        .unwrap();
+    service
+        .execute(
+            PLAYER,
+            &command(
+                room,
+                Join {
+                    name: "Lark".into(),
+                },
+            ),
+        )
+        .unwrap();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"submit","score":15,"companions":[]}),
+    );
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":2,"score":10}),
+    );
+    let rows = board(&service, room)["rows"].as_array().unwrap().clone();
+    let wolves: Vec<Value> = rows
+        .iter()
+        .filter(|r| r.get("enemy").is_some())
+        .map(|r| r["id"].clone())
+        .collect();
+    let lark = rows.iter().find(|r| r.get("enemy").is_none()).unwrap()["id"].clone();
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"reveal","id":wolves[0],"revealed":true}),
+    );
+    let fireball = Uuid::new_v4();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"place_template","template":{"id":fireball,"spell":"Fireball","shape":"sphere","size":20,"lasts":"removed"}}),
+    );
+
+    let id = |v: &Value| serde_json::from_value::<Uuid>(v.clone()).unwrap();
+    let report = vec![InsideReport {
+        template: fireball,
+        rows: vec![id(&wolves[0]), id(&wolves[1]), id(&lark), Uuid::new_v4()],
+    }];
+    // Only the DM's own link may report.
+    assert!(service.report_inside(PLAYER, room, report.clone()).is_err());
+    service.report_inside(HOST, room, report).unwrap();
+    let revision = board(&service, room)["revision"].clone();
+
+    // The caster sees revealed rows only; the DM sees every row; neither sees unknown rows.
+    let mine = service.poll(PLAYER, room, 0).unwrap().combat.unwrap();
+    let inside: Vec<Value> = mine["templates"][0]["inside"].as_array().unwrap().clone();
+    assert!(
+        inside.contains(&wolves[0]) && inside.contains(&lark) && !inside.contains(&wolves[1]),
+        "{inside:?}"
+    );
+    assert_eq!(inside.len(), 2);
+    assert_eq!(
+        board(&service, room)["templates"][0]["inside"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        board(&service, room)["revision"],
+        revision,
+        "reports do not touch the revision"
+    );
+
+    // A later report replaces the earlier one, and reports for unknown templates are ignored.
+    service
+        .report_inside(
+            HOST,
+            room,
+            vec![InsideReport {
+                template: Uuid::new_v4(),
+                rows: vec![id(&lark)],
+            }],
+        )
+        .unwrap();
+    assert!(
+        service.poll(PLAYER, room, 0).unwrap().combat.unwrap()["templates"][0]
+            .get("inside")
+            .is_none()
+    );
+
+    // The caster confirms targets; rows must be in the encounter and listed once.
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            PLAYER,
+            json!({"kind":"confirm_template","id":fireball,"targets":[Uuid::new_v4()]})
+        )
+        .is_err()
+    );
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            PLAYER,
+            json!({"kind":"confirm_template","id":fireball,"targets":[wolves[0], wolves[0]]})
+        )
+        .is_err()
+    );
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"confirm_template","id":fireball,"targets":[wolves[0]]})
+        )
+        .is_err()
+    );
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"confirm_template","id":fireball,"targets":[wolves[0], lark]}),
+    );
+    let dm = board(&service, room);
+    assert_eq!(dm["templates"][0]["confirmed"], json!([wolves[0], lark]));
+    assert_eq!(
+        service.poll(PLAYER, room, 0).unwrap().combat.unwrap()["templates"][0]["confirmed"],
+        json!([wolves[0], lark])
+    );
 }

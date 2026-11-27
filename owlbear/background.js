@@ -5,7 +5,12 @@ import OBR from "./obr-sdk-3.1.0.js";
 import { BridgeClient } from "./bridge-client.js";
 import { LINK, addTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
 import { autoMatch } from "./players.js";
-import { listenForDraws, syncTemplates } from "./template-sync.js";
+import { insideReports, listenForDraws, syncTemplates } from "./template-sync.js";
+
+// Send inside reports when they change, and now and then in case the helper restarted.
+const RESEND_MS = 10000;
+let lastInside = { key: "", at: 0 };
+let insideTimer = null;
 
 const POLL_MS = 2000;
 const BASE = new URL(".", import.meta.url).href;
@@ -37,12 +42,29 @@ async function syncMap() {
     state.onMap = await linkedRows(state.table.room_id);
     autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
     state.mapNotes = await syncTemplates(state.table);
+    await reportInside();
     state.mapError = null;
   } catch (error) {
     state.mapError = error.message || String(error);
   } finally {
     syncing = false;
   }
+}
+
+async function reportInside() {
+  if (!state.table || !client || !client.paired) return;
+  const { reports, note } = await insideReports(state.table);
+  if (note) state.mapNotes = [...state.mapNotes, note];
+  const key = JSON.stringify(reports);
+  if (key === lastInside.key && Date.now() - lastInside.at < RESEND_MS) return;
+  await client.request("inside", { reports });
+  lastInside = { key, at: Date.now() };
+}
+
+// A template or token moved: update the suggestion once things settle for half a second.
+function insideSoon() {
+  clearTimeout(insideTimer);
+  insideTimer = setTimeout(() => reportInside().catch(() => {}), 500);
 }
 
 async function refresh() {
@@ -151,6 +173,7 @@ OBR.onReady(async () => {
     client = new BridgeClient({ onChange: () => refresh() });
     createMenus();
     setInterval(refresh, POLL_MS);
+    OBR.scene.items.onChange(insideSoon);
   } else {
     // Players' extensions draw the templates they cast, so they own them.
     listenForDraws();
