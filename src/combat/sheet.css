@@ -968,3 +968,16 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .hp-card > h3 { padding-right: 90px; }
 #concentration .focus-status h2 { min-height: 20px; }
 @media (min-width: 1080px) { .compact-combat #concentration { padding-top: 3px; } }
+
+/* Turn action chips on the combat rail and the Settings dialog. */
+.economy-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-right: 6px; }
+.economy-chip { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line); }
+.economy-chip[data-state=ready] { color: #8fd6a8; border-color: #2f6a48; background: #142a20; }
+.economy-chip[data-state=spent] { color: var(--muted); background: transparent; text-decoration: line-through; }
+#sheet-settings { max-width: 520px; }
+.settings-group { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+.settings-group legend { padding: 0 4px; font-weight: 600; }
+.settings-group label { display: block; margin: 4px 0; }
+.settings-hint, .settings-note { color: var(--muted); font-size: 13px; margin: 2px 0 6px; }
+.more-options > summary { color: var(--muted); font-size: 13px; margin: 6px 0; }
+.settings-trigger { min-width: 0; padding-inline: 8px; font-size: 15px; line-height: 1; }

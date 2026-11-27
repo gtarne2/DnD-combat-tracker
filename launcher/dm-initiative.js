@@ -177,13 +177,46 @@ function setupDmInitiative(request, refresh) {
     const init = make("span", null, "dm-stat");
     init.append(icon("dice-twenty-faces-twenty"), make("span", "Init", "dm-stat-label"), make("strong", String(row.score)));
     stats.append(hp, armor, init);
-    card.append(stats);
+    card.append(stats, quickHp(row));
     if (enemy.conditions) {
       const tags = make("div", null, "dm-tags");
       for (const condition of enemy.conditions.split(/\s*,\s*/).filter(Boolean)) tags.append(make("span", condition, "dm-tag dm-condition"));
       card.append(tags);
     }
     if (enemy.notes) card.append(make("p", enemy.notes, "dm-enemy-notes"));
+  }
+  // Quick damage and healing for the selected enemy, without opening Edit enemy. The typed
+  // amount survives the dashboard's refresh.
+  let quickAmount = "", quickFocus = false;
+  function quickHp(row) {
+    const enemy = row.enemy;
+    const box = make("form", null, "dm-quick-hp");
+    const amount = Object.assign(document.createElement("input"), {type:"number", min:1, max:100000, value:quickAmount, placeholder:"Amount"});
+    amount.setAttribute("aria-label", "HP change for " + row.name);
+    amount.oninput = () => { quickAmount = amount.value; };
+    amount.onfocus = () => { quickFocus = true; };
+    amount.onblur = () => { quickFocus = false; };
+    const apply = async sign => {
+      const value = amount.valueAsNumber;
+      if (!Number.isInteger(value) || value < 1 || enemy.hp == null) {
+        status.textContent = enemy.hp == null ? "Set this enemy's HP in Edit enemy first." : "Type a whole number first.";
+        return;
+      }
+      const hp = sign < 0 ? Math.max(0, enemy.hp - value) : Math.min(enemy.max_hp ?? Number.MAX_SAFE_INTEGER, enemy.hp + value);
+      const next = {revealed:enemy.revealed, hp, max_hp:enemy.max_hp, ac:enemy.ac};
+      for (const name of ["name","alias","conditions","notes"]) next[name] = enemy[name] ?? "";
+      if (await change({kind:"enemy", id:row.id, score:row.score, enemy:next})) {
+        quickAmount = "";
+        status.textContent = (sign < 0 ? "Damaged " : "Healed ") + row.name + " by " + value + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
+      }
+    };
+    const damage = Object.assign(make("button", "Damage"), {type:"submit", disabled:busy});
+    const heal = Object.assign(make("button", "Heal"), {type:"button", disabled:busy});
+    heal.onclick = () => apply(1);
+    box.onsubmit = event => { event.preventDefault(); apply(-1); };
+    box.append(amount, damage, heal);
+    if (quickFocus) queueMicrotask(() => amount.focus({preventScroll:true}));
+    return box;
   }
   const renderActions = setupMonsterActions(el, change, id => { order.value = id; controls(); });
 
@@ -403,6 +436,8 @@ function setupDmInitiative(request, refresh) {
     if (outcome === "succeeded") amount = area.save?.on_success === "half" ? Math.floor(amount / 2) : 0;
     return Math.floor(amount * defense(row, area.damage_type).factor);
   }
+  const rollNow = new Set();
+  document.addEventListener("dm-settings-change", () => { areasKey = null; if (room?.combat) renderAreas(); });
   function renderAreas() {
     const board = room.combat;
     const pending = (board.areas || []).filter(area => !area.results);
@@ -444,7 +479,7 @@ function setupDmInitiative(request, refresh) {
         const id = area.id + "/" + target;
         const companion = !row.enemy && !row.damage_recipient;
         const bonus = area.save ? saveBonus(row, area.save.ability) : null;
-        if (area.save && bonus !== null && !areaRolls[id]) {
+        if (area.save && bonus !== null && !areaRolls[id] && (dmSettings.get("autoSaves") || rollNow.has(area.id))) {
           areaRolls[id] = {d20: monsterAssist.die(20)};
           rolled = true;
         }
@@ -455,7 +490,7 @@ function setupDmInitiative(request, refresh) {
         areaChoices.set(id, choice);
         const tr = make("tr");
         tr.append(make("td", label.get(target) + (row.enemy && !row.enemy.revealed ? " (hidden)" : "")));
-        tr.append(make("td", !area.save ? "—" : total === null ? (companion ? "At the table" : "Unknown bonus") : "d20 " + roll.d20 + (bonus >= 0 ? " + " : " − ") + Math.abs(bonus) + " = " + total));
+        tr.append(make("td", !area.save ? "—" : total === null ? (companion ? "At the table" : bonus !== null ? "Not rolled (" + (bonus >= 0 ? "+" : "−") + Math.abs(bonus) + ")" : "Unknown bonus") : "d20 " + roll.d20 + (bonus >= 0 ? " + " : " − ") + Math.abs(bonus) + " = " + total));
         const outcome = document.createElement("select");
         outcome.setAttribute("aria-label", "Outcome for " + label.get(target));
         if (!choice.outcome) outcome.append(new Option("Choose…", ""));
@@ -496,6 +531,14 @@ function setupDmInitiative(request, refresh) {
       dismiss.type = "button";
       dismiss.disabled = busy;
       dismiss.onclick = () => change({kind: "dismiss_area", id: area.id});
+      // With automatic saves off, Assist rolls only when asked.
+      if (area.save && !dmSettings.get("autoSaves") && inputs.some(({row}) => !areaRolls[area.id + "/" + row])) {
+        const roll = make("button", "Roll saves");
+        roll.type = "button";
+        roll.disabled = busy;
+        roll.onclick = () => { rollNow.add(area.id); areasKey = null; renderAreas(); };
+        actions.append(roll);
+      }
       actions.append(apply, dismiss);
       box.append(actions);
       return box;

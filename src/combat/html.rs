@@ -25,7 +25,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     escape(&mut html, profile_key);
     html.push_str("\" data-session-page=\"combat\"><header class=\"command-bar\"><a class=\"brand\" href=\"#character-dialog\" data-session-nav=\"character\" aria-label=\"Aurora Combat Tracker, go to character overview\"><span class=\"brand-mark\" aria-hidden=\"true\">A</span><span><strong>Aurora</strong><small>Combat Tracker</small></span></a>\
         <nav class=\"command-nav\" aria-label=\"Tracker\"><a href=\"#combat\" id=\"combat-nav\" data-session-nav=\"combat\" aria-current=\"page\">Combat</a><button type=\"button\" id=\"character-nav\" data-session-nav=\"character\">Character</button><button type=\"button\" data-session-nav=\"features\">Features &amp; Traits</button><button type=\"button\" id=\"companions-nav\" data-session-nav=\"companions\">Companions</button><button type=\"button\" data-session-nav=\"inventory\">Inventory</button><button type=\"button\" data-session-nav=\"journal\">Journal</button></nav>\
-        <p id=\"encounter-status\" class=\"focus-feedback\" role=\"status\"></p><div class=\"command-tools\" role=\"group\" aria-label=\"Sheet tools\"><button type=\"button\" id=\"review-consumables\" hidden>Review consumables</button><button type=\"button\" id=\"sheet-find\" aria-haspopup=\"dialog\" aria-keyshortcuts=\"Control+K Meta+K /\">Find on sheet <kbd>/</kbd></button><button type=\"button\" id=\"party-chip\" class=\"party-chip\" data-dialog=\"session-files\" hidden><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#gi-tabletop-players\"/></svg><span class=\"party-chip-text\">Party</span><span class=\"party-chip-count\" hidden></span></button><button type=\"button\" data-dialog=\"session-files\">Session</button><button type=\"button\" class=\"layout-trigger\" data-dialog=\"layout-dialog\">Layout</button></div></header><main class=\"dashboard\">");
+        <p id=\"encounter-status\" class=\"focus-feedback\" role=\"status\"></p><div class=\"command-tools\" role=\"group\" aria-label=\"Sheet tools\"><button type=\"button\" id=\"review-consumables\" hidden>Review consumables</button><button type=\"button\" id=\"sheet-find\" aria-haspopup=\"dialog\" aria-keyshortcuts=\"Control+K Meta+K /\">Find on sheet <kbd>/</kbd></button><button type=\"button\" id=\"party-chip\" class=\"party-chip\" data-dialog=\"session-files\" hidden><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#gi-tabletop-players\"/></svg><span class=\"party-chip-text\">Party</span><span class=\"party-chip-count\" hidden></span></button><button type=\"button\" data-dialog=\"session-files\">Session</button><button type=\"button\" class=\"settings-trigger\" data-dialog=\"sheet-settings\" aria-label=\"Settings\" title=\"Settings\">⚙</button><button type=\"button\" class=\"layout-trigger\" data-dialog=\"layout-dialog\">Layout</button></div></header><main class=\"dashboard\">");
     render_companions(&mut html, sheet);
     html.push_str("<section class=\"overview\" id=\"character-overview\" aria-label=\"Character overview\"><div class=\"identity\"><span class=\"identity-mark\" aria-hidden=\"true\">");
     let name = sheet.character_name.as_deref().unwrap_or("Character");
@@ -243,6 +243,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str("<p><label><input type=\"checkbox\" id=\"guidance-without-concentration\"> Guidance does not require concentration at my table</label></p><button type=\"button\" data-dialog=\"encounter-settings\">Optional initiative settings</button> <button type=\"button\" data-dialog=\"portrait-dialog\">Character portrait</button>");
     html.push_str("</dialog>");
     html.push_str(include_str!("portrait.html"));
+    html.push_str(include_str!("settings.html"));
     html.push_str(
         "</dialog><section class=\"sheet-page\" id=\"character-dialog\" data-view-scroll=\"character\" aria-labelledby=\"character-page-title\" hidden><h2 id=\"character-page-title\">Character</h2>",
     );
@@ -265,6 +266,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str("</main><script>");
     html.push_str(include_str!("session-view.js"));
     html.push_str(include_str!("preferences.js"));
+    html.push_str(include_str!("settings.js"));
     html.push_str(include_str!("portrait.js"));
     html.push_str(include_str!("encounter.js"));
     html.push_str(include_str!("party-actions.js"));

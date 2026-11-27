@@ -205,12 +205,18 @@ async fn party(State(state): State<Shared>, Json(p): Json<Packet>) -> Result<Jso
         }
         Request::Poll { cursor } => {
             // Re-read the authorized projection after every wait. No database lock is held while idle.
+            // Map reports (who is inside a template) are not events, so a changed view also
+            // ends the wait. That keeps a dragged template's suggestion within a quarter second.
+            let mut first = None;
             for attempt in 0..=8 {
                 let view = host.service.poll(who, p.room, cursor).map_err(failed)?;
                 host.leases.insert(id, Instant::now());
-                if !view.events.is_empty() || attempt == 8 {
-                    return Ok(Json(json!(view)));
+                let body = json!(view);
+                let changed = first.as_ref().is_some_and(|seen| seen != &body);
+                if !view.events.is_empty() || attempt == 8 || changed {
+                    return Ok(Json(body));
                 }
+                first.get_or_insert(body);
                 drop(host);
                 tokio::time::sleep(Duration::from_millis(250)).await;
                 host = state.lock().await;

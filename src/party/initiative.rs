@@ -242,6 +242,9 @@ pub enum Edit {
         template: Box<Snapshot>,
         count: u32,
         score: i32,
+        /// The name players see once revealed. Empty or absent means the monster's name.
+        #[serde(default)]
+        alias: Option<String>,
     },
     Duplicate {
         id: Uuid,
@@ -644,6 +647,76 @@ pub struct Clock {
     pub rounds: u32,
 }
 
+/// "Bandit 2" is ("Bandit", Some(2)); a name without a trailing number is itself.
+fn name_stem(value: &str) -> (&str, Option<u32>) {
+    match value.rsplit_once(' ') {
+        Some((stem, digits))
+            if !stem.trim().is_empty()
+                && !digits.starts_with('0')
+                && digits.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            match digits.parse::<u32>() {
+                Ok(n) if n > 0 && n < 1000 => (stem, Some(n)),
+                _ => (value, None),
+            }
+        }
+        _ => (value, None),
+    }
+}
+/// Give enemies added from index `added` onward a number when another enemy already uses
+/// the same name, so "Bandit" becomes "Bandit 1" and the newcomers "Bandit 2", "Bandit 3".
+/// Names (the DM's) and aliases (the players') are numbered separately. Existing numbers stay.
+fn number_duplicates(rows: &mut [Row], added: usize) {
+    for field in [0, 1] {
+        for index in added..rows.len() {
+            let pick = |row: &Row| match &row.actor {
+                Participant::Enemy(enemy) => Some(if field == 0 {
+                    enemy.name.clone()
+                } else {
+                    enemy.alias.clone()
+                }),
+                _ => None,
+            };
+            let Some(mine) = pick(&rows[index]) else {
+                continue;
+            };
+            let stem = name_stem(&mine).0.to_string();
+            if stem.trim().is_empty() {
+                continue;
+            }
+            let others: Vec<usize> = (0..rows.len())
+                .filter(|&i| i < index && pick(&rows[i]).is_some_and(|v| name_stem(&v).0 == stem))
+                .collect();
+            if others.is_empty() {
+                continue;
+            }
+            let mut highest = 0;
+            for &i in &others {
+                let value = pick(&rows[i]).unwrap_or_default();
+                match name_stem(&value).1 {
+                    Some(n) => highest = highest.max(n),
+                    None => {
+                        highest = highest.max(1);
+                        set(&mut rows[i], field, format!("{stem} 1"));
+                    }
+                }
+            }
+            set(&mut rows[index], field, format!("{stem} {}", highest + 1));
+        }
+    }
+    fn set(row: &mut Row, field: u8, value: String) {
+        if let Participant::Enemy(enemy) = &mut row.actor {
+            if label(&value) {
+                if field == 0 {
+                    enemy.name = value;
+                } else {
+                    enemy.alias = value;
+                }
+            }
+        }
+    }
+}
+
 pub(super) fn label(value: &str) -> bool {
     !value.trim().is_empty() && value.chars().count() <= 120 && !value.chars().any(char::is_control)
 }
@@ -775,7 +848,7 @@ impl Fight {
     /// Map-facing projection for the DM's virtual tabletop link (Owlbear Rodeo): row IDs,
     /// kinds, revealed names, the turn pointer, and for enemies whether they are down plus the
     /// monster template's key, name and size for token art. No HP, AC, conditions, scores,
-    /// notes or stat blocks. Unrevealed enemies carry no alias.
+    /// notes or stat blocks. Enemies carry their player-facing alias, never the DM's name.
     pub fn table_view(&self) -> Value {
         let rows: Vec<Value> = self
             .position
@@ -787,7 +860,9 @@ impl Fight {
                         "id": row.id,
                         "kind": "enemy",
                         "revealed": enemy.revealed,
-                        "name": enemy.revealed.then_some(&enemy.alias),
+                        // Hidden tokens keep the name players will see on reveal; Owlbear does not
+                        // show hidden items to players.
+                        "name": &enemy.alias,
                         "down": enemy.hp == Some(0),
                     });
                     // For the DM's own extension only: which art to use and how big the token is.
@@ -1204,6 +1279,7 @@ impl Fight {
                 if !valid_enemy(enemy) {
                     return Err(Rejection::InvalidInput);
                 }
+                let added = rows.len();
                 if let Some(id) = id {
                     let row = rows
                         .iter_mut()
@@ -1226,24 +1302,33 @@ impl Fight {
                         }),
                         actions: Actions::default(),
                     });
+                    number_duplicates(rows, added);
                 }
             }
             Edit::AddMonsters {
                 template,
                 count,
                 score,
+                alias,
             } => {
-                if !(1..=100).contains(count) || template.validate().is_err() {
+                let alias = alias
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|a| !a.is_empty())
+                    .unwrap_or(&template.monster.name)
+                    .to_string();
+                if !(1..=100).contains(count) || template.validate().is_err() || !label(&alias) {
                     return Err(Rejection::InvalidInput);
                 }
                 let stats = &template.monster.stats;
+                let added = rows.len();
                 for _ in 0..*count {
                     rows.push(Row {
                         id: Uuid::new_v4(),
                         score: *score,
                         actor: Participant::Enemy(Enemy {
                             name: template.monster.name.clone(),
-                            alias: template.monster.name.clone(),
+                            alias: alias.clone(),
                             revealed: false,
                             hp: stats.hp,
                             max_hp: stats.hp,
@@ -1255,6 +1340,7 @@ impl Fight {
                         actions: Actions::default(),
                     });
                 }
+                number_duplicates(rows, added);
             }
             Edit::Duplicate { id } => {
                 let mut row = rows
@@ -1265,6 +1351,8 @@ impl Fight {
                 row.id = Uuid::new_v4();
                 row.actions.duplicate();
                 rows.push(row);
+                let added = rows.len() - 1;
+                number_duplicates(rows, added);
             }
             Edit::MonsterAction { id, action } => {
                 let targets = rows
@@ -1320,7 +1408,8 @@ impl Fight {
                     if let Participant::Enemy(other) = &r.actor {
                         let matches = match (&enemy.template, &other.template) {
                             (Some(a), Some(b)) => a.same_template(b),
-                            (None, None) => enemy.name == other.name,
+                            // Numbered copies (Bandit 1, Bandit 2) group together.
+                            (None, None) => name_stem(&enemy.name).0 == name_stem(&other.name).0,
                             _ => false,
                         };
                         if matches {

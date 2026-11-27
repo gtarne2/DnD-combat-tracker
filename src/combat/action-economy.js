@@ -13,12 +13,21 @@ const actionEconomy = (() => {
     return card?.turn === "owner" ? "owner" : actor;
   }
 
+  // In the DM's shared initiative, tracking is on unless the player switched it off for this
+  // participant or in Settings. Solo play keeps it opt-in, since nothing advances turns there.
+  function tracking(state, actor) {
+    if (!state.progress) return false;
+    const chosen = state.progress.economyEnabled?.[actor];
+    if (chosen !== undefined) return Boolean(chosen);
+    return sheetSettings.get("trackActions") && Boolean(state.progress.partyClock);
+  }
+
   function override(state, actor, kind) {
     return Boolean(kind && state.progress?.economyOverrides?.[actor]?.[kind]);
   }
 
   function reason(state, actor, kind, force = false) {
-    if (!Object.hasOwn(names, kind) || !force && (state.progress?.active === false || !state.progress?.economyEnabled?.[actor]) || override(state, actor, kind)) return "";
+    if (!Object.hasOwn(names, kind) || !force && (state.progress?.active === false || !tracking(state, actor)) || override(state, actor, kind)) return "";
     const current = state.progress?.current || encounterTracker.turns(state)[0]?.key;
     if (kind !== "reaction" && turnKey(state, actor) !== current) return `${names[kind]} is available on this participant's turn.`;
     return state.progress?.economyUsed?.[actor]?.[kind] ? `${names[kind]} already used.` : "";
@@ -36,7 +45,7 @@ const actionEconomy = (() => {
       delete progress.economyOverrides[actor][kind];
       previewEncounter.log(state, "override", `Table override used · ${names[kind]}`);
     }
-    if (force || progress?.economyEnabled?.[actor]) {
+    if (force || tracking(state, actor)) {
       progress.economyUsed ||= {};
       progress.economyUsed[actor] ||= {};
       progress.economyUsed[actor][kind] = true;
@@ -56,7 +65,8 @@ const actionEconomy = (() => {
     const progress = state.progress;
     const opener = document.getElementById("action-economy-open");
     const used = Object.keys(progress?.economyUsed?.owner || {}).length;
-    opener.textContent = progress?.economyEnabled?.owner ? `Turn actions · ${used}/3 used` : "Turn actions";
+    opener.textContent = tracking(state, "owner") ? `Turn actions · ${used}/3 used` : "Turn actions";
+    renderChips(state);
     if (!dialog.open) return;
     const selected = select.value;
     const choices = [new Option(encounterTracker.ownerName, "owner"), ...(state.companions?.cards || []).filter(companionControls.available)
@@ -64,7 +74,7 @@ const actionEconomy = (() => {
     select.replaceChildren(...choices);
     select.value = choices.some((entry) => entry.value === selected) ? selected : "owner";
     const actor = select.value;
-    enabled.checked = Boolean(progress?.economyEnabled?.[actor]);
+    enabled.checked = tracking(state, actor);
     controls.hidden = !enabled.checked;
     const focus = document.activeElement.dataset.economyControl;
     controls.replaceChildren(...Object.entries(names).map(([kind, label]) => {
@@ -99,6 +109,40 @@ const actionEconomy = (() => {
     if (focus) ([...controls.querySelectorAll("button:not(:disabled)")].find((button) => button.dataset.economyControl === focus) || enabled).focus();
   }
 
+  // Quick view on the combat rail: one chip per action. Clicking a spent one is a table
+  // override that makes it ready again; clicking a ready one records it.
+  function renderChips(state) {
+    const host = document.getElementById("economy-chips");
+    if (!host) return;
+    const progress = state.progress;
+    host.hidden = !tracking(state, "owner") || progress?.active === false;
+    if (host.hidden) return;
+    const focus = document.activeElement?.dataset?.economyChip;
+    host.replaceChildren(...Object.entries(names).map(([kind, label]) => {
+      const used = Boolean(progress?.economyUsed?.owner?.[kind]);
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "economy-chip";
+      chip.dataset.economyChip = kind;
+      chip.dataset.state = used ? "spent" : "ready";
+      chip.setAttribute("aria-pressed", String(used));
+      chip.textContent = label + (used ? " spent" : " ready");
+      chip.title = used ? `Mark ${label} ready again (table override)` : `Record ${label}`;
+      chip.onclick = () => encounterTracker.update((_, draft) => {
+        if (used) {
+          delete draft.progress.economyUsed.owner[kind];
+          previewEncounter.log(draft, "override", `Table override · ${label} ready again`);
+          return "changing a table override";
+        }
+        if (!spend(draft, "owner", kind)) return false;
+        previewEncounter.log(draft, "action", `Recorded ${label} · ${encounterTracker.ownerName}`);
+        return "recording " + label.toLowerCase();
+      });
+      return chip;
+    }));
+    if (focus) host.querySelector(`[data-economy-chip="${focus}"]`)?.focus();
+  }
+
   function open(actor) {
     dialog.showModal();
     render();
@@ -112,9 +156,8 @@ const actionEconomy = (() => {
     const checked = enabled.checked;
     encounterTracker.update((progress) => {
       progress.economyEnabled ||= {};
-      if (checked) progress.economyEnabled[actor] = true;
-      else {
-        delete progress.economyEnabled[actor];
+      progress.economyEnabled[actor] = checked;
+      if (!checked) {
         if (progress.economyUsed) delete progress.economyUsed[actor];
         if (progress.economyOverrides) delete progress.economyOverrides[actor];
       }
@@ -122,5 +165,6 @@ const actionEconomy = (() => {
     });
   };
   document.addEventListener("preview-encounter-change", render);
-  return {turnKey, timing, override, reason, spend, reset, open, render};
+  document.addEventListener("sheet-settings-change", render);
+  return {turnKey, timing, override, reason, spend, reset, open, render, tracking};
 })();

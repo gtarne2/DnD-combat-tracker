@@ -271,6 +271,13 @@ const partyInitiative = (() => {
       [...picks].map(([id, p]) => [id, p.key, p.edited, [...p.chosen], p.rolled])]);
     if (host.dataset.signature === signature) return;
     host.dataset.signature = signature;
+    // Keep focus in the damage box or a checkbox across the rebuild, so typing is not lost.
+    const focusLabel = host.contains(document.activeElement) ? document.activeElement.getAttribute("aria-label") : null;
+    queueMicrotask(() => {
+      if (!focusLabel) return;
+      const again = [...host.querySelectorAll("[aria-label]")].find(node => node.getAttribute("aria-label") === focusLabel);
+      again?.focus();
+    });
     host.hidden = !templates.length;
     host.replaceChildren(...templates.map(template => {
       const card = document.createElement("div");
@@ -348,22 +355,32 @@ const partyInitiative = (() => {
   // The damage line, the send button and the outcome of the latest application.
   function areaControls(template, pick, chosen, rows) {
     const nodes = [];
+    let send = null;
     const sent = lastAreas.filter(area => area.template === template.id);
     const latest = sent[sent.length - 1];
-    if (pick.rolled == null || pick.sentRoll === pick.rolled) {
-      pick.rolled = rollDice(template.damage);
+    // The damage box starts empty unless the player asked the sheet to roll for them. It keeps
+    // its number after sending; a zone spell clears it once the DM applies the last send.
+    const auto = sheetSettings.get("autoRollArea");
+    if (pick.rolled === undefined) pick.rolled = auto ? rollDice(template.damage) : null;
+    if (latest?.results && pick.resetFor !== latest.id) {
+      if (pick.resetFor !== undefined || pick.sentRoll !== undefined) pick.rolled = auto ? rollDice(template.damage) : null;
+      pick.resetFor = latest.id;
       pick.sentRoll = undefined;
     }
     const line = document.createElement("p");
     line.className = "party-template-damage";
     const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
       + (template.save.on_success === "half" ? ", half on a success" : ", none on a success") : "";
-    const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? ""});
+    const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? "", placeholder:"Total"});
     amount.setAttribute("aria-label", template.spell + " damage");
-    amount.onchange = () => { pick.rolled = amount.valueAsNumber; };
-    const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button", textContent:"Reroll", title:"Roll " + template.damage + " again"});
+    amount.oninput = () => {
+      pick.rolled = amount.value === "" ? null : amount.valueAsNumber;
+      send.disabled = blocked();
+    };
+    const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button",
+      textContent: pick.rolled == null ? "Roll" : "Reroll", title:"Roll " + template.damage});
     reroll.onclick = () => { pick.rolled = rollDice(template.damage); renderTemplates(); };
-    line.append("Damage " + template.damage + " = ", amount, " " + (template.damage_type || "") + save + " ", reroll);
+    line.append(template.damage + " " + (template.damage_type || "") + save + " = ", amount, " ", reroll);
     nodes.push(line);
     const names = new Map(rows.map(row => [row.id, rowName(row)]));
     if (latest) {
@@ -377,9 +394,9 @@ const partyInitiative = (() => {
     // Instant spells are sent once. Zone spells can be sent again on later turns.
     const repeat = template.lasts === "concentration";
     const pending = latest && !latest.results;
-    const send = Object.assign(document.createElement("button"), {type:"button",
-      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM",
-      disabled: !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled)});
+    const blocked = () => !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled);
+    send = Object.assign(document.createElement("button"), {type:"button",
+      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM", disabled: blocked()});
     send.onclick = async () => {
       send.disabled = true;
       try {

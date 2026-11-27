@@ -507,3 +507,14 @@ article p { white-space: pre-line; overflow-wrap: anywhere; margin: 4px 0; color
 .dm-area td input { width: 5em; }
 .dm-area-note { color: var(--faint); font-size: 11px; }
 .dm-area-actions { display: flex; gap: 6px; margin-top: 6px; }
+button.dm-pill { cursor: pointer; font-family: inherit; line-height: 1.5; }
+button.dm-pill:hover:not(:disabled) { filter: brightness(1.25); }
+.dm-quick-hp { display: flex; gap: 6px; align-items: center; margin: 8px 0 4px; }
+.dm-quick-hp input { width: 90px; }
+.dm-more { margin: 6px 0; }
+.dm-more > summary { cursor: pointer; color: var(--faint); font-size: 13px; padding: 4px 0; }
+.dm-more[open] > summary { margin-bottom: 6px; }
+.dm-topbar-tools { display: flex; align-items: flex-start; gap: 10px; }
+.dm-settings-group { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+.dm-settings-group label { display: block; margin: 6px 0; }
+#dm-settings { max-width: 520px; }

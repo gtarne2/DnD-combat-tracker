@@ -186,8 +186,10 @@ const concentrationControls = (() => {
       if (result && proposal.map) {
         placement = {...proposal.map, id: crypto.randomUUID(), spell: proposal.name};
         // What the DM needs to resolve the area: the damage roll, its type and the save.
-        const dice = String(roll || proposal.damage || "").replace(/[^0-9a-zA-Z +-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
-        if (/\d+d\d+/i.test(dice)) placement.damage = dice;
+        // Only the dice expression, such as "2d8" or "8d6+3": the preview text also names the
+        // damage type, which travels separately.
+        const dice = String(roll || proposal.damage || "").match(/\d+d\d+(?:\s*[+-]\s*\d+(?:d\d+)?)*/i)?.[0].replace(/\s+/g, "");
+        if (dice && dice.length <= 40) placement.damage = dice;
         if (proposal.damageType) placement.damage_type = proposal.damageType;
         const dc = Number(String(proposal.dc || "").match(/\d+/)?.[0]);
         const [ability, branch] = (proposal.spellSave || "").split(" ");

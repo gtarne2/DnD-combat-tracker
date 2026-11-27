@@ -4,8 +4,25 @@
     <span class="dm-brand-mark"><svg class="icon" aria-hidden="true"><use href="#gi-dice-twenty-faces-twenty"/></svg></span>
     <div><p class="product-name">Aurora Combat Tracker</p><h1>DM dashboard</h1></div>
   </div>
-  <div id="party-controls"></div>
+  <div class="dm-topbar-tools"><button type="button" id="dm-settings-open">Settings</button><div id="party-controls"></div></div>
 </header>
+<dialog id="dm-settings" aria-labelledby="dm-settings-title">
+  <form method="dialog" class="dm-library-body">
+    <h2 id="dm-settings-title">Settings</h2>
+    <p class="dm-muted">Saved in this browser.</p>
+    <fieldset class="dm-settings-group">
+      <legend>Assists</legend>
+      <label><input type="checkbox" data-dm-setting="autoSaves"> Roll saves for area spells with Assist</label>
+      <p class="dm-waiting-hint">When off, each area spell has a Roll saves button, or you can choose outcomes from the table's rolls.</p>
+      <label><input type="checkbox" data-dm-setting="assistDefault"> Start monster actions in Assist mode</label>
+    </fieldset>
+    <fieldset class="dm-settings-group">
+      <legend>Layout</legend>
+      <label><input type="checkbox" data-dm-setting="openMore"> Keep "More options" sections open</label>
+    </fieldset>
+    <div class="dm-controls dm-dialog-actions"><button class="dm-primary">Close</button></div>
+  </form>
+</dialog>
 <main class="dm-shell">
   <section class="dm-panel dm-party" aria-labelledby="party-overview-heading">
     <div class="panel-heading">
@@ -45,15 +62,20 @@
         <button type="button" id="dm-open-library" class="dm-accent"><svg class="icon" aria-hidden="true"><use href="#gi-dragon-head"/></svg><span>Monster library</span></button>
         <button data-edit="add"><svg class="icon" aria-hidden="true"><use href="#gi-wolf-head"/></svg><span>Add enemy</span></button>
         <button data-edit="edit"><svg class="icon" aria-hidden="true"><use href="#gi-quill-ink"/></svg><span>Edit enemy</span></button>
-        <button data-edit="duplicate"><svg class="icon" aria-hidden="true"><use href="#gi-files"/></svg><span>Duplicate</span></button>
         <button data-edit="reveal"><svg class="icon" aria-hidden="true"><use href="#gi-eyeball"/></svg><span class="dm-label">Reveal</span></button>
-        <button data-edit="group"><svg class="icon" aria-hidden="true"><use href="#gi-tabletop-players"/></svg><span>Group initiative by name</span></button>
-        <button data-edit="remove" class="dm-danger-quiet"><svg class="icon" aria-hidden="true"><use href="#gi-skull-crossed-bones"/></svg><span>Remove enemy</span></button>
       </div>
-      <div class="dm-toolbar dm-fixes" role="group" aria-label="Turn fixes">
-        <span class="dm-group-label">Fix order</span>
-        <button data-edit="move_up">Move up in tie</button><button data-edit="correct">Correct current turn</button>
-      </div>
+      <details class="dm-more" id="dm-more-enemy">
+        <summary>More enemy and turn options</summary>
+        <div class="dm-toolbar" role="group" aria-label="More enemy options">
+          <button data-edit="duplicate"><svg class="icon" aria-hidden="true"><use href="#gi-files"/></svg><span>Duplicate</span></button>
+          <button data-edit="group"><svg class="icon" aria-hidden="true"><use href="#gi-tabletop-players"/></svg><span>Group initiative by name</span></button>
+          <button data-edit="remove" class="dm-danger-quiet"><svg class="icon" aria-hidden="true"><use href="#gi-skull-crossed-bones"/></svg><span>Remove enemy</span></button>
+        </div>
+        <div class="dm-toolbar dm-fixes" role="group" aria-label="Turn fixes">
+          <span class="dm-group-label">Fix order</span>
+          <button data-edit="move_up">Move up in tie</button><button data-edit="correct">Correct current turn</button>
+        </div>
+      </details>
       <p id="dm-initiative-status" class="dm-status" role="status"></p>
       <p id="dm-zone-note" class="dm-zone-note" role="status" hidden></p>
       <section id="dm-areas" class="dm-areas" aria-labelledby="dm-areas-title" hidden>
@@ -61,6 +83,8 @@
         <p class="dm-waiting-hint">Assist rolls each save from the stat block or the player's shared sheet. Check the results, then Apply.</p>
         <div id="dm-area-list"></div>
       </section>
+      <details class="dm-more" id="dm-more-tools">
+      <summary>Game time, rosters and encounter files</summary>
       <div class="dm-tools">
         <form id="dm-advance" class="dm-tool"><span class="dm-tool-title"><svg class="icon" aria-hidden="true"><use href="#gi-hourglass"/></svg>Game time</span>
           <label>Advance game time <input name="amount" type="number" min="1" required></label>
@@ -75,6 +99,7 @@
           <label>Import encounter <input id="dm-import-encounter" type="file" accept=".json,application/json"></label>
         </div>
       </div>
+      </details>
     </div>
     <div class="dm-focus">
       <p class="dm-focus-empty" id="dm-focus-empty"><svg class="icon" aria-hidden="true"><use href="#gi-dragon-head"/></svg>Select a combatant to see its stat block and actions here.</p>
@@ -100,7 +125,6 @@
         </article>
         <div class="dm-controls">
           <button id="dm-preview-action" type="button" class="dm-primary"><svg class="icon" aria-hidden="true"><use href="#gi-sword-brandish"/></svg><span>Preview action</span></button>
-          <button id="dm-correct-rule" type="button">Correct power counters</button>
         </div>
         <form id="dm-recharge-form" class="dm-controls dm-recharge" hidden>
           <label>Recharge roll for next turn <input name="roll" type="number" min="1" required></label>
@@ -111,10 +135,14 @@
           <h4 id="dm-action-catalog-title">All actions</h4>
           <div id="dm-action-list" class="dm-action-list"></div>
         </section>
-        <div class="dm-controls dm-quiet-row">
-          <button id="dm-add-rule" type="button">Add hand-entered action</button>
-          <button id="dm-correct-budget" type="button">Correct action economy</button>
-        </div>
+        <details class="dm-more" id="dm-more-actions">
+          <summary>More action options</summary>
+          <div class="dm-controls dm-quiet-row">
+            <button id="dm-add-rule" type="button">Add hand-entered action</button>
+            <button id="dm-correct-budget" type="button">Correct action economy</button>
+            <button id="dm-correct-rule" type="button">Correct power counters</button>
+          </div>
+        </details>
         <details id="dm-action-history" class="dm-history" hidden>
           <summary><svg class="icon" aria-hidden="true"><use href="#gi-conversation"/></svg>Recorded actions (DM only)</summary><ol></ol>
         </details>
@@ -171,6 +199,7 @@
       <form class="dm-add-bar" id="monster-add">
         <label>Quantity <input name="count" type="number" min="1" max="100" value="1" required></label>
         <label>Initiative <input name="score" type="number" min="-2147483648" max="2147483647" value="0" required></label>
+        <label>Player alias <input name="alias" type="text" maxlength="120" placeholder="Same as name" title="The name players see once revealed. Several are numbered: Bandit 1, Bandit 2."></label>
         <button class="dm-primary"><svg class="icon" aria-hidden="true"><use href="#gi-crossed-swords"/></svg><span>Add to encounter</span></button>
       </form>
       <p id="monster-status" class="dm-status" role="status"></p>

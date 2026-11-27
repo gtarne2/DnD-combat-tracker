@@ -30,7 +30,7 @@
   <p id="damage-hp"></p>
   <form id="concentration-damage" class="focus-form">
     <label>Damage after reductions <input name="damage" type="number" min="1" max="4294967295" required autofocus></label>
-    <label>Concentration rules <select id="concentration-rules"><option value="2014">2014</option><option value="2024">2024</option></select></label>
+    <details class="more-options"><summary>More options</summary><label>Concentration rules <select id="concentration-rules"><option value="2014">2014</option><option value="2024">2024</option></select></label></details>
     <label id="incoming-event-field" hidden>Incoming event <select id="incoming-event"><option value="">Other damage</option><option value="attack">Attack hit</option><option value="missile">Magic Missile</option></select></label>
     <div id="reaction-reminders" class="focus-form" hidden></div>
     <button type="submit">Apply damage</button>
@@ -53,6 +53,9 @@
     <fieldset id="cast-target-field" hidden><legend>Spell targets</legend><div id="cast-targets"></div><p id="cast-target-feedback" role="status"></p></fieldset>
     <fieldset id="cast-map-field" hidden><legend>Owlbear template</legend>
       <label><input type="checkbox" name="mapPlace"> Place a template at my token</label>
+      <label id="cast-map-aim">Point at <select name="mapAim"></select></label>
+      <details class="more-options">
+      <summary>Adjust shape, size and removal</summary>
       <div class="cast-map-options">
         <label>Shape <select name="mapShape">
           <option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option>
@@ -60,11 +63,11 @@
         </select></label>
         <label><span id="cast-map-size-label">Radius</span> (ft) <input name="mapSize" type="number" min="1" max="1000"></label>
         <label id="cast-map-width">Width (ft) <input name="mapWidth" type="number" min="1" max="100" value="5"></label>
-        <label id="cast-map-aim">Point at <select name="mapAim"></select></label>
         <label>Remove <select name="mapLasts">
           <option value="turn">At the end of my turn</option><option value="concentration">When concentration ends</option><option value="removed">When I remove it</option>
         </select></label>
       </div>
+      </details>
       <p id="cast-map-note" class="hint"></p>
     </fieldset>
     <label id="cast-firearm-field" class="firearm-toggle" hidden><input type="checkbox" name="firearm"> Cast through Arcane Firearm <small>+1d8 to one damage roll</small></label>

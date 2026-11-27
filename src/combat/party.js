@@ -416,7 +416,7 @@ function initiativeWriter(request) {
   }
   async function poll() {
     await refresh();
-    setTimeout(poll, 1200);
+    setTimeout(poll, 600);
   }
   panel.addEventListener("toggle", () => { if (panel.open) refresh(); });
   poll();

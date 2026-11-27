@@ -141,7 +141,7 @@ fn table_view_shows_only_what_players_may_see() {
     let hidden = rows.iter().find(|r| r["id"] == enemies[1]["id"]).unwrap();
     assert_eq!(hidden["kind"], "enemy");
     assert_eq!(hidden["revealed"], false);
-    assert!(hidden["name"].is_null());
+    assert_eq!(hidden["name"], enemies[1]["enemy"]["alias"]);
     assert_eq!(hidden["down"], false);
     assert_eq!(
         hidden["template"]["key"],
@@ -754,4 +754,88 @@ fn an_area_spell_resolves_through_the_dm_queue() {
         json!({"kind":"dismiss_area","id":again}),
     );
     assert_eq!(board(&service, room)["areas"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn enemies_with_the_same_name_are_numbered_and_can_have_an_alias() {
+    let db = Database(std::env::temp_dir().join(format!("aurora-obr-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = Uuid::new_v4();
+    service
+        .execute(
+            HOST,
+            &command(
+                room,
+                Create {
+                    mode: HostMode::Dm,
+                    name: "Warden".into(),
+                },
+            ),
+        )
+        .unwrap();
+    let names = |service: &RoomService| -> Vec<(String, String)> {
+        board(service, room)["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| {
+                let enemy = r.get("enemy")?;
+                Some((
+                    enemy["name"].as_str()?.to_string(),
+                    enemy["alias"].as_str()?.to_string(),
+                ))
+            })
+            .collect()
+    };
+    let pair = |name: &str, alias: &str| (name.to_string(), alias.to_string());
+    // One alone keeps its name.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":1,"score":14}),
+    );
+    assert_eq!(names(&service), [pair("Wolf", "Wolf")]);
+    // A second one numbers both, and a third continues the count.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":2,"score":14}),
+    );
+    assert_eq!(
+        names(&service),
+        [
+            pair("Wolf 1", "Wolf 1"),
+            pair("Wolf 2", "Wolf 2"),
+            pair("Wolf 3", "Wolf 3")
+        ]
+    );
+    // Duplicate takes the next number.
+    let first = board(&service, room)["rows"][0]["id"].clone();
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"duplicate","id":first}),
+    );
+    assert_eq!(names(&service).last().unwrap(), &pair("Wolf 4", "Wolf 4"));
+    // An alias from the monster library names what players see; the DM keeps the stat block name.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":2,"score":10,"alias":"Grey hound"}),
+    );
+    let all = names(&service);
+    assert!(all.contains(&pair("Wolf 5", "Grey hound 1")), "{all:?}");
+    assert!(all.contains(&pair("Wolf 6", "Grey hound 2")), "{all:?}");
+    // A blank alias falls back to the monster's name.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":1,"score":9,"alias":"  "}),
+    );
+    assert!(names(&service).contains(&pair("Wolf 7", "Wolf 5")));
 }

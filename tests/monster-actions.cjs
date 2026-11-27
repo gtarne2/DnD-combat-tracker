@@ -121,7 +121,7 @@ module.exports = async function monsterActions({launch,pageFor,open,api,pkg}) {
   await page.locator("#dm-monster-library").waitFor({state:"hidden"});
   await clickAndWait("Next Turn");
   assert.equal((await board()).current,first);
-  await panel.getByText("Orchard beetle · Current turn · Manual",{exact:true}).waitFor();
+  await panel.getByText("Orchard beetle 1 · Current turn · Manual",{exact:true}).waitFor();
   await pick("pack:rush");
   await panel.getByText("Makes exactly two Foil Nip strikes.",{exact:true}).waitFor();
 
@@ -262,7 +262,7 @@ module.exports = async function monsterActions({launch,pageFor,open,api,pkg}) {
   assert.equal(replay.status,200,await replay.text());
   assert.equal((await board()).revision,revision);
   assert.equal(beam(await row(first)).last_roll,6);
-  await panel.getByText("Orchard beetle · Current turn · Manual",{exact:true}).waitFor();
+  await panel.getByText("Orchard beetle 1 · Current turn · Manual",{exact:true}).waitFor();
   for (let i = 0; i < 4; i++) await clickAndWait("Next Turn");
   assert.equal(beam(await row(first)).remaining,2);
   await wait(()=>state(guest),s=>s.combat?.revision===(revision+4),"Guest received the final projection");

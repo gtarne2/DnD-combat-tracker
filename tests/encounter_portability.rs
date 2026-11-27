@@ -151,7 +151,7 @@ fn encounter_export_omits_identities_and_imports_into_a_fresh_room_with_explicit
         .as_array()
         .unwrap()
         .iter()
-        .filter(|r| r["name"] == "Wolf")
+        .filter(|r| r["name"].as_str().is_some_and(|n| n.starts_with("Wolf")))
         .cloned()
         .collect();
     let (bitten, other_wolf) = (wolves[0]["id"].clone(), wolves[1]["id"].clone());
@@ -319,7 +319,7 @@ fn encounter_export_omits_identities_and_imports_into_a_fresh_room_with_explicit
         .collect();
     assert_eq!(
         names,
-        ["Lark (new laptop)", "Wolf", "Wolf", "Steel Defender"]
+        ["Lark (new laptop)", "Wolf 1", "Wolf 2", "Steel Defender"]
     );
     assert_eq!(row(&view, "Lark (new laptop)")["id"], first_seat);
     assert_eq!(

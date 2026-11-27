@@ -1,3 +1,27 @@
+// DM settings: assists and layout choices, kept in this browser. Other scripts read them with
+// dmSettings.get(name) and listen for "dm-settings-change".
+const dmSettings = (() => {
+  const KEY = "aurora-dm-settings-v1";
+  const DEFAULTS = {autoSaves: true, assistDefault: false, openMore: false};
+  const values = {...DEFAULTS};
+  try { Object.assign(values, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
+  const dialog = document.getElementById("dm-settings");
+  const inputs = [...dialog.querySelectorAll("[data-dm-setting]")];
+  const more = () => document.querySelectorAll("details.dm-more");
+  for (const input of inputs) {
+    input.checked = Boolean(values[input.dataset.dmSetting]);
+    input.addEventListener("change", () => {
+      values[input.dataset.dmSetting] = input.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(values)); } catch {}
+      if (input.dataset.dmSetting === "openMore") for (const details of more()) details.open = input.checked;
+      document.dispatchEvent(new Event("dm-settings-change"));
+    });
+  }
+  if (values.openMore) for (const details of more()) details.open = true;
+  document.getElementById("dm-settings-open").onclick = () => dialog.showModal();
+  return {get: name => Boolean(values[name] ?? DEFAULTS[name])};
+})();
+
 const renderDmParty = (() => {
   const rows = document.getElementById("dm-party-list");
   const hint = document.getElementById("dm-join-hint");

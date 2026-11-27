@@ -143,7 +143,9 @@ function render() {
   const mapText = state.mapError ? `Map: ${state.mapError}` : (state.mapNotes || []).join(" ");
   $("map-error").hidden = !mapText;
   $("map-error").textContent = mapText;
-  if (!state.connected) setSummary("Not connected. Open the bridge window.", "bad");
+  // After an Owlbear reload the open bridge window finds the extension again within a few seconds.
+  if (!state.connected && Date.now() - (state.startedAt || 0) < 8000) setSummary("Reconnecting to the bridge window…");
+  else if (!state.connected) setSummary("Not connected. Open the bridge window.", "bad");
   else if (!state.paired) setSummary("Bridge open. Enter the pairing code.");
   else if (state.error) setSummary("Linked, but the last update failed.", "bad");
   else setSummary("Linked to the tracker.", "ok");
