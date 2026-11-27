@@ -3736,5 +3736,268 @@
     "size": 15
    }
   }
+ ],
+ "features": [
+  {
+   "name": "Second Wind",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Rage",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Bardic Inspiration",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Cunning Action",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Flurry of Blows",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Patient Defense",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Step of the Wind",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Wild Shape",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Wild Shape",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Lay on Hands",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Lay on Hands",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Channel Divinity",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Uncanny Dodge",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Deflect Missiles",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Deflect Attacks",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Action Surge",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "none"
+  },
+  {
+   "name": "Healing Light",
+   "sources": [
+    "XGE"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Eldritch Cannon",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "activation": "action"
+  }
+ ],
+ "summons": [
+  {
+   "name": "Eldritch Cannon",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "kind": "Construct",
+   "armor_class": "18",
+   "hp": {
+    "base": 0,
+    "per_level": 5,
+    "class": "Artificer"
+   },
+   "speed": "15 ft. (walk or climb with legs)",
+   "command": "Bonus action while within 60 ft: activate one option and move it up to 15 ft.",
+   "duration": "1 hour",
+   "variants": [
+    {
+     "name": "Flamethrower",
+     "summary": "15-ft cone from the cannon · Dexterity save against your spell save DC · 2d8 fire, half on a success",
+     "attack": false
+    },
+    {
+     "name": "Force Ballista",
+     "summary": "Ranged spell attack, 120 ft · 2d8 force · a creature hit is pushed 5 ft away",
+     "attack": true
+    },
+    {
+     "name": "Protector",
+     "summary": "The cannon and creatures you choose within 10 ft gain 1d8 + your Intelligence modifier temporary HP (minimum 1)",
+     "attack": false
+    }
+   ]
+  }
+ ],
+ "companions": [
+  {
+   "name": "Steel Defender",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "hp": {
+    "base": 2,
+    "per_level": 5,
+    "class": "Artificer",
+    "ability": "intelligence"
+   }
+  },
+  {
+   "name": "Homunculus Servant",
+   "sources": [
+    "TCE",
+    "EFA"
+   ],
+   "hp": {
+    "base": 1,
+    "per_level": 1,
+    "class": "Artificer",
+    "ability": "intelligence"
+   }
+  },
+  {
+   "name": "Beast of the Land",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Beast of the Sea",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Beast of the Sky",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 4,
+    "per_level": 4,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Drake Companion",
+   "sources": [
+    "FTD"
+   ],
+   "hp": {
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Wildfire Spirit",
+   "sources": [
+    "TCE"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Druid"
+   }
+  }
  ]
 }

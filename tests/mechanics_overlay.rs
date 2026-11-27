@@ -144,3 +144,67 @@ fn the_sheet_uses_the_overlay_only_for_matching_imports() {
     assert!(html.contains(&format!("data-spell-colour=\"{}\"", fire.unwrap())));
     assert!(html.contains("data-spell-overlay"));
 }
+
+#[test]
+fn features_get_timing_cannon_variants_and_companion_hp_from_the_overlay() {
+    use aurora_combat_tracker::combat::ActionGroup;
+    let files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let character = import_character(
+        &files.join("overlay-features.dnd5e"),
+        &files.join("overlay-features.xml"),
+    )
+    .unwrap();
+    let sheet = CombatSheet::from_character(&character);
+    let group_of = |name: &str| {
+        sheet
+            .groups
+            .iter()
+            .find(|group| group.options.iter().any(|option| option.name == name))
+            .map(|group| group.action)
+    };
+    // The import gives no timing, so the overlay's applies for the matching book only.
+    assert_eq!(group_of("Second Wind"), Some(ActionGroup::BonusAction));
+    assert_eq!(group_of("Rage"), Some(ActionGroup::Other));
+    // A cannon with a different Aurora ID is still a summon, created with an action.
+    assert_eq!(group_of("Eldritch Cannon"), Some(ActionGroup::Action));
+    let cannon = sheet
+        .groups
+        .iter()
+        .flat_map(|group| &group.options)
+        .find(|option| option.name == "Eldritch Cannon")
+        .unwrap();
+    assert!(cannon.summon);
+
+    // The import has no variants, so the overlay supplies all three, with HP from the level.
+    let template = |id: &str| {
+        &sheet
+            .companion_templates
+            .iter()
+            .find(|template| template.id == id)
+            .unwrap_or_else(|| panic!("{id} is a template"))
+            .details
+    };
+    let ballista = template("ID_TEST_TCE_ARTILLERIST_CANNON_FORCE_BALLISTA");
+    assert_eq!(ballista.name, "Eldritch Cannon — Force Ballista");
+    assert_eq!(ballista.armor_class, "18");
+    assert_eq!(ballista.max_hp, Some(25));
+    assert_eq!(ballista.duration, "1 hour");
+    assert!(ballista.attacks.contains("120 ft"));
+    assert!(
+        template("ID_TEST_TCE_ARTILLERIST_CANNON_PROTECTOR")
+            .abilities
+            .contains("temporary HP")
+    );
+    assert!(
+        template("ID_TEST_TCE_ARTILLERIST_CANNON_FLAMETHROWER")
+            .abilities
+            .contains("15-ft cone")
+    );
+
+    // 2 + Intelligence modifier (+3) + 5 × artificer level (5).
+    assert_eq!(template("ID_TEST_STEEL_DEFENDER").max_hp, Some(30));
+    assert_eq!(sheet.companions.cards[0].current_hp, Some(30));
+
+    let html = render_html(&sheet);
+    assert!(html.contains("data-summon-feature"));
+}

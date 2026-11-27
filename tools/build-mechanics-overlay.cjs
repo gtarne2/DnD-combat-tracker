@@ -146,6 +146,10 @@ const overlay = {
   damage_colours: curated.damage_colours,
   books: Object.fromEntries(Object.entries(books).sort(([a], [b]) => a.localeCompare(b))),
   spells,
+  // Feature timing, companion variants and companion hit points are hand-written only.
+  features: curated.features || [],
+  summons: curated.summons || [],
+  companions: curated.companions || [],
 };
 fs.writeFileSync(path.join(here, "overlay.json"), JSON.stringify(overlay, null, 1) + "\n");
 console.log(`${total} area spells, ${spells.length} overlay entries (${curatedCount} reviewed by hand).`);

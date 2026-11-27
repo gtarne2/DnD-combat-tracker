@@ -26,6 +26,101 @@ struct OverlayFile {
     books: HashMap<String, String>,
     #[serde(default)]
     spells: Vec<SpellMechanics>,
+    #[serde(default)]
+    features: Vec<FeatureMechanics>,
+    #[serde(default)]
+    summons: Vec<SummonMechanics>,
+    #[serde(default)]
+    companions: Vec<CompanionMechanics>,
+}
+
+/// When a class feature, feat or trait is used, for features whose imported content does not
+/// say. The imported content's own timing always wins.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct FeatureMechanics {
+    pub name: String,
+    #[serde(default)]
+    pub sources: Vec<String>,
+    pub activation: Activation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Activation {
+    Action,
+    Bonus,
+    Reaction,
+    /// Used as part of something else, such as on a hit, or with no action.
+    None,
+}
+
+/// Hit points worked out from the owner: `base + per_level × class level + ability modifier`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct HpFormula {
+    #[serde(default)]
+    pub base: u32,
+    #[serde(default)]
+    pub per_level: u32,
+    /// The class whose level counts, such as "Artificer".
+    pub class: String,
+    /// The owner's ability whose modifier is added, such as "intelligence".
+    #[serde(default)]
+    pub ability: Option<String>,
+}
+
+impl HpFormula {
+    /// The hit points for an owner of this class level and modifier, at least 1.
+    pub fn hit_points(&self, class_level: u32, modifier: Option<i32>) -> Option<u32> {
+        if self.ability.is_some() && modifier.is_none() {
+            return None;
+        }
+        let total = i64::from(self.base)
+            + i64::from(self.per_level) * i64::from(class_level)
+            + i64::from(modifier.unwrap_or(0));
+        u32::try_from(total.max(1)).ok()
+    }
+}
+
+/// A feature that creates a companion in one of several variants, such as Eldritch Cannon.
+/// Only measurements and short summaries the tracker wrote; the import's text is shown too.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct SummonMechanics {
+    pub name: String,
+    #[serde(default)]
+    pub sources: Vec<String>,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub armor_class: String,
+    #[serde(default)]
+    pub hp: Option<HpFormula>,
+    #[serde(default)]
+    pub speed: String,
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub duration: String,
+    #[serde(default)]
+    pub variants: Vec<SummonVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct SummonVariant {
+    pub name: String,
+    /// The tracker's one-line summary, such as "15-ft cone · Dex save · 2d8 fire".
+    pub summary: String,
+    /// True when the summary is an attack rather than an ability.
+    #[serde(default)]
+    pub attack: bool,
+}
+
+/// A companion whose hit points depend on its owner.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct CompanionMechanics {
+    pub name: String,
+    #[serde(default)]
+    pub sources: Vec<String>,
+    pub hp: HpFormula,
 }
 
 /// One spell's mechanics for one rules edition.
@@ -95,6 +190,30 @@ pub struct Overlay {
     books: HashMap<String, String>,
     /// Normalized spell name to its editions.
     spells: HashMap<String, Vec<SpellMechanics>>,
+    features: Vec<FeatureMechanics>,
+    summons: Vec<SummonMechanics>,
+    companions: Vec<CompanionMechanics>,
+}
+
+/// An entry with this name from the import's book, or the first when the import names none.
+fn by_book<'a, T>(
+    overlay: &Overlay,
+    entries: &'a [T],
+    name: &str,
+    source: Option<&str>,
+    parts: impl Fn(&T) -> (&str, &[String]),
+) -> Option<&'a T> {
+    let wanted = normalize(name);
+    let mut named = entries
+        .iter()
+        .filter(|entry| normalize(parts(entry).0) == wanted);
+    match source.map(str::trim).filter(|source| !source.is_empty()) {
+        Some(source) => {
+            let code = overlay.book_code(source)?;
+            named.find(|entry| parts(entry).1.iter().any(|listed| listed == code))
+        }
+        None => named.next(),
+    }
 }
 
 /// Lowercase letters and digits only, so "Player’s Handbook" and "Player's Handbook" agree.
@@ -154,6 +273,9 @@ impl Overlay {
                 .map(|(name, code)| (normalize(&name), code))
                 .collect(),
             spells,
+            features: file.features,
+            summons: file.summons,
+            companions: file.companions,
         })
     }
 
@@ -211,6 +333,27 @@ impl Overlay {
                     .iter()
                     .find_map(|kind| self.damage_colour(kind).map(str::to_owned))
             })
+    }
+
+    /// When a feature is used, if the overlay knows it for the import's book.
+    pub fn feature(&self, name: &str, source: Option<&str>) -> Option<&FeatureMechanics> {
+        by_book(self, &self.features, name, source, |entry| {
+            (entry.name.as_str(), entry.sources.as_slice())
+        })
+    }
+
+    /// A feature that creates companion variants, such as Eldritch Cannon.
+    pub fn summon(&self, name: &str, source: Option<&str>) -> Option<&SummonMechanics> {
+        by_book(self, &self.summons, name, source, |entry| {
+            (entry.name.as_str(), entry.sources.as_slice())
+        })
+    }
+
+    /// A companion whose hit points the overlay can work out.
+    pub fn companion(&self, name: &str, source: Option<&str>) -> Option<&CompanionMechanics> {
+        by_book(self, &self.companions, name, source, |entry| {
+            (entry.name.as_str(), entry.sources.as_slice())
+        })
     }
 
     pub fn spell_count(&self) -> usize {

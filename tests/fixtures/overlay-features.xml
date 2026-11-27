@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic features for the mechanics overlay tests. The descriptions are written for these
+     tests; only the names and book titles match published features. -->
+<elements>
+  <element type="Archetype Feature" id="ID_TEST_TCE_ARTILLERIST_CANNON" name="Eldritch Cannon" source="Tasha’s Cauldron of Everything">
+    <description><p>You build a small magical cannon.</p></description>
+  </element>
+  <element type="Class Feature" id="ID_TEST_SECOND_WIND" name="Second Wind" source="Player’s Handbook">
+    <description><p>You regain 1d10 + your fighter level hit points once per rest.</p></description>
+  </element>
+  <element type="Class Feature" id="ID_TEST_HOMEBREW_RAGE" name="Rage" source="Homebrew Workshop">
+    <description><p>You get angry.</p></description>
+  </element>
+  <element type="Archetype Feature" id="ID_TEST_BATTLE_SMITH" name="Battle Smith Companion" source="Tasha’s Cauldron of Everything">
+    <description><p>A loyal construct follows you.</p></description>
+    <rules><select type="Companion" name="Choose a defender" supports="Defender" /></rules>
+  </element>
+  <element type="Companion" id="ID_TEST_STEEL_DEFENDER" name="Steel Defender" source="Tasha’s Cauldron of Everything">
+    <setters><set name="type">Construct</set><set name="ac">15</set>
+      <set name="hp">2 + your Intelligence modifier + five times your artificer level</set></setters>
+  </element>
+</elements>

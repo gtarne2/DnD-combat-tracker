@@ -103,6 +103,8 @@ pub struct CombatOption {
     pub resource_binding: Option<feature_rules::ResourceBinding>,
     pub feature_level_available: bool,
     pub concentration: Option<ConcentrationSpell>,
+    /// A feature that creates companion variants, such as Eldritch Cannon.
+    pub summon: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -819,12 +821,32 @@ impl CombatSheet {
             ),
         }
 
+        option.summon = kind == OptionKind::Feature && crate::companion::is_summon(id, definition);
+        // The tracker's overlay knows when some features are used; the import's own timing
+        // (its time setter or sheet action) still wins.
+        let overlay_timing = (kind == OptionKind::Feature)
+            .then(|| {
+                crate::mechanics::overlay().feature(
+                    definition
+                        .and_then(|definition| definition.name.as_deref())
+                        .unwrap_or(name),
+                    definition.and_then(|definition| definition.source.as_deref()),
+                )
+            })
+            .flatten()
+            .map(|feature| match feature.activation {
+                crate::mechanics::Activation::Action => ActionGroup::Action,
+                crate::mechanics::Activation::Bonus => ActionGroup::BonusAction,
+                crate::mechanics::Activation::Reaction => ActionGroup::Reaction,
+                crate::mechanics::Activation::None => ActionGroup::Other,
+            });
         let fallback = match time.as_deref() {
             Some(time) => ActionGroup::from_label(time),
             None if kind == OptionKind::Attack => Some(ActionGroup::Action),
             // Creating an Eldritch Cannon takes an action; its text also mentions the bonus
             // action that activates it, which would otherwise leave it under Other options.
-            None if crate::companion::is_summon_feature(id) => Some(ActionGroup::Action),
+            None if option.summon => Some(ActionGroup::Action),
+            None if overlay_timing.is_some() => overlay_timing,
             None => option
                 .moxie
                 .and_then(|usage| usage.timing)
@@ -1084,6 +1106,7 @@ impl CombatOption {
     fn new(kind: OptionKind, name: &str) -> Self {
         Self {
             name: name.to_owned(),
+            summon: false,
             spell_level: None,
             preparation: None,
             heat_metal: false,

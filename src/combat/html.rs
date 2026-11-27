@@ -109,6 +109,11 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
         }
         for option in &group.options {
             start_card(&mut html, Some("option-row"), option.pin_key.as_deref());
+            if option.summon {
+                // Marks the row that gets the Create control and its variant list.
+                html.pop();
+                html.push_str(" data-summon-feature>");
+            }
             render_option_row(&mut html, option, group.action);
             if option.pin_key.is_some() {
                 pin_button(&mut html, &option.name);

@@ -109,7 +109,7 @@ const companionControls = (() => {
   const variantName = (name) => name.replace(/^Eldritch Cannon\s*[-—:]?\s*/i, "");
   const summons = [];
   if (cannonTemplates.size) {
-    const row = document.querySelector('.option-row[data-pin$="_ARTILLERIST_ELDRITCH_CANNON"]');
+    const row = document.querySelector('.option-row[data-summon-feature], .option-row[data-pin$="_ARTILLERIST_ELDRITCH_CANNON"]');
     if (row) summons.push({row, variants: [...cannonTemplates.keys()], label: "Create cannon"});
   }
   for (const {row, variants, label} of summons) {

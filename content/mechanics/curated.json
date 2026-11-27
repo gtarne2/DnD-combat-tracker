@@ -20,52 +20,676 @@
   "Player's Handbook 2024": "XPHB"
  },
  "spells": [
-  {"name": "Aganazzar's Scorcher", "edition": "2014", "sources": ["XGE"], "area": {"shape": "line", "size": 30, "width": 5}},
-  {"name": "Blade Barrier", "edition": "any", "area": {"shape": "line", "size": 100, "width": 5}},
-  {"name": "Call Lightning", "edition": "any", "area": {"shape": "cylinder", "size": 5}},
-  {"name": "Cloud of Daggers", "edition": "any", "area": {"shape": "cube", "size": 5}},
-  {"name": "Cloudkill", "edition": "any", "colour": "#82c91e"},
-  {"name": "Conjure Animals", "edition": "2024", "sources": ["XPHB"], "area": {"shape": "emanation", "size": 10}},
-  {"name": "Control Water", "edition": "any", "area": {"shape": "cube", "size": 100}},
-  {"name": "Cordon of Arrows", "edition": "any", "area": {"shape": "sphere", "size": 30}},
-  {"name": "Dark Star", "edition": "2014", "sources": ["EGW"], "area": {"shape": "sphere", "size": 40}, "colour": "#212529"},
-  {"name": "Darkness", "edition": "any", "colour": "#212529"},
-  {"name": "Earth Tremor", "edition": "2014", "sources": ["XGE"], "area": {"shape": "emanation", "size": 10}},
-  {"name": "Entangle", "edition": "any", "area": {"shape": "cube", "size": 20}, "colour": "#2f9e44"},
-  {"name": "Evard's Black Tentacles", "edition": "any", "area": {"shape": "cube", "size": 20}, "colour": "#343a40"},
-  {"name": "Faerie Fire", "edition": "any", "colour": "#cc5de8"},
-  {"name": "Fog Cloud", "edition": "any", "colour": "#adb5bd"},
-  {"name": "Forcecage", "edition": "any", "area": {"shape": "cube", "size": 20}},
-  {"name": "Grease", "edition": "any", "area": {"shape": "cube", "size": 10}, "colour": "#e8b04a"},
-  {"name": "Hail of Thorns", "edition": "any", "area": {"shape": "sphere", "size": 5}},
-  {"name": "Hunger of Hadar", "edition": "any", "colour": "#212529"},
-  {"name": "Hypnotic Pattern", "edition": "any", "colour": "#f783ac"},
-  {"name": "Lightning Arrow", "edition": "any", "area": {"shape": "sphere", "size": 10}},
-  {"name": "Melf's Minute Meteors", "edition": "2014", "sources": ["XGE"], "area": {"shape": "sphere", "size": 5}},
-  {"name": "Moonbeam", "edition": "any", "colour": "#dee2e6"},
-  {"name": "Mordenkainen's Private Sanctum", "edition": "any", "area": {"shape": "cube", "size": 100}},
-  {"name": "Move Earth", "edition": "any", "area": {"shape": "cube", "size": 40}},
-  {"name": "Prismatic Wall", "edition": "any", "area": {"shape": "line", "size": 90, "width": 1}, "colour": "#be4bdb"},
-  {"name": "Shadow of Moil", "edition": "2014", "sources": ["XGE"], "area": {"shape": "emanation", "size": 10}, "colour": "#212529"},
-  {"name": "Silence", "edition": "any", "colour": "#748ffc"},
-  {"name": "Sleep", "edition": "2014", "sources": ["PHB"], "area": {"shape": "sphere", "size": 20}, "colour": "#9775fa"},
-  {"name": "Sleet Storm", "edition": "any", "colour": "#a5d8ff"},
-  {"name": "Spirit Guardians", "edition": "any", "colour": "#fab005"},
-  {"name": "Stinking Cloud", "edition": "any", "colour": "#94d82d"},
-  {"name": "Storm of Vengeance", "edition": "any", "area": {"shape": "cylinder", "size": 360}},
-  {"name": "Thunder Step", "edition": "2014", "sources": ["XGE"], "area": {"shape": "emanation", "size": 10}},
-  {"name": "Thunderclap", "edition": "2014", "sources": ["XGE"], "area": {"shape": "emanation", "size": 5}},
-  {"name": "Tidal Wave", "edition": "2014", "sources": ["XGE"], "area": {"shape": "line", "size": 30, "width": 10}},
-  {"name": "Tsunami", "edition": "any", "area": {"shape": "line", "size": 300, "width": 50}},
-  {"name": "Wall of Fire", "edition": "any", "area": {"shape": "line", "size": 60, "width": 1}},
-  {"name": "Wall of Force", "edition": "any", "area": {"shape": "line", "size": 100, "width": 1}, "colour": "#845ef7"},
-  {"name": "Wall of Ice", "edition": "any", "area": {"shape": "line", "size": 100, "width": 1}},
-  {"name": "Wall of Light", "edition": "2014", "sources": ["XGE"], "area": {"shape": "line", "size": 60, "width": 5}, "colour": "#fab005"},
-  {"name": "Wall of Sand", "edition": "2014", "sources": ["XGE"], "area": {"shape": "line", "size": 30, "width": 10}, "colour": "#e8b04a"},
-  {"name": "Wall of Stone", "edition": "any", "area": {"shape": "line", "size": 100, "width": 1}, "colour": "#868e96"},
-  {"name": "Wall of Thorns", "edition": "any", "area": {"shape": "line", "size": 60, "width": 5}, "colour": "#2f9e44"},
-  {"name": "Wall of Water", "edition": "2014", "sources": ["XGE"], "area": {"shape": "line", "size": 30, "width": 1}, "colour": "#228be6"},
-  {"name": "Web", "edition": "any", "colour": "#f1f3f5"},
-  {"name": "Wind Wall", "edition": "any", "area": {"shape": "line", "size": 50, "width": 1}, "colour": "#c5f6fa"}
+  {
+   "name": "Aganazzar's Scorcher",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 5
+   }
+  },
+  {
+   "name": "Blade Barrier",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 5
+   }
+  },
+  {
+   "name": "Call Lightning",
+   "edition": "any",
+   "area": {
+    "shape": "cylinder",
+    "size": 5
+   }
+  },
+  {
+   "name": "Cloud of Daggers",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 5
+   }
+  },
+  {
+   "name": "Cloudkill",
+   "edition": "any",
+   "colour": "#82c91e"
+  },
+  {
+   "name": "Conjure Animals",
+   "edition": "2024",
+   "sources": [
+    "XPHB"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Control Water",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 100
+   }
+  },
+  {
+   "name": "Cordon of Arrows",
+   "edition": "any",
+   "area": {
+    "shape": "sphere",
+    "size": 30
+   }
+  },
+  {
+   "name": "Dark Star",
+   "edition": "2014",
+   "sources": [
+    "EGW"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 40
+   },
+   "colour": "#212529"
+  },
+  {
+   "name": "Darkness",
+   "edition": "any",
+   "colour": "#212529"
+  },
+  {
+   "name": "Earth Tremor",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Entangle",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "colour": "#2f9e44"
+  },
+  {
+   "name": "Evard's Black Tentacles",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 20
+   },
+   "colour": "#343a40"
+  },
+  {
+   "name": "Faerie Fire",
+   "edition": "any",
+   "colour": "#cc5de8"
+  },
+  {
+   "name": "Fog Cloud",
+   "edition": "any",
+   "colour": "#adb5bd"
+  },
+  {
+   "name": "Forcecage",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 20
+   }
+  },
+  {
+   "name": "Grease",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 10
+   },
+   "colour": "#e8b04a"
+  },
+  {
+   "name": "Hail of Thorns",
+   "edition": "any",
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   }
+  },
+  {
+   "name": "Hunger of Hadar",
+   "edition": "any",
+   "colour": "#212529"
+  },
+  {
+   "name": "Hypnotic Pattern",
+   "edition": "any",
+   "colour": "#f783ac"
+  },
+  {
+   "name": "Lightning Arrow",
+   "edition": "any",
+   "area": {
+    "shape": "sphere",
+    "size": 10
+   }
+  },
+  {
+   "name": "Melf's Minute Meteors",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 5
+   }
+  },
+  {
+   "name": "Moonbeam",
+   "edition": "any",
+   "colour": "#dee2e6"
+  },
+  {
+   "name": "Mordenkainen's Private Sanctum",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 100
+   }
+  },
+  {
+   "name": "Move Earth",
+   "edition": "any",
+   "area": {
+    "shape": "cube",
+    "size": 40
+   }
+  },
+  {
+   "name": "Prismatic Wall",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 90,
+    "width": 1
+   },
+   "colour": "#be4bdb"
+  },
+  {
+   "name": "Shadow of Moil",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   },
+   "colour": "#212529"
+  },
+  {
+   "name": "Silence",
+   "edition": "any",
+   "colour": "#748ffc"
+  },
+  {
+   "name": "Sleep",
+   "edition": "2014",
+   "sources": [
+    "PHB"
+   ],
+   "area": {
+    "shape": "sphere",
+    "size": 20
+   },
+   "colour": "#9775fa"
+  },
+  {
+   "name": "Sleet Storm",
+   "edition": "any",
+   "colour": "#a5d8ff"
+  },
+  {
+   "name": "Spirit Guardians",
+   "edition": "any",
+   "colour": "#fab005"
+  },
+  {
+   "name": "Stinking Cloud",
+   "edition": "any",
+   "colour": "#94d82d"
+  },
+  {
+   "name": "Storm of Vengeance",
+   "edition": "any",
+   "area": {
+    "shape": "cylinder",
+    "size": 360
+   }
+  },
+  {
+   "name": "Thunder Step",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 10
+   }
+  },
+  {
+   "name": "Thunderclap",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "emanation",
+    "size": 5
+   }
+  },
+  {
+   "name": "Tidal Wave",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 10
+   }
+  },
+  {
+   "name": "Tsunami",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 300,
+    "width": 50
+   }
+  },
+  {
+   "name": "Wall of Fire",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 1
+   }
+  },
+  {
+   "name": "Wall of Force",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "colour": "#845ef7"
+  },
+  {
+   "name": "Wall of Ice",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   }
+  },
+  {
+   "name": "Wall of Light",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "colour": "#fab005"
+  },
+  {
+   "name": "Wall of Sand",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 10
+   },
+   "colour": "#e8b04a"
+  },
+  {
+   "name": "Wall of Stone",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 100,
+    "width": 1
+   },
+   "colour": "#868e96"
+  },
+  {
+   "name": "Wall of Thorns",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 60,
+    "width": 5
+   },
+   "colour": "#2f9e44"
+  },
+  {
+   "name": "Wall of Water",
+   "edition": "2014",
+   "sources": [
+    "XGE"
+   ],
+   "area": {
+    "shape": "line",
+    "size": 30,
+    "width": 1
+   },
+   "colour": "#228be6"
+  },
+  {
+   "name": "Web",
+   "edition": "any",
+   "colour": "#f1f3f5"
+  },
+  {
+   "name": "Wind Wall",
+   "edition": "any",
+   "area": {
+    "shape": "line",
+    "size": 50,
+    "width": 1
+   },
+   "colour": "#c5f6fa"
+  }
+ ],
+ "features_about": "When a feature is used, for features whose imported content gives no timing. activation is action, bonus, reaction or none.",
+ "features": [
+  {
+   "name": "Second Wind",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Rage",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Bardic Inspiration",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Cunning Action",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Flurry of Blows",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Patient Defense",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Step of the Wind",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Wild Shape",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Wild Shape",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Lay on Hands",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Lay on Hands",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Channel Divinity",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "action"
+  },
+  {
+   "name": "Uncanny Dodge",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Deflect Missiles",
+   "sources": [
+    "PHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Deflect Attacks",
+   "sources": [
+    "XPHB"
+   ],
+   "activation": "reaction"
+  },
+  {
+   "name": "Action Surge",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "activation": "none"
+  },
+  {
+   "name": "Healing Light",
+   "sources": [
+    "XGE"
+   ],
+   "activation": "bonus"
+  },
+  {
+   "name": "Eldritch Cannon",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "activation": "action"
+  }
+ ],
+ "summons": [
+  {
+   "name": "Eldritch Cannon",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "kind": "Construct",
+   "armor_class": "18",
+   "hp": {
+    "base": 0,
+    "per_level": 5,
+    "class": "Artificer"
+   },
+   "speed": "15 ft. (walk or climb with legs)",
+   "command": "Bonus action while within 60 ft: activate one option and move it up to 15 ft.",
+   "duration": "1 hour",
+   "variants": [
+    {
+     "name": "Flamethrower",
+     "summary": "15-ft cone from the cannon · Dexterity save against your spell save DC · 2d8 fire, half on a success",
+     "attack": false
+    },
+    {
+     "name": "Force Ballista",
+     "summary": "Ranged spell attack, 120 ft · 2d8 force · a creature hit is pushed 5 ft away",
+     "attack": true
+    },
+    {
+     "name": "Protector",
+     "summary": "The cannon and creatures you choose within 10 ft gain 1d8 + your Intelligence modifier temporary HP (minimum 1)",
+     "attack": false
+    }
+   ]
+  }
+ ],
+ "companions": [
+  {
+   "name": "Steel Defender",
+   "sources": [
+    "ERLW",
+    "TCE",
+    "EFA"
+   ],
+   "hp": {
+    "base": 2,
+    "per_level": 5,
+    "class": "Artificer",
+    "ability": "intelligence"
+   }
+  },
+  {
+   "name": "Homunculus Servant",
+   "sources": [
+    "TCE",
+    "EFA"
+   ],
+   "hp": {
+    "base": 1,
+    "per_level": 1,
+    "class": "Artificer",
+    "ability": "intelligence"
+   }
+  },
+  {
+   "name": "Beast of the Land",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Beast of the Sea",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Beast of the Sky",
+   "sources": [
+    "TCE",
+    "XPHB"
+   ],
+   "hp": {
+    "base": 4,
+    "per_level": 4,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Drake Companion",
+   "sources": [
+    "FTD"
+   ],
+   "hp": {
+    "per_level": 5,
+    "class": "Ranger"
+   }
+  },
+  {
+   "name": "Wildfire Spirit",
+   "sources": [
+    "TCE"
+   ],
+   "hp": {
+    "base": 5,
+    "per_level": 5,
+    "class": "Druid"
+   }
+  }
  ]
 }
