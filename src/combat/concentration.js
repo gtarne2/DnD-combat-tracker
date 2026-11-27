@@ -143,7 +143,8 @@ const concentrationControls = (() => {
   }
 
   function finishCast(proposal, method, pool = "") {
-    previewEncounter.transact((state) => {
+    let placement = null;
+    const done = previewEncounter.transact((state) => {
       if (!playbook.isPrepared(proposal.key, state) && method !== "ritual") {
         status.textContent = "This spell is unprepared. Choose a prepared spell or a ritual.";
         return false;
@@ -159,8 +160,8 @@ const concentrationControls = (() => {
         return false;
       }
       const result = proposal.focus ? start(state, proposal.focus) : "casting " + proposal.name;
+      const roll = result ? spellRoll(proposal, method, pool) : "";
       if (result) {
-        const roll = spellRoll(proposal, method, pool);
         const kind = {cantrip: "cantrip", ritual: "ritual", free: "free use", slot: "spell slot"}[method];
         const source = "option:" + proposal.key;
         const active = state.focus.active;
@@ -182,10 +183,31 @@ const concentrationControls = (() => {
         const situational = proposal.advantageSelected ? "Advantage · " + proposal.advantage : "";
         previewEncounter.log(state, "cast", ["Cast " + proposal.name, kind, roll, situational].filter(Boolean).join(" · "), source);
       }
+      if (result && proposal.map) {
+        placement = {...proposal.map, id: crypto.randomUUID(), spell: proposal.name};
+        // What the DM needs to resolve the area: the damage roll, its type and the save.
+        const dice = String(roll || proposal.damage || "").replace(/[^0-9a-zA-Z +-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+        if (/\d+d\d+/i.test(dice)) placement.damage = dice;
+        if (proposal.damageType) placement.damage_type = proposal.damageType;
+        const dc = Number(String(proposal.dc || "").match(/\d+/)?.[0]);
+        const [ability, branch] = (proposal.spellSave || "").split(" ");
+        if (ability && dc >= 1 && dc <= 40) placement.save = {ability, dc, on_success: branch === "half" ? "half" : "none"};
+        if (placement.lasts === "concentration") placement.focus = state.focus.active?.id;
+        if (placement.focus == null && placement.lasts === "concentration") placement.lasts = "removed";
+      }
       if (!proposal.focus) status.textContent = `Cast ${proposal.name}.`;
       if (proposal.advantageSelected) status.textContent += " Advantage on this attack.";
       if (proposal.firearm && (!proposal.focus || result)) status.textContent += " " + attackModifiers.firearmHint + ".";
       return result;
+    });
+    Promise.resolve(done).then(async () => {
+      if (!placement) return;
+      try {
+        await partyInitiative.templates.place(placement);
+        status.textContent += " Template sent to Owlbear.";
+      } catch (error) {
+        status.textContent += " The template was not placed: " + error.message;
+      }
     });
   }
 
@@ -267,6 +289,48 @@ const concentrationControls = (() => {
   castForm.elements.freePool.onchange = renderCost;
   castForm.elements.situational.onchange = renderCost;
 
+  const SIZE_LABEL = {sphere: "Radius", cylinder: "Radius", emanation: "Radius", cone: "Length", line: "Length", cube: "Side"};
+  function renderMap() {
+    const form = castForm.elements;
+    const shape = form.mapShape.value;
+    castForm.querySelector(".cast-map-options").hidden = !form.mapPlace.checked;
+    byId("cast-map-size-label").textContent = SIZE_LABEL[shape];
+    byId("cast-map-width").hidden = shape !== "line";
+    byId("cast-map-aim").hidden = !["cone", "line", "cube"].includes(shape);
+    form.mapSize.required = form.mapPlace.checked;
+  }
+  castForm.elements.mapPlace.onchange = renderMap;
+  castForm.elements.mapShape.onchange = renderMap;
+
+  function openMap(tools, focus) {
+    const field = byId("cast-map-field");
+    field.hidden = !partyInitiative.templates.available();
+    if (field.hidden) return;
+    const form = castForm.elements;
+    const [shape, size, width] = (tools.dataset.spellArea || "").split(" ");
+    form.mapPlace.checked = Boolean(shape);
+    form.mapShape.value = shape || "sphere";
+    form.mapSize.value = size || "";
+    form.mapWidth.value = width || "5";
+    form.mapAim.replaceChildren(new Option("North (drag to aim)", ""),
+      ...partyInitiative.templates.targets().map((row) => new Option(row.name, row.id)));
+    const lasts = form.mapLasts;
+    lasts.querySelector("[value=concentration]").disabled = !focus;
+    lasts.value = focus ? "concentration" : "turn";
+    byId("cast-map-note").textContent = shape ? "" : "This spell names no area. Choose a shape to place one.";
+    renderMap();
+  }
+
+  function readMap() {
+    const form = castForm.elements;
+    if (byId("cast-map-field").hidden || !form.mapPlace.checked) return null;
+    const shape = form.mapShape.value;
+    const map = {shape, size: form.mapSize.valueAsNumber, lasts: form.mapLasts.value};
+    if (shape === "line") map.width = form.mapWidth.valueAsNumber || 5;
+    if (["cone", "line", "cube"].includes(shape) && form.mapAim.value) map.aim = form.mapAim.value;
+    return map;
+  }
+
   function openCast(control, fromReaction = false) {
     if (!control || (!fromReaction && control.disabled)) return;
     const row = control.closest("article");
@@ -287,9 +351,11 @@ const concentrationControls = (() => {
       focus, activeId: active?.id ?? null, key: row.dataset.pin, level, ritual, firearm, timing,
       previews: control.dataset.castPreviews?.split("|") || [], effect: tools.dataset.spellEffect,
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
-      advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage};
+      advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage,
+      damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave};
     proposal.healing = tools.hasAttribute("data-healing-cast");
-    if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage) {
+    const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
+    if (level === 0 && !proposal.healing && !active && !ritualOnly && !proposal.advantage && !mapReady) {
       finishCast(proposal, "cantrip");
       return;
     }
@@ -338,6 +404,7 @@ const concentrationControls = (() => {
     castForm.elements.freePool.replaceChildren(new Option("No tracked resource", ""), ...encounterTracker.resources(state)
       .filter((pool) => !/^(Spell slot|Pact Magic slot):/.test(pool.key) && (state.progress?.used[pool.key] || 0) < pool.capacity)
       .map((pool) => new Option(pool.name, pool.key)));
+    openMap(tools, Boolean(focus));
     renderCost();
     castDialog.showModal();
   }
@@ -369,6 +436,11 @@ const concentrationControls = (() => {
         field.setCustomValidity("Choose up to " + limit + " healing targets.");
         field.reportValidity();
         field.setCustomValidity("");
+        return;
+      }
+      proposal.map = readMap();
+      if (proposal.map && !(proposal.map.size >= 1 && proposal.map.size <= 1000)) {
+        castForm.elements.mapSize.reportValidity();
         return;
       }
       proposal.targets = new FormData(castForm).getAll("target");

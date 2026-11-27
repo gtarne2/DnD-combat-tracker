@@ -17,6 +17,10 @@ mod spell_options;
 mod spell_scaling;
 
 pub use html::{render_html, render_html_with_profile};
+pub use spell_options::{
+    AreaShape, SpellArea, SpellSave, area as spell_area, damage_type as spell_damage_type,
+    spell_save,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionGroup {
@@ -693,8 +697,14 @@ impl CombatSheet {
         };
         let lower = text.to_ascii_lowercase();
         if kind == OptionKind::Spell {
+            let range = option
+                .details
+                .iter()
+                .find(|detail| detail.label == "Range")
+                .map(|detail| detail.value.clone());
             option.spell_options = spell_options::SpellOptions::read(
                 &text,
+                range.as_deref(),
                 time.as_deref(),
                 option.spell_level,
                 setter(mechanics, "school"),

@@ -1,5 +1,6 @@
 mod lan;
 mod monster_library;
+mod owlbear;
 mod vault;
 use aurora_combat_tracker::party::initiative::FightEdit;
 use aurora_combat_tracker::party::interruptions::{Reply, WindowRef};
@@ -106,6 +107,7 @@ struct Local {
     vault: Vault,
     detached: Arc<AtomicBool>,
     publication_revision: Arc<AtomicU64>,
+    owlbear: Option<owlbear::Link>,
 }
 
 #[derive(Deserialize)]
@@ -305,6 +307,14 @@ async fn local_action(s: &Local, action: &str, body: &[u8]) -> Result<Value, Err
                     return Ok(
                         json!({"role":h.saved.role,"state":"Hosting","members":view.members,"self_id":view.self_id,"open":h.saved.invites_open,"room_id":s.room,"combat":view.combat,"offers":view.offers,"announcements":view.announcements}),
                     );
+                }
+                "owlbear" | "owlbear_code" | "owlbear_disconnect" => {
+                    let link = s.owlbear.as_ref().ok_or("Owlbear link is for DM rooms")?;
+                    return Ok(match action {
+                        "owlbear_code" => link.new_code(),
+                        "owlbear_disconnect" => link.disconnect(),
+                        _ => link.status(),
+                    });
                 }
                 "export_encounter" => {
                     return Ok(json!(
@@ -527,6 +537,10 @@ pub async fn serve() -> Result<(), Error> {
     } else {
         guest(saved, &vault, new, status.clone()).await?
     };
+    let owlbear = match &side {
+        Side::Host(host) if role == "dm" => Some(owlbear::start(host.clone(), room).await?),
+        _ => None,
+    };
     let cap = Uuid::new_v4().to_string();
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
     let url = format!("http://{}/{cap}", listener.local_addr()?);
@@ -544,6 +558,7 @@ pub async fn serve() -> Result<(), Error> {
             vault,
             detached: Arc::new(AtomicBool::new(false)),
             publication_revision: Arc::new(AtomicU64::new(0)),
+            owlbear,
         });
     println!("{}", json!({"url":url,"role":role}));
     std::io::stdout().flush()?;

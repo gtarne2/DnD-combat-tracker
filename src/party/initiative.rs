@@ -32,6 +32,163 @@ pub struct Companion {
     pub initiative: Option<i32>,
 }
 
+/// A spell area a player asked to draw on the virtual tabletop (Owlbear Rodeo).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AreaTemplate {
+    /// Chosen by the sheet for this cast, so a retried request replaces rather than repeats.
+    pub id: Uuid,
+    pub spell: String,
+    pub shape: TemplateShape,
+    /// Feet: radius for spheres, cylinders and emanations, length for cones and lines, side
+    /// for cubes.
+    pub size: u32,
+    /// Feet across, for lines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    pub lasts: Lasting,
+    /// Row the cone or line points at. None points north.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aim: Option<Uuid>,
+    /// The sheet's concentration ID, so the sheet can clear the template when it ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus: Option<u32>,
+    /// The spell's damage roll as the sheet shows it, such as "8d6".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub save: Option<AreaSave>,
+}
+
+/// The saving throw an area spell asks for.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AreaSave {
+    /// Lowercase ability name, such as "dexterity".
+    pub ability: String,
+    pub dc: u32,
+    /// Damage on a successful save.
+    pub on_success: SaveBranch,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SaveBranch {
+    Half,
+    None,
+}
+
+/// A caster's request to apply an area spell's damage to the targets they confirmed.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AreaRequest {
+    /// Chosen by the sheet for this application. A zone spell sends a new one each time.
+    pub id: Uuid,
+    pub template: Uuid,
+    /// Damage rolled on the caster's sheet, before saves and defenses.
+    pub amount: u32,
+    pub targets: Vec<Uuid>,
+}
+
+/// One target's final damage, decided on the DM dashboard.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AreaResult {
+    pub row: Uuid,
+    pub amount: u32,
+    /// What the dashboard decided, for the record: "failed", "succeeded" or "table".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub save: Option<String>,
+}
+
+/// An area application waiting for, or resolved by, the DM.
+#[derive(Clone, Serialize, Deserialize)]
+pub(super) struct QueuedArea {
+    member: Uuid,
+    spell: String,
+    request: AreaRequest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    damage_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    save: Option<AreaSave>,
+    round: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    results: Option<Vec<AreaResult>>,
+}
+
+/// Resolved applications kept for the record. Pending ones are always kept.
+const KEEP_RESOLVED_AREAS: usize = 10;
+const ABILITY_NAMES: [&str; 6] = [
+    "strength",
+    "dexterity",
+    "constitution",
+    "intelligence",
+    "wisdom",
+    "charisma",
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TemplateShape {
+    Sphere,
+    Cylinder,
+    Cone,
+    Cube,
+    Line,
+    Emanation,
+}
+
+/// How long a template stays on the map.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lasting {
+    /// Until the caster's turn ends, for instantaneous spells.
+    Turn,
+    /// Until the caster's sheet reports that concentration ended.
+    Concentration,
+    /// Until the caster removes it.
+    Removed,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct PlacedTemplate {
+    member: Uuid,
+    template: AreaTemplate,
+    /// Rows the caster confirmed, for applying the effect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    confirmed: Option<Vec<Uuid>>,
+}
+
+/// Most rows one template can name.
+const MAX_TEMPLATE_TARGETS: usize = 100;
+
+/// Templates one player may have on the map at once. Placing another drops the oldest.
+pub const MAX_TEMPLATES: usize = 6;
+
+fn valid_template(template: &AreaTemplate) -> bool {
+    label(&template.spell)
+        && template.spell.chars().count() <= 80
+        && (1..=1000).contains(&template.size)
+        && template
+            .width
+            .is_none_or(|width| template.shape == TemplateShape::Line && (1..=100).contains(&width))
+        && template.damage.as_deref().is_none_or(|dice| {
+            !dice.is_empty()
+                && dice.len() <= 40
+                && dice
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || " +-".contains(c))
+        })
+        && template.damage_type.as_deref().is_none_or(|kind| {
+            !kind.is_empty() && kind.len() <= 20 && kind.chars().all(|c| c.is_ascii_lowercase())
+        })
+        && template.save.as_ref().is_none_or(|save| {
+            ABILITY_NAMES.contains(&save.ability.as_str()) && (1..=40).contains(&save.dc)
+        })
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Edit {
@@ -40,6 +197,32 @@ pub enum Edit {
         companions: Vec<Companion>,
     },
     Leave,
+    /// A player asks for a spell template on the map at their token.
+    PlaceTemplate {
+        template: AreaTemplate,
+    },
+    /// A player removes one of their templates.
+    ClearTemplate {
+        id: Uuid,
+    },
+    /// A player confirms which rows a template affects, after checking the map's suggestion.
+    ConfirmTemplate {
+        id: Uuid,
+        targets: Vec<Uuid>,
+    },
+    /// A player sends rolled damage for their confirmed targets to the DM's queue.
+    SendArea {
+        request: AreaRequest,
+    },
+    /// The DM applies an area: enemies lose HP, players get damage offers.
+    ApplyArea {
+        id: Uuid,
+        results: Vec<AreaResult>,
+    },
+    /// The DM drops an area from the queue without applying it.
+    DismissArea {
+        id: Uuid,
+    },
     /// The owner of the current row ends that turn. Same effect as the DM's Next.
     EndTurn {
         id: Uuid,
@@ -414,6 +597,10 @@ pub struct Fight {
     running: bool,
     position: Position,
     saves: BTreeMap<String, Position>,
+    #[serde(default)]
+    templates: Vec<PlacedTemplate>,
+    #[serde(default)]
+    areas: Vec<QueuedArea>,
 }
 
 impl Default for Fight {
@@ -428,6 +615,8 @@ impl Default for Fight {
                 current: None,
             },
             saves: BTreeMap::new(),
+            templates: Vec::new(),
+            areas: Vec::new(),
         }
     }
 }
@@ -545,7 +734,106 @@ impl Fight {
         if dm {
             view["saves"] = json!(self.saves.keys().collect::<Vec<_>>());
         }
+        view["templates"] = json!(
+            self.templates
+                .iter()
+                .filter(|t| dm || t.member == viewer)
+                .map(|t| {
+                    let mut view = json!(&t.template);
+                    if let Some(confirmed) = &t.confirmed {
+                        view["confirmed"] = json!(confirmed);
+                    }
+                    if dm {
+                        view["member_id"] = json!(t.member);
+                    }
+                    view
+                })
+                .collect::<Vec<_>>()
+        );
+        // The DM sees the whole queue; a caster sees their own applications and outcomes.
+        view["areas"] = json!(
+            self.areas
+                .iter()
+                .filter(|a| dm || a.member == viewer)
+                .map(|a| {
+                    let mut view = json!({
+                        "id": a.request.id, "template": a.request.template, "spell": a.spell,
+                        "amount": a.request.amount, "targets": a.request.targets,
+                        "damage_type": a.damage_type, "save": a.save, "round": a.round,
+                        "results": a.results,
+                    });
+                    if dm {
+                        view["member_id"] = json!(a.member);
+                    }
+                    view
+                })
+                .collect::<Vec<_>>()
+        );
         view
+    }
+
+    /// Map-facing projection for the DM's virtual tabletop link (Owlbear Rodeo): row IDs,
+    /// kinds, revealed names, the turn pointer, and for enemies whether they are down plus the
+    /// monster template's key, name and size for token art. No HP, AC, conditions, scores,
+    /// notes or stat blocks. Unrevealed enemies carry no alias.
+    pub fn table_view(&self) -> Value {
+        let rows: Vec<Value> = self
+            .position
+            .rows
+            .iter()
+            .map(|row| match &row.actor {
+                Participant::Enemy(enemy) => {
+                    let mut view = json!({
+                        "id": row.id,
+                        "kind": "enemy",
+                        "revealed": enemy.revealed,
+                        "name": enemy.revealed.then_some(&enemy.alias),
+                        "down": enemy.hp == Some(0),
+                    });
+                    // For the DM's own extension only: which art to use and how big the token is.
+                    if let Some(template) = &enemy.template {
+                        view["template"] = json!({
+                            "key": format!("{}/{}", template.pack.id, template.monster.id),
+                            "name": template.monster.name,
+                            "size": template.monster.stats.size,
+                        });
+                    }
+                    view
+                }
+                Participant::Player { member, name, .. } => json!({
+                    "id": row.id, "kind": "player", "member_id": member, "name": name,
+                }),
+                Participant::Companion {
+                    member,
+                    local_id,
+                    name,
+                } => json!({
+                    "id": row.id, "kind": "companion", "member_id": member,
+                    "local_id": local_id, "name": name,
+                }),
+            })
+            .collect();
+        // Templates name their caster's row so the extension can place them at its token.
+        let templates: Vec<Value> = self
+            .templates
+            .iter()
+            .filter_map(|t| {
+                let caster = self
+                    .position
+                    .rows
+                    .iter()
+                    .find(|r| r.player() == Some(t.member))?;
+                let template = &t.template;
+                Some(json!({
+                    "id": template.id, "caster": caster.id, "member_id": t.member,
+                    "spell": template.spell, "shape": template.shape, "size": template.size,
+                    "width": template.width, "lasts": template.lasts, "aim": template.aim,
+                }))
+            })
+            .collect();
+        json!({"id":self.id,"revision":self.revision,"running":self.running,
+            "round":self.position.round,"current":self.position.current,"rows":rows,
+            "templates":templates})
     }
 
     fn members(&self) -> BTreeSet<Uuid> {
@@ -641,6 +929,95 @@ impl Fight {
         Err(Rejection::InvalidInput)
     }
 
+    /// Record the DM's decision on a queued area and lower each enemy's HP. Returns the players
+    /// to send damage offers to, as (member, amount), and the spell name for the offer source.
+    pub(super) fn apply_area(
+        &mut self,
+        cmd: &FightEdit,
+        id: Uuid,
+        results: &[AreaResult],
+    ) -> Result<(String, Vec<(Uuid, u32)>), Rejection> {
+        self.check_revision(cmd)?;
+        let area = self
+            .areas
+            .iter()
+            .find(|a| a.request.id == id)
+            .ok_or(Rejection::InvalidInput)?;
+        if area.results.is_some() {
+            return Err(Rejection::InvalidTransition);
+        }
+        let unique: BTreeSet<Uuid> = results.iter().map(|r| r.row).collect();
+        if unique.len() != results.len()
+            || results.iter().any(|r| {
+                !area.request.targets.contains(&r.row)
+                    || r.amount > 100_000
+                    || r.save
+                        .as_deref()
+                        .is_some_and(|s| !matches!(s, "failed" | "succeeded" | "table"))
+            })
+        {
+            return Err(Rejection::InvalidInput);
+        }
+        let spell = area.spell.clone();
+        let mut offers = Vec::new();
+        for result in results {
+            let Some(row) = self.position.rows.iter_mut().find(|r| r.id == result.row) else {
+                continue;
+            };
+            match &mut row.actor {
+                Participant::Enemy(enemy) => {
+                    if let Some(hp) = &mut enemy.hp {
+                        *hp = hp.saturating_sub(result.amount);
+                    }
+                }
+                Participant::Player { member, .. } if result.amount > 0 => {
+                    offers.push((*member, result.amount));
+                }
+                // Companions and zero damage are settled at the table.
+                _ => {}
+            }
+        }
+        let area = self
+            .areas
+            .iter_mut()
+            .find(|a| a.request.id == id)
+            .expect("found above");
+        area.results = Some(results.to_vec());
+        let resolved: Vec<usize> = self
+            .areas
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| a.results.is_some())
+            .map(|(i, _)| i)
+            .collect();
+        if resolved.len() > KEEP_RESOLVED_AREAS {
+            let drop: BTreeSet<usize> = resolved[..resolved.len() - KEEP_RESOLVED_AREAS]
+                .iter()
+                .copied()
+                .collect();
+            let mut index = 0;
+            self.areas.retain(|_| {
+                let keep = !drop.contains(&index);
+                index += 1;
+                keep
+            });
+        }
+        self.revised();
+        Ok((spell, offers))
+    }
+
+    /// IDs of the templates on the map.
+    pub(super) fn template_ids(&self) -> BTreeSet<Uuid> {
+        self.templates.iter().map(|t| t.template.id).collect()
+    }
+
+    /// False for an enemy the DM has not revealed. Players never learn such a row is in an area.
+    pub(super) fn shown_to_players(&self, id: Uuid) -> bool {
+        self.position.rows.iter().any(|row| {
+            row.id == id && !matches!(&row.actor, Participant::Enemy(enemy) if !enemy.revealed)
+        })
+    }
+
     pub(super) fn has_row(&self, id: Uuid) -> bool {
         self.position.rows.iter().any(|row| row.id == id)
     }
@@ -657,7 +1034,13 @@ impl Fight {
         if dm
             == matches!(
                 cmd.edit,
-                Edit::Submit { .. } | Edit::Leave | Edit::EndTurn { .. }
+                Edit::Submit { .. }
+                    | Edit::Leave
+                    | Edit::EndTurn { .. }
+                    | Edit::PlaceTemplate { .. }
+                    | Edit::ClearTemplate { .. }
+                    | Edit::ConfirmTemplate { .. }
+                    | Edit::SendArea { .. }
             )
         {
             return Err(Rejection::Forbidden);
@@ -734,6 +1117,88 @@ impl Fight {
                         save.current = None;
                     }
                 }
+            }
+            Edit::PlaceTemplate { template } => {
+                if !valid_template(template)
+                    || !rows.iter().any(|r| r.player() == Some(actor))
+                    || template
+                        .aim
+                        .is_some_and(|aim| !rows.iter().any(|r| r.id == aim))
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                self.templates.retain(|t| t.template.id != template.id);
+                let mine = self.templates.iter().filter(|t| t.member == actor).count();
+                if mine >= MAX_TEMPLATES
+                    && let Some(oldest) = self.templates.iter().position(|t| t.member == actor)
+                {
+                    self.templates.remove(oldest);
+                }
+                self.templates.push(PlacedTemplate {
+                    member: actor,
+                    template: template.clone(),
+                    confirmed: None,
+                });
+            }
+            Edit::SendArea { request } => {
+                let unique: BTreeSet<Uuid> = request.targets.iter().copied().collect();
+                if request.targets.is_empty()
+                    || unique.len() != request.targets.len()
+                    || request.targets.len() > MAX_TEMPLATE_TARGETS
+                    || request.amount > 100_000
+                    || !request
+                        .targets
+                        .iter()
+                        .all(|t| rows.iter().any(|r| r.id == *t))
+                    || self.areas.iter().any(|a| a.request.id == request.id)
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                let placed = self
+                    .templates
+                    .iter_mut()
+                    .find(|t| t.member == actor && t.template.id == request.template)
+                    .ok_or(Rejection::InvalidInput)?;
+                if placed.template.damage.is_none() {
+                    return Err(Rejection::InvalidInput);
+                }
+                placed.confirmed = Some(request.targets.clone());
+                self.areas.push(QueuedArea {
+                    member: actor,
+                    spell: placed.template.spell.clone(),
+                    request: request.clone(),
+                    damage_type: placed.template.damage_type.clone(),
+                    save: placed.template.save.clone(),
+                    round: self.position.round,
+                    results: None,
+                });
+            }
+            Edit::DismissArea { id } => {
+                let before = self.areas.len();
+                self.areas
+                    .retain(|a| a.request.id != *id || a.results.is_some());
+                if self.areas.len() == before {
+                    return Err(Rejection::InvalidInput);
+                }
+            }
+            Edit::ConfirmTemplate { id, targets } => {
+                let unique: BTreeSet<Uuid> = targets.iter().copied().collect();
+                if unique.len() != targets.len()
+                    || targets.len() > MAX_TEMPLATE_TARGETS
+                    || !targets.iter().all(|t| rows.iter().any(|r| r.id == *t))
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                let placed = self
+                    .templates
+                    .iter_mut()
+                    .find(|t| t.member == actor && t.template.id == *id)
+                    .ok_or(Rejection::InvalidInput)?;
+                placed.confirmed = Some(targets.clone());
+            }
+            Edit::ClearTemplate { id } => {
+                self.templates
+                    .retain(|t| !(t.member == actor && t.template.id == *id));
             }
             Edit::Enemy { id, score, enemy } => {
                 if !valid_enemy(enemy) {
@@ -994,6 +1459,24 @@ impl Fight {
                 }
             }
         }
+        // Templates follow their caster: they go when the caster's row goes, when the
+        // encounter ends, and, for instantaneous spells, when the caster's turn ends.
+        let casters: BTreeSet<Uuid> = self.position.rows.iter().filter_map(Row::player).collect();
+        let ended_turn = (phase == Phase::Step)
+            .then(|| previous.as_ref().and_then(Row::player))
+            .flatten();
+        let stopped = was_running && !self.running;
+        if matches!(
+            cmd.edit,
+            Edit::New | Edit::Load { .. } | Edit::Import { .. }
+        ) {
+            self.areas.clear();
+        }
+        self.templates.retain(|t| {
+            casters.contains(&t.member)
+                && !stopped
+                && !(t.template.lasts == Lasting::Turn && ended_turn == Some(t.member))
+        });
         self.revision += 1;
         let after = self.members();
         let mut deliveries = vec![];

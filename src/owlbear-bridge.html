@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Aurora ↔ Owlbear bridge</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f3ec; --fg: #2b2620; --muted: #6b6257; --ok: #2e7d32; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1d1a; --fg: #eee8df; --muted: #a99f92; --ok: #81c784; --bad: #ef9a9a; } }
+  body { margin: 0; padding: 16px; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  p { margin: 4px 0; }
+  #state { font-weight: 600; }
+  #state[data-tone="ok"] { color: var(--ok); }
+  #state[data-tone="bad"] { color: var(--bad); }
+  .hint { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Aurora Combat Tracker ↔ Owlbear Rodeo</h1>
+<p id="state" role="status">Starting…</p>
+<p class="hint">Keep this window open while you play. You can minimize it. Closing it disconnects Owlbear from the tracker.</p>
+<script>
+"use strict";
+// Served by the DM helper on 127.0.0.1. It relays requests from the Owlbear extension
+// (in an iframe inside the Owlbear tab that opened this window) to the helper, using
+// same-origin fetches. It only answers frames on the extension origin allowlist, and
+// only forwards the allowlisted actions. Every forwarded request still needs a token.
+const ORIGINS = "__ORIGINS__";
+const ACTIONS = "__ACTIONS__";
+const stateEl = document.getElementById("state");
+const host = window.opener && window.opener.top;
+let partner = null;
+let partnerOrigin = null;
+let lastHeard = 0;
+
+function show(text, tone) {
+  stateEl.textContent = text;
+  stateEl.dataset.tone = tone || "";
+}
+
+// Ask every frame in the Owlbear tab whether it is our extension's background page.
+// targetOrigin makes the browser drop the message for frames on any other origin.
+function hello() {
+  if (!host || host.closed) return;
+  const visit = (win, depth) => {
+    for (const origin of ORIGINS) {
+      try { win.postMessage({type: "aurora-obr-hello", v: 1}, origin); } catch {}
+    }
+    if (depth >= 4) return;
+    let count = 0;
+    try { count = win.frames.length; } catch {}
+    for (let i = 0; i < count; i++) {
+      try { visit(win.frames[i], depth + 1); } catch {}
+    }
+  };
+  visit(host, 0);
+}
+
+async function forward(action, payload) {
+  if (!ACTIONS.includes(action)) return {ok: false, status: 400, error: "Unknown request."};
+  try {
+    const response = await fetch("/obr/api/" + action, {
+      method: "POST",
+      cache: "no-store",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload ?? {}),
+    });
+    const text = await response.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch {}
+    return response.ok ? {ok: true, status: response.status, data}
+      : {ok: false, status: response.status, error: (data && data.error) || text || "Request refused."};
+  } catch {
+    return {ok: false, status: 0, error: "The tracker is not running. Start the DM session from the launcher."};
+  }
+}
+
+window.addEventListener("message", async (event) => {
+  if (!ORIGINS.includes(event.origin) || !event.source) return;
+  const msg = event.data;
+  if (!msg || typeof msg !== "object") return;
+  if (msg.type === "aurora-obr-claim") {
+    partner = event.source;
+    partnerOrigin = event.origin;
+    lastHeard = Date.now();
+    partner.postMessage({type: "aurora-obr-ready", v: 1}, partnerOrigin);
+    show("Connected to Owlbear.", "ok");
+    return;
+  }
+  if (msg.type === "aurora-obr-request" && event.source === partner && event.origin === partnerOrigin) {
+    lastHeard = Date.now();
+    const result = await forward(String(msg.action || ""), msg.payload);
+    partner.postMessage({type: "aurora-obr-response", id: msg.id, ...result}, partnerOrigin);
+  }
+});
+
+if (!host) {
+  show("Open this window from the Aurora extension in Owlbear Rodeo.", "bad");
+} else {
+  show("Looking for the Owlbear tab…");
+  hello();
+  // Owlbear reloads replace the extension frames. Saying hello again lets the new
+  // background page claim this window without another click.
+  setInterval(() => {
+    if (host.closed) {
+      partner = null;
+      show("The Owlbear tab was closed. You can close this window.", "bad");
+      return;
+    }
+    if (!partner || Date.now() - lastHeard > 8000) {
+      if (partner) show("Waiting for Owlbear to reconnect…");
+      hello();
+    }
+  }, 3000);
+}
+</script>
+</body>
+</html>

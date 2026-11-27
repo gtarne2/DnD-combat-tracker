@@ -7,5 +7,6 @@ pub mod encounter;
 pub mod fivetools;
 pub mod inventory;
 pub mod monsters;
+pub mod owlbear;
 pub mod party;
 pub mod session;

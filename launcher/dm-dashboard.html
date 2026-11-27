@@ -15,6 +15,13 @@
     <div id="dm-empty" class="dm-empty" role="status">Waiting for players to join.</div>
     <p class="dm-hint" id="dm-join-hint">Use <strong>Copy invite</strong> above and send it to your players. They join from the launcher with <strong>Party… → Join</strong>.</p>
     <div id="dm-party-list" class="dm-party-list"></div>
+    <section class="dm-owlbear" id="dm-owlbear" aria-labelledby="dm-owlbear-heading" hidden>
+      <div class="dm-owlbear-head"><h3 id="dm-owlbear-heading">Owlbear Rodeo</h3><span id="dm-owlbear-state" class="dm-owlbear-state" role="status"></span></div>
+      <p class="dm-owlbear-code"><span>Pairing code</span> <strong id="dm-owlbear-code"></strong></p>
+      <p class="dm-owlbear-help">In Owlbear, open the Aurora Combat Tracker extension, click <strong>Open bridge window</strong>, then enter this code. Each code works once.</p>
+      <p class="dm-owlbear-help" id="dm-owlbear-port" hidden></p>
+      <div class="dm-owlbear-actions"><button type="button" id="dm-owlbear-new">New code</button><button type="button" id="dm-owlbear-disconnect" class="dm-danger-quiet" hidden>Unpair Owlbear</button></div>
+    </section>
   </section>
   <section class="dm-panel dm-encounter" id="dm-initiative" aria-labelledby="initiative-heading" hidden>
     <div class="dm-tracker">
@@ -48,6 +55,12 @@
         <button data-edit="move_up">Move up in tie</button><button data-edit="correct">Correct current turn</button>
       </div>
       <p id="dm-initiative-status" class="dm-status" role="status"></p>
+      <p id="dm-zone-note" class="dm-zone-note" role="status" hidden></p>
+      <section id="dm-areas" class="dm-areas" aria-labelledby="dm-areas-title" hidden>
+        <h3 id="dm-areas-title">Area spells to resolve</h3>
+        <p class="dm-waiting-hint">Assist rolls each save from the stat block or the player's shared sheet. Check the results, then Apply.</p>
+        <div id="dm-area-list"></div>
+      </section>
       <div class="dm-tools">
         <form id="dm-advance" class="dm-tool"><span class="dm-tool-title"><svg class="icon" aria-hidden="true"><use href="#gi-hourglass"/></svg>Game time</span>
           <label>Advance game time <input name="amount" type="number" min="1" required></label>

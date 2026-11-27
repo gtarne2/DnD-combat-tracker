@@ -9,7 +9,7 @@ pub mod wire;
 use model::{ConnectionChange, Connections, Presence, Room};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use std::{fmt, path::Path};
+use std::{collections::BTreeMap, fmt, path::Path};
 use uuid::Uuid;
 use wire::*;
 
@@ -60,13 +60,28 @@ impl From<serde_json::Error> for PartyError {
 pub struct RoomService {
     db: Connection,
     live: Connections,
+    /// Rows the DM's tabletop reports inside each template, by room and template. Map positions
+    /// change constantly, so these stay in memory and never enter the journal or revisions.
+    inside: BTreeMap<Uuid, BTreeMap<Uuid, Vec<Uuid>>>,
 }
+
+/// Rows a map template covers, from the DM's tabletop extension.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InsideReport {
+    pub template: Uuid,
+    pub rows: Vec<Uuid>,
+}
+
+/// Most templates one inside report may describe.
+pub const MAX_INSIDE_REPORTS: usize = 64;
 
 impl RoomService {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, PartyError> {
         Ok(Self {
             db: store::open(path.as_ref())?,
             live: Connections::new(),
+            inside: BTreeMap::new(),
         })
     }
 
@@ -228,7 +243,11 @@ impl RoomService {
             members,
             publication_session: (room.mode == HostMode::Dm && !dm)
                 .then(|| self.live[&(room_id, id)].publication_session),
-            combat: (room.mode == HostMode::Dm).then(|| room.combat(id, dm)),
+            combat: (room.mode == HostMode::Dm).then(|| {
+                let mut combat = room.combat(id, dm);
+                self.add_inside(&room, room_id, dm, &mut combat);
+                combat
+            }),
             encounter: room.encounter,
             offers: room.addressed_offers(id),
             questions: room.questions(id),
@@ -236,6 +255,79 @@ impl RoomService {
             events,
             cursor,
         })
+    }
+
+    /// DM-only, player-safe projection of the current encounter for a virtual tabletop link.
+    /// See `initiative::Fight::table_view`.
+    pub fn table_view(
+        &self,
+        principal: Principal,
+        room_id: Uuid,
+    ) -> Result<serde_json::Value, PartyError> {
+        let room = store::load(&self.db, room_id)?.ok_or(Rejection::UnknownRoom)?;
+        room.active(principal)?;
+        if principal != Principal::LocalHost || room.mode != HostMode::Dm {
+            return Err(Rejection::Forbidden.into());
+        }
+        Ok(serde_json::json!({"room_id": room_id, "encounter": room.fight.table_view()}))
+    }
+
+    /// Replace the DM tabletop's record of who is inside each template. DM-only. Reports for
+    /// templates that are gone are dropped, and rows that are not in the encounter are ignored.
+    pub fn report_inside(
+        &mut self,
+        principal: Principal,
+        room_id: Uuid,
+        reports: Vec<InsideReport>,
+    ) -> Result<(), PartyError> {
+        let room = store::load(&self.db, room_id)?.ok_or(Rejection::UnknownRoom)?;
+        room.active(principal)?;
+        if principal != Principal::LocalHost || room.mode != HostMode::Dm {
+            return Err(Rejection::Forbidden.into());
+        }
+        if reports.len() > MAX_INSIDE_REPORTS {
+            return Err(Rejection::InvalidInput.into());
+        }
+        let templates = room.fight.template_ids();
+        let mut inside = BTreeMap::new();
+        for report in reports {
+            if !templates.contains(&report.template) {
+                continue;
+            }
+            let mut rows: Vec<Uuid> = report
+                .rows
+                .into_iter()
+                .filter(|row| room.fight.has_row(*row))
+                .collect();
+            rows.sort();
+            rows.dedup();
+            inside.insert(report.template, rows);
+        }
+        self.inside.insert(room_id, inside);
+        Ok(())
+    }
+
+    fn add_inside(&self, room: &Room, room_id: Uuid, dm: bool, combat: &mut serde_json::Value) {
+        let Some(reports) = self.inside.get(&room_id) else {
+            return;
+        };
+        let Some(templates) = combat["templates"].as_array_mut() else {
+            return;
+        };
+        for template in templates {
+            let Some(rows) = template["id"]
+                .as_str()
+                .and_then(|id| id.parse::<Uuid>().ok())
+                .and_then(|id| reports.get(&id))
+            else {
+                continue;
+            };
+            let shown: Vec<&Uuid> = rows
+                .iter()
+                .filter(|row| dm || room.fight.shown_to_players(**row))
+                .collect();
+            template["inside"] = serde_json::json!(shown);
+        }
     }
 
     /// DM-only portable copy of the current encounter position. See `initiative::PortableEncounter`.

@@ -700,6 +700,13 @@ fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGrou
             .join(",");
         roll_attribute(html, "data-target-counts", Some(&counts));
     }
+    if let Some(area) = &spell.area {
+        roll_attribute(html, "data-spell-area", Some(&area.attribute()));
+    }
+    if let Some(save) = &spell.save {
+        roll_attribute(html, "data-spell-save", Some(&save.attribute()));
+    }
+    roll_attribute(html, "data-damage-type", spell.damage_type);
     if let Some(note) = &option.attunement {
         roll_attribute(html, "data-attunement-note", Some(note));
         roll_attribute(html, "data-attunement-key", option.inventory_key.as_deref());

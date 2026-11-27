@@ -185,3 +185,42 @@ const renderDmParty = (() => {
   };
   return render;
 })();
+
+// Owlbear Rodeo link (stage O1): show the pairing code and whether an extension is connected.
+;(() => {
+  const panel = document.getElementById("dm-owlbear");
+  const url = document.body.dataset.partyUrl;
+  if (!panel || !url) return;
+  const code = document.getElementById("dm-owlbear-code");
+  const state = document.getElementById("dm-owlbear-state");
+  const port = document.getElementById("dm-owlbear-port");
+  const unpair = document.getElementById("dm-owlbear-disconnect");
+  async function call(action) {
+    const response = await fetch(url + "/" + action, {method:"POST", cache:"no-store", referrerPolicy:"no-referrer"});
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  }
+  function show(link) {
+    panel.hidden = false;
+    code.textContent = link.code;
+    const linked = link.sessions > 0 && link.last_seen != null && link.last_seen < 15;
+    state.dataset.linked = String(linked);
+    state.textContent = linked ? "Linked" : link.sessions > 0 ? "Paired, bridge window closed" : "Not linked";
+    unpair.hidden = link.sessions === 0;
+    port.hidden = link.port === 47831;
+    port.textContent = "Port 47831 was busy, so the bridge uses port " + link.port + ". Enter it under Different port in the extension.";
+  }
+  let stopped = false;
+  async function refresh() {
+    if (stopped) return;
+    try { show(await call("owlbear")); }
+    catch (error) {
+      // Player rooms and older helpers have no Owlbear link: keep the panel hidden.
+      if (/DM rooms|unavailable/i.test(error.message)) { stopped = true; panel.hidden = true; }
+    }
+  }
+  document.getElementById("dm-owlbear-new").addEventListener("click", async () => show(await call("owlbear_code")));
+  unpair.addEventListener("click", async () => show(await call("owlbear_disconnect")));
+  refresh();
+  setInterval(refresh, 3000);
+})();

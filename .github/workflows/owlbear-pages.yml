@@ -1,0 +1,41 @@
+# Publish the Owlbear Rodeo extension (owlbear/) to the gh-pages branch, which GitHub Pages
+# serves at https://gtarne2.github.io/DnD-combat-tracker/. The DM helper's bridge only talks
+# to that origin, so this is the only place the extension is hosted.
+name: Publish Owlbear extension
+
+on:
+  push:
+    branches: [dev, main]
+    paths: ["owlbear/**", ".github/workflows/owlbear-pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: owlbear-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy owlbear/ to gh-pages
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          source_sha="$(git rev-parse --short HEAD)"
+          rm -rf /tmp/site && cp -r owlbear /tmp/site && touch /tmp/site/.nojekyll
+          if git fetch --depth 1 origin gh-pages; then
+            git checkout -B gh-pages FETCH_HEAD
+          else
+            git checkout --orphan gh-pages
+          fi
+          git rm -rq --ignore-unmatch . && git clean -fdq
+          cp -r /tmp/site/. .
+          git add -A
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -qm "Publish Owlbear extension from ${GITHUB_REF_NAME}@${source_sha}"
+          git push origin gh-pages
