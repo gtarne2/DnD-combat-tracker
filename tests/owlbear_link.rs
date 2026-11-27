@@ -227,3 +227,168 @@ fn bridge_checks_pin_the_loopback_origin_and_host() {
     assert!(page.contains("const ACTIONS = [\"pair\",\"status\",\"table\"]"));
     assert!(!page.contains("__ORIGINS__") && !page.contains("__ACTIONS__"));
 }
+
+fn try_edit(
+    service: &mut RoomService,
+    room: Uuid,
+    who: Principal,
+    edit: Value,
+) -> Result<(), PartyError> {
+    let view = board(service, room);
+    service
+        .execute(
+            who,
+            &command(
+                room,
+                Initiative(FightEdit {
+                    encounter_id: serde_json::from_value(view["id"].clone()).unwrap(),
+                    expected_revision: view["revision"].as_u64().unwrap(),
+                    edit: serde_json::from_value(edit).unwrap(),
+                }),
+            ),
+        )
+        .map(|_| ())
+}
+
+#[test]
+fn players_place_spell_templates_that_follow_their_casting() {
+    let db = Database(std::env::temp_dir().join(format!("aurora-obr-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = Uuid::new_v4();
+    service
+        .execute(
+            HOST,
+            &command(
+                room,
+                Create {
+                    mode: HostMode::Dm,
+                    name: "Warden".into(),
+                },
+            ),
+        )
+        .unwrap();
+    service
+        .execute(
+            PLAYER,
+            &command(
+                room,
+                Join {
+                    name: "Lark".into(),
+                },
+            ),
+        )
+        .unwrap();
+    let template = |id: Uuid, shape: &str, lasts: &str| json!({"kind":"place_template","template":{"id":id,"spell":"Burning Hands","shape":shape,"size":15,"lasts":lasts}});
+    let burn = Uuid::new_v4();
+    // A player needs a row first, and the DM does not place templates through this edit.
+    assert!(try_edit(&mut service, room, PLAYER, template(burn, "cone", "turn")).is_err());
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"submit","score":15,"companions":[]}),
+    );
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":1,"score":10}),
+    );
+    assert!(try_edit(&mut service, room, HOST, template(burn, "cone", "turn")).is_err());
+    let wolf_row = board(&service, room)["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r.get("enemy").is_some())
+        .unwrap()["id"]
+        .clone();
+    let mut aimed = template(burn, "cone", "turn");
+    aimed["template"]["aim"] = wolf_row.clone();
+    edit(&mut service, room, PLAYER, aimed);
+    let guardians = Uuid::new_v4();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"place_template","template":{"id":guardians,"spell":"Spirit Guardians","shape":"emanation","size":15,"lasts":"concentration","focus":3}}),
+    );
+
+    // Bad shapes and sizes are refused.
+    for bad in [
+        json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"X","shape":"cone","size":0,"lasts":"turn"}}),
+        json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"X","shape":"cone","size":15,"width":5,"lasts":"turn"}}),
+        json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"","shape":"cone","size":15,"lasts":"turn"}}),
+        json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"X","shape":"cone","size":15,"lasts":"turn","aim":Uuid::new_v4()}}),
+    ] {
+        assert!(try_edit(&mut service, room, PLAYER, bad).is_err());
+    }
+
+    let table = service.table_view(HOST, room).unwrap();
+    let templates = table["encounter"]["templates"].as_array().unwrap();
+    assert_eq!(templates.len(), 2);
+    let cone = templates.iter().find(|t| t["id"] == json!(burn)).unwrap();
+    let player_row = table["encounter"]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["kind"] == "player")
+        .unwrap()["id"]
+        .clone();
+    assert_eq!(cone["caster"], player_row);
+    assert_eq!(cone["shape"], "cone");
+    assert_eq!(cone["size"], 15);
+    assert_eq!(cone["aim"], wolf_row);
+    let mine = service.poll(PLAYER, room, 0).unwrap().combat.unwrap();
+    assert_eq!(mine["templates"].as_array().unwrap().len(), 2);
+    assert_eq!(mine["templates"][1]["focus"], 3);
+
+    // An instantaneous template goes when the caster's turn ends; concentration stays.
+    edit(&mut service, room, HOST, json!({"kind":"start"}));
+    edit(&mut service, room, HOST, json!({"kind":"next"}));
+    let ids: Vec<Value> = service.table_view(HOST, room).unwrap()["encounter"]["templates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].clone())
+        .collect();
+    assert_eq!(ids, vec![json!(guardians)]);
+
+    // The caster clears their own; more than the cap drops the oldest.
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"clear_template","id":guardians}),
+    );
+    for _ in 0..8 {
+        edit(
+            &mut service,
+            room,
+            PLAYER,
+            template(Uuid::new_v4(), "sphere", "removed"),
+        );
+    }
+    let count = |service: &RoomService| {
+        service.table_view(HOST, room).unwrap()["encounter"]["templates"]
+            .as_array()
+            .unwrap()
+            .len()
+    };
+    assert_eq!(
+        count(&service),
+        aurora_combat_tracker::party::initiative::MAX_TEMPLATES
+    );
+    // Ending the encounter clears them.
+    edit(&mut service, room, HOST, json!({"kind":"end"}));
+    assert_eq!(count(&service), 0);
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        template(Uuid::new_v4(), "sphere", "removed"),
+    );
+    assert_eq!(count(&service), 1);
+    // So does leaving.
+    edit(&mut service, room, PLAYER, json!({"kind":"leave"}));
+    assert_eq!(count(&service), 0);
+}

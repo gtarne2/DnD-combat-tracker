@@ -1,5 +1,7 @@
 const partyInitiative = (() => {
   let view, left = null;
+  let sendEdit = null, refreshView = null;
+  const clearing = new Set();
   function rows(state) {
     const clock = state.progress.partyClock;
     if (view?.combat?.id === clock.encounter && view.combat.rows.length)
@@ -89,6 +91,8 @@ const partyInitiative = (() => {
       await refresh();
     };
     const send = initiativeWriter(request);
+    sendEdit = send;
+    refreshView = refresh;
     const epoch = previewEncounter.restoreEpoch();
     let busy = false;
     let choices = "";
@@ -165,6 +169,7 @@ const partyInitiative = (() => {
         if (events.length < 128) break;
       }
       if (panel.hidden) return;
+      await syncTemplates(state);
       const mine = state.combat.rows.find(row => row.key === "owner");
       const sheet = previewEncounter.current();
       const cards = (sheet.companions?.cards || []).filter(companionControls.available);
@@ -193,6 +198,59 @@ const partyInitiative = (() => {
       }
     };
   }
+  // Owlbear spell templates. The room keeps them; the DM's Owlbear extension draws them.
+  const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"around me"};
+  async function templateEdit(edit) {
+    if (!sendEdit || !board()?.joined) throw new Error("Join the party encounter to place templates.");
+    for (let attempt = 1; ; attempt++) {
+      try { await sendEdit(view, edit); break; }
+      catch (error) {
+        // Another edit landed first. A joined sheet's view of the room can lag by a couple of
+        // seconds, so wait for a newer revision and try again.
+        if (attempt === 4 || !/revision|updated order/i.test(error.message)) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        await refreshView();
+      }
+    }
+    await refreshView();
+  }
+  async function syncTemplates(state) {
+    const host = document.getElementById("party-templates");
+    const templates = state.combat?.templates || [];
+    const focus = previewEncounter.current().focus?.active?.id ?? null;
+    // Concentration templates go when this sheet's concentration ends or changes.
+    for (const template of templates) {
+      if (template.lasts !== "concentration" || template.focus === focus || clearing.has(template.id)) continue;
+      clearing.add(template.id);
+      // Keep the ID after success: this sheet's view can show the template for a moment longer.
+      templateEdit({kind:"clear_template", id:template.id}).catch(() => clearing.delete(template.id));
+    }
+    if (!host) return;
+    const signature = JSON.stringify(templates.map(t => [t.id, t.spell, t.shape, t.size]));
+    if (host.dataset.signature === signature) return;
+    host.dataset.signature = signature;
+    host.hidden = !templates.length;
+    host.replaceChildren(...(templates.length ? [Object.assign(document.createElement("span"), {textContent:"On the map:"})] : []),
+      ...templates.map(template => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "quiet-button";
+        button.textContent = template.spell + " · " + template.size + " ft " + SHAPES[template.shape] + " ✕";
+        button.title = "Remove this template from Owlbear";
+        button.onclick = async () => {
+          button.disabled = true;
+          try { await templateEdit({kind:"clear_template", id:template.id}); }
+          catch (error) { button.disabled = false; button.title = error.message; }
+        };
+        return button;
+      }));
+  }
+  const templates = {
+    available: () => Boolean(board()?.joined),
+    // Rows a cone or line can point at. Hidden enemies are left out.
+    targets: () => (board()?.rows || []).filter(row => row.key !== "owner" && row.score !== null).map(row => ({id:row.id, name:row.name})),
+    place: template => templateEdit({kind:"place_template", template}),
+  };
   // The shared encounter as this player sees it, whether or not they have joined it yet.
   function board() {
     if (!view?.combat || view.ended || !view.self_id || view.role === "host") return null;
@@ -205,5 +263,5 @@ const partyInitiative = (() => {
     return (view.members || []).filter(member => member.member_id !== view.self_id && member.member_id !== view.dm_id)
       .map(member => member.name);
   }
-  return {rows, setup, release, remember, board, players: companionsAtTable};
+  return {rows, setup, release, remember, board, players: companionsAtTable, templates};
 })();

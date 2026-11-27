@@ -8,11 +8,123 @@ pub struct SpellOptions {
     pub healing: bool,
     pub target_counts: Vec<u32>,
     pub advantage: Option<&'static str>,
+    /// The area of effect for a map template, when the range or description names one.
+    pub area: Option<SpellArea>,
+}
+
+/// A spell's area of effect in feet, for drawing a template on a virtual tabletop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpellArea {
+    pub shape: AreaShape,
+    /// Radius for spheres, cylinders and emanations; length for cones and lines; side for cubes.
+    pub size: u32,
+    /// Width of a line.
+    pub width: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AreaShape {
+    Sphere,
+    Cylinder,
+    Cone,
+    Cube,
+    Line,
+    /// A radius around the caster, such as Spirit Guardians.
+    Emanation,
+}
+
+impl SpellArea {
+    /// Compact form for the sheet, such as `line 100 5` or `sphere 20`.
+    pub fn attribute(&self) -> String {
+        let shape = match self.shape {
+            AreaShape::Sphere => "sphere",
+            AreaShape::Cylinder => "cylinder",
+            AreaShape::Cone => "cone",
+            AreaShape::Cube => "cube",
+            AreaShape::Line => "line",
+            AreaShape::Emanation => "emanation",
+        };
+        match self.width {
+            Some(width) => format!("{shape} {} {width}", self.size),
+            None => format!("{shape} {}", self.size),
+        }
+    }
+}
+
+fn feet(word: &str) -> Option<u32> {
+    word.parse().ok().filter(|value| (1..=1000).contains(value))
+}
+
+/// Read an area from Aurora's range text, such as "Self (15-foot cone)", or from the
+/// description, such as "20-foot-radius sphere" or "a line 100 feet long and 5 feet wide".
+/// Returns nothing when no area is named; the cast dialog lets the player choose one.
+pub fn area(range: Option<&str>, description: &str) -> Option<SpellArea> {
+    let range = range.unwrap_or("").to_ascii_lowercase();
+    if range.trim_start().starts_with("self")
+        && let Some((_, inner)) = range.split_once('(')
+    {
+        let words = super::words(inner);
+        if let Some(area) = scan(&words, true) {
+            return Some(area);
+        }
+    }
+    let lower = description.to_ascii_lowercase();
+    scan(&super::words(&lower), false)
+}
+
+fn scan(words: &[&str], from_self: bool) -> Option<SpellArea> {
+    let area = |shape, size, width| Some(SpellArea { shape, size, width });
+    for (index, window) in words.windows(3).enumerate() {
+        let [number, unit, kind] = window else {
+            continue;
+        };
+        if !matches!(*unit, "foot" | "feet" | "ft") {
+            continue;
+        }
+        let Some(size) = feet(number) else { continue };
+        let rest = &words[index + 3..words.len().min(index + 8)];
+        match *kind {
+            "cone" => return area(AreaShape::Cone, size, None),
+            "cube" => return area(AreaShape::Cube, size, None),
+            "line" => return area(AreaShape::Line, size, line_width(rest).or(Some(5))),
+            "emanation" => return area(AreaShape::Emanation, size, None),
+            "radius" => {
+                if rest.first() == Some(&"sphere") {
+                    return area(AreaShape::Sphere, size, None);
+                }
+                if rest.contains(&"cylinder") {
+                    return area(AreaShape::Cylinder, size, None);
+                }
+                if from_self || rest.first() == Some(&"emanation") {
+                    return area(AreaShape::Emanation, size, None);
+                }
+                if rest.contains(&"sphere") {
+                    return area(AreaShape::Sphere, size, None);
+                }
+            }
+            // "a line 100 feet long and 5 feet wide", or "a 100-foot-long, 5-foot-wide line".
+            "long" if index > 0 && words[index - 1] == "line" || rest.contains(&"line") => {
+                return area(AreaShape::Line, size, line_width(rest).or(Some(5)));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// "... and 5 feet wide" after a line's length.
+fn line_width(rest: &[&str]) -> Option<u32> {
+    rest.windows(3).find_map(|window| {
+        (matches!(window[1], "foot" | "feet" | "ft") && window[2] == "wide")
+            .then(|| feet(window[0]))
+            .flatten()
+    })
 }
 
 impl SpellOptions {
     pub(super) fn read(
         text: &str,
+        range: Option<&str>,
         time: Option<&str>,
         level: Option<u8>,
         school: Option<String>,
@@ -115,6 +227,7 @@ impl SpellOptions {
             effect,
             target_counts,
             advantage,
+            area: area(range, &plain),
         }
     }
 }

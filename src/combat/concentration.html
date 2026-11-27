@@ -51,6 +51,22 @@
       <div id="cast-healing-targets"></div><label>HP per selected target <input name="healing" type="number" min="1" max="4294967295"></label>
     </fieldset>
     <fieldset id="cast-target-field" hidden><legend>Spell targets</legend><div id="cast-targets"></div><p id="cast-target-feedback" role="status"></p></fieldset>
+    <fieldset id="cast-map-field" hidden><legend>Owlbear template</legend>
+      <label><input type="checkbox" name="mapPlace"> Place a template at my token</label>
+      <div class="cast-map-options">
+        <label>Shape <select name="mapShape">
+          <option value="sphere">Sphere</option><option value="cylinder">Cylinder</option><option value="cone">Cone</option>
+          <option value="cube">Cube</option><option value="line">Line</option><option value="emanation">Around me</option>
+        </select></label>
+        <label><span id="cast-map-size-label">Radius</span> (ft) <input name="mapSize" type="number" min="1" max="1000"></label>
+        <label id="cast-map-width">Width (ft) <input name="mapWidth" type="number" min="1" max="100" value="5"></label>
+        <label id="cast-map-aim">Point at <select name="mapAim"></select></label>
+        <label>Remove <select name="mapLasts">
+          <option value="turn">At the end of my turn</option><option value="concentration">When concentration ends</option><option value="removed">When I remove it</option>
+        </select></label>
+      </div>
+      <p id="cast-map-note" class="hint"></p>
+    </fieldset>
     <label id="cast-firearm-field" class="firearm-toggle" hidden><input type="checkbox" name="firearm"> Cast through Arcane Firearm <small>+1d8 to one damage roll</small></label>
     <div class="focus-form companion-edit-actions">
       <button id="cancel-cast" type="button">Cancel</button>

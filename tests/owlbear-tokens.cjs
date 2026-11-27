@@ -1,4 +1,4 @@
-// O2 Owlbear token sync: tokens.js and players.js against a stand-in Owlbear SDK.
+// O2 and O3 Owlbear map sync: tokens, player matching and spell templates against a stand-in Owlbear SDK.
 //
 //   node tests/owlbear-tokens.cjs
 //
@@ -37,11 +37,16 @@ function builder(type, extra) {
 }
 export const buildImage = (image, grid) => builder("IMAGE", { image, grid });
 export const buildLabel = () => builder("LABEL", {});
+export const buildCurve = () => builder("CURVE", {});
+export const sent = [];
+export const party = { players: [], me: "me" };
+let listener = null;
+export const deliver = (data, connectionId) => listener({ data, connectionId });
 const pick = (filter) => [...scene.values()].filter((item) => Array.isArray(filter) ? filter.includes(item.id) : filter ? filter(item) : true);
 export default {
   scene: {
     isReady: async () => true,
-    grid: { getDpi: async () => 150, snapPosition: async (p) => ({ x: Math.round(p.x / 75) * 75, y: Math.round(p.y / 75) * 75 }) },
+    grid: { getScale: async () => ({ parsed: { multiplier: 5, unit: "ft" } }), getDpi: async () => 150, snapPosition: async (p) => ({ x: Math.round(p.x / 75) * 75, y: Math.round(p.y / 75) * 75 }) },
     items: {
       getItems: async (filter) => copy(pick(filter)),
       addItems: async (items) => { for (const item of items) scene.set(item.id, copy(item)); },
@@ -53,6 +58,9 @@ export default {
       },
     },
   },
+  party: { getPlayers: async () => party.players },
+  player: { getId: async () => party.me },
+  broadcast: { sendMessage: async (channel, data) => { sent.push({ channel, data }); }, onMessage: (channel, fn) => { listener = fn; return () => {}; } },
   viewport: { getWidth: async () => 1000, getHeight: async () => 800, inverseTransformPoint: async (p) => p },
 };
 `;
@@ -72,7 +80,7 @@ const table = (rows) => ({ room_id: ROOM, encounter: { id: "e", revision: 1, run
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aurora-obr-tokens-"));
   try {
-    for (const name of ["tokens.js", "players.js"]) fs.copyFileSync(path.join(extension, name), path.join(dir, name));
+    for (const name of ["tokens.js", "players.js", "templates.js", "template-sync.js"]) fs.copyFileSync(path.join(extension, name), path.join(dir, name));
     fs.writeFileSync(path.join(dir, "obr-sdk-3.1.0.js"), SDK);
     fs.writeFileSync(path.join(dir, "package.json"), '{"type":"module"}');
     const sdk = await import(pathToFileURL(path.join(dir, "obr-sdk-3.1.0.js")).href);
@@ -161,6 +169,79 @@ async function main() {
     assert(p.loadMatches(ROOM)["obr-2"] === "m2" && Object.keys(p.loadMatches("other")).length === 0, "manual match per room");
     p.saveMatch(ROOM, "obr-2", "");
     assert(!p.loadMatches(ROOM)["obr-2"], "clearing a match");
+
+    // Spell templates (O3).
+    const tp = await import(pathToFileURL(path.join(dir, "templates.js")).href);
+    const ts = await import(pathToFileURL(path.join(dir, "template-sync.js")).href);
+    scene.clear();
+    memory.clear();
+    const casterRow = { id: "p1", kind: "player", member_id: "m1", name: "Lark" };
+    const target = { id: "w1", kind: "enemy", revealed: true, name: "Wolf A", down: false, template: wolf };
+    await t.addTokens(table([casterRow, target]), ["p1", "w1"]);
+    const caster = tokenFor("p1");
+    const wolfToken = tokenFor("w1");
+    assert(tp.tokenCells(caster) === 1, "a placeholder token is one cell");
+
+    // Geometry: 150 px per 5 ft, so 30 px per foot.
+    const at = { id: caster.id, position: { x: 0, y: 0 }, cells: 1 };
+    const cone = tp.placement({ shape: "cone", size: 15 }, at, { x: 300, y: 0 }, 150, 30);
+    assert(cone.position.x === 75 && cone.rotation === 0 && cone.points[1].x === 450 && cone.points[2].y === 225, "15 ft cone from the token edge, pointing at the aim");
+    const north = tp.placement({ shape: "line", size: 100, width: 5 }, at, null, 150, 30);
+    assert(north.rotation === -90 && north.points[2].x === 3000 && north.points[2].y === 75, "100 by 5 ft line pointing north");
+    const ball = tp.placement({ shape: "sphere", size: 20 }, at, { x: 900, y: 300 }, 150, 30);
+    assert(ball.position.x === 900 && Math.round(ball.points[0].x) === 600 && ball.points.length === 48, "20 ft sphere centred on the aim");
+    const aura = tp.placement({ shape: "emanation", size: 15 }, at, null, 150, 30);
+    assert(aura.attachedTo === caster.id && Math.round(aura.points[0].x) === 525, "emanation surrounds the caster's space and moves with it");
+    assert(tp.pixelsPerFoot(150, { parsed: { multiplier: 10, unit: "ft" } }) === 15 && tp.pixelsPerFoot(150, null) === 30, "grid scale");
+    assert(!tp.validSpec({ room: "r", id: "x", name: "n", colour: "red", position: { x: 0, y: 0 }, rotation: 0, points: [] }), "bad specs are refused");
+
+    const fireball = { id: "t1", caster: "p1", member_id: "m1", spell: "Fireball", shape: "sphere", size: 20, lasts: "turn", aim: "w1" };
+    const withTemplates = (templates) => ({ ...table([casterRow, target]), encounter: { ...table([casterRow, target]).encounter, templates } });
+    const templateItems = () => items().filter((i) => i.metadata[tp.TEMPLATE]);
+
+    // No matched player: the DM's extension draws it at once, on the aimed token.
+    await ts.syncTemplates(withTemplates([fireball]), 1000);
+    assert(templateItems().length === 1 && templateItems()[0].position.x === wolfToken.position.x, "DM draws an unmatched caster's template at the aim");
+    assert(JSON.stringify(templateItems()[0].metadata) === JSON.stringify({ [tp.TEMPLATE]: { room: ROOM, id: "t1" } }), "template metadata holds only IDs");
+    await ts.syncTemplates(withTemplates([fireball]), 2000);
+    assert(templateItems().length === 1, "drawn once");
+    // Deleted by hand: not redrawn. Dropped by the room: removed.
+    scene.delete(templateItems()[0].id);
+    await ts.syncTemplates(withTemplates([fireball]), 3000);
+    assert(templateItems().length === 0, "a template deleted by hand is not redrawn");
+
+    // A matched player's extension is asked to draw it, and draws it when the DM asked.
+    p.saveMatch(ROOM, "obr-lark", "m1");
+    sdk.party.players = [{ id: "obr-lark", connectionId: "c-lark", role: "PLAYER", name: "Lark" }, { id: "obr-dm", connectionId: "c-dm", role: "GM" }];
+    const guardians = { id: "t2", caster: "p1", member_id: "m1", spell: "Spirit Guardians", shape: "emanation", size: 15, lasts: "concentration" };
+    await ts.syncTemplates(withTemplates([fireball, guardians]), 10000);
+    assert(templateItems().length === 0 && sdk.sent.length === 1 && sdk.sent[0].data.to === "obr-lark", "caster's extension asked to draw");
+    sdk.party.me = "obr-lark";
+    ts.listenForDraws();
+    await sdk.deliver(sdk.sent[0].data, "c-lark");
+    assert(templateItems().length === 0, "a draw request from a player is ignored");
+    await sdk.deliver({ ...sdk.sent[0].data, to: "someone-else" }, "c-dm");
+    assert(templateItems().length === 0, "a request for another player is ignored");
+    await sdk.deliver(sdk.sent[0].data, "c-dm");
+    assert(templateItems().length === 1 && templateItems()[0].attachedTo === caster.id, "caster draws the emanation, attached to their token");
+    await ts.syncTemplates(withTemplates([fireball, guardians]), 11000);
+    assert(templateItems().length === 1 && sdk.sent.length === 1, "not asked twice");
+
+    // Unanswered requests fall back to the DM after the wait.
+    const bolt = { id: "t3", caster: "p1", member_id: "m1", spell: "Lightning Bolt", shape: "line", size: 100, width: 5, lasts: "turn" };
+    await ts.syncTemplates(withTemplates([guardians, bolt]), 20000);
+    assert(templateItems().length === 1, "waiting for the caster");
+    await ts.syncTemplates(withTemplates([guardians, bolt]), 20000 + ts.ANSWER_MS);
+    assert(templateItems().length === 2, "DM draws after the caster does not answer");
+
+    // A caster with no token on the map waits, with a note.
+    scene.delete(caster.id);
+    const late = { ...bolt, id: "t4" };
+    const notes = await ts.syncTemplates(withTemplates([guardians, bolt, late]), 30000);
+    assert(notes.length === 1 && /token/.test(notes[0]), "note for a caster without a token");
+    await ts.syncTemplates(withTemplates([]), 31000);
+    assert(templateItems().length === 0, "templates the room dropped are removed");
+
     console.log("owlbear-tokens: all checks passed");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

@@ -343,6 +343,13 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 .reaction-trigger { grid-column: 1 / -1; color: var(--muted); font-size: 11px; font-weight: 500; }
 #spell-filter-form > label, #cast-targets label, #ongoing-spell-targets label { display: block; margin-top: 4px; }
 #cast-target-field { max-height: 24vh; overflow: auto; border: 1px solid var(--line); }
+#cast-map-field { border: 1px solid var(--line); }
+#cast-map-field .cast-map-options { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; }
+#cast-map-field .cast-map-options[hidden] { display: none; }
+#cast-map-field input[type=number] { width: 5.5em; }
+#cast-map-note:empty { display: none; }
+.party-templates { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+.party-templates button { font-size: .85em; }
 #spell-turn-reminder, #attack-sequence { color: var(--teal); margin: 3px 0; }
 #attack-riders button, #attack-outcome button { padding: 2px 5px; }
 #rest-summary, #rest-hp { margin: 6px 0; }

@@ -32,6 +32,70 @@ pub struct Companion {
     pub initiative: Option<i32>,
 }
 
+/// A spell area a player asked to draw on the virtual tabletop (Owlbear Rodeo).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AreaTemplate {
+    /// Chosen by the sheet for this cast, so a retried request replaces rather than repeats.
+    pub id: Uuid,
+    pub spell: String,
+    pub shape: TemplateShape,
+    /// Feet: radius for spheres, cylinders and emanations, length for cones and lines, side
+    /// for cubes.
+    pub size: u32,
+    /// Feet across, for lines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    pub lasts: Lasting,
+    /// Row the cone or line points at. None points north.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aim: Option<Uuid>,
+    /// The sheet's concentration ID, so the sheet can clear the template when it ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus: Option<u32>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TemplateShape {
+    Sphere,
+    Cylinder,
+    Cone,
+    Cube,
+    Line,
+    Emanation,
+}
+
+/// How long a template stays on the map.
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lasting {
+    /// Until the caster's turn ends, for instantaneous spells.
+    Turn,
+    /// Until the caster's sheet reports that concentration ended.
+    Concentration,
+    /// Until the caster removes it.
+    Removed,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct PlacedTemplate {
+    member: Uuid,
+    template: AreaTemplate,
+}
+
+/// Templates one player may have on the map at once. Placing another drops the oldest.
+pub const MAX_TEMPLATES: usize = 6;
+
+fn valid_template(template: &AreaTemplate) -> bool {
+    label(&template.spell)
+        && template.spell.chars().count() <= 80
+        && (1..=1000).contains(&template.size)
+        && template
+            .width
+            .is_none_or(|width| template.shape == TemplateShape::Line && (1..=100).contains(&width))
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Edit {
@@ -40,6 +104,14 @@ pub enum Edit {
         companions: Vec<Companion>,
     },
     Leave,
+    /// A player asks for a spell template on the map at their token.
+    PlaceTemplate {
+        template: AreaTemplate,
+    },
+    /// A player removes one of their templates.
+    ClearTemplate {
+        id: Uuid,
+    },
     /// The owner of the current row ends that turn. Same effect as the DM's Next.
     EndTurn {
         id: Uuid,
@@ -414,6 +486,8 @@ pub struct Fight {
     running: bool,
     position: Position,
     saves: BTreeMap<String, Position>,
+    #[serde(default)]
+    templates: Vec<PlacedTemplate>,
 }
 
 impl Default for Fight {
@@ -428,6 +502,7 @@ impl Default for Fight {
                 current: None,
             },
             saves: BTreeMap::new(),
+            templates: Vec::new(),
         }
     }
 }
@@ -545,6 +620,13 @@ impl Fight {
         if dm {
             view["saves"] = json!(self.saves.keys().collect::<Vec<_>>());
         }
+        view["templates"] = json!(
+            self.templates
+                .iter()
+                .filter(|t| dm || t.member == viewer)
+                .map(|t| &t.template)
+                .collect::<Vec<_>>()
+        );
         view
     }
 
@@ -589,8 +671,27 @@ impl Fight {
                 }),
             })
             .collect();
+        // Templates name their caster's row so the extension can place them at its token.
+        let templates: Vec<Value> = self
+            .templates
+            .iter()
+            .filter_map(|t| {
+                let caster = self
+                    .position
+                    .rows
+                    .iter()
+                    .find(|r| r.player() == Some(t.member))?;
+                let template = &t.template;
+                Some(json!({
+                    "id": template.id, "caster": caster.id, "member_id": t.member,
+                    "spell": template.spell, "shape": template.shape, "size": template.size,
+                    "width": template.width, "lasts": template.lasts, "aim": template.aim,
+                }))
+            })
+            .collect();
         json!({"id":self.id,"revision":self.revision,"running":self.running,
-            "round":self.position.round,"current":self.position.current,"rows":rows})
+            "round":self.position.round,"current":self.position.current,"rows":rows,
+            "templates":templates})
     }
 
     fn members(&self) -> BTreeSet<Uuid> {
@@ -702,7 +803,11 @@ impl Fight {
         if dm
             == matches!(
                 cmd.edit,
-                Edit::Submit { .. } | Edit::Leave | Edit::EndTurn { .. }
+                Edit::Submit { .. }
+                    | Edit::Leave
+                    | Edit::EndTurn { .. }
+                    | Edit::PlaceTemplate { .. }
+                    | Edit::ClearTemplate { .. }
             )
         {
             return Err(Rejection::Forbidden);
@@ -779,6 +884,31 @@ impl Fight {
                         save.current = None;
                     }
                 }
+            }
+            Edit::PlaceTemplate { template } => {
+                if !valid_template(template)
+                    || !rows.iter().any(|r| r.player() == Some(actor))
+                    || template
+                        .aim
+                        .is_some_and(|aim| !rows.iter().any(|r| r.id == aim))
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                self.templates.retain(|t| t.template.id != template.id);
+                let mine = self.templates.iter().filter(|t| t.member == actor).count();
+                if mine >= MAX_TEMPLATES
+                    && let Some(oldest) = self.templates.iter().position(|t| t.member == actor)
+                {
+                    self.templates.remove(oldest);
+                }
+                self.templates.push(PlacedTemplate {
+                    member: actor,
+                    template: template.clone(),
+                });
+            }
+            Edit::ClearTemplate { id } => {
+                self.templates
+                    .retain(|t| !(t.member == actor && t.template.id == *id));
             }
             Edit::Enemy { id, score, enemy } => {
                 if !valid_enemy(enemy) {
@@ -1039,6 +1169,18 @@ impl Fight {
                 }
             }
         }
+        // Templates follow their caster: they go when the caster's row goes, when the
+        // encounter ends, and, for instantaneous spells, when the caster's turn ends.
+        let casters: BTreeSet<Uuid> = self.position.rows.iter().filter_map(Row::player).collect();
+        let ended_turn = (phase == Phase::Step)
+            .then(|| previous.as_ref().and_then(Row::player))
+            .flatten();
+        let stopped = was_running && !self.running;
+        self.templates.retain(|t| {
+            casters.contains(&t.member)
+                && !stopped
+                && !(t.template.lasts == Lasting::Turn && ended_turn == Some(t.member))
+        });
         self.revision += 1;
         let after = self.members();
         let mut deliveries = vec![];
