@@ -218,7 +218,7 @@ function setupDmInitiative(request, refresh) {
     const enemy = row.enemy;
     const box = make("form", null, "dm-quick-hp");
     const amount = Object.assign(document.createElement("input"), {type:"number", min:1, max:100000, value:quickAmount, placeholder:"Amount"});
-    amount.setAttribute("aria-label", "HP change for " + row.name);
+    amount.setAttribute("aria-label", "HP change for " + shownName(row));
     amount.oninput = () => { quickAmount = amount.value; };
     amount.onfocus = () => { quickFocus = true; };
     amount.onblur = () => { quickFocus = false; };
@@ -233,7 +233,7 @@ function setupDmInitiative(request, refresh) {
       for (const name of ["name","alias","conditions","notes"]) next[name] = enemy[name] ?? "";
       if (await change({kind:"enemy", id:row.id, score:row.score, enemy:next})) {
         quickAmount = "";
-        status.textContent = (sign < 0 ? "Damaged " : "Healed ") + row.name + " by " + value + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
+        status.textContent = (sign < 0 ? "Damaged " : "Healed ") + shownName(row) + " by " + value + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
       }
     };
     const damage = Object.assign(make("button", "Damage"), {type:"submit", disabled:busy});
@@ -572,9 +572,55 @@ function setupDmInitiative(request, refresh) {
     if (rolled) try { localStorage.setItem(AREA_ROLLS, JSON.stringify(areaRolls)); } catch {}
   }
 
+  // Concentration reminders: when a concentrating enemy or player loses HP, note the
+  // Constitution save DC (half the damage, at least 10). The DM or player still rolls.
+  const lastHp = new Map();
+  const checks = [];
+  const concentrationList = el("dm-concentration");
+  function watchConcentration() {
+    const seen = new Set();
+    for (const row of room.combat.rows) {
+      let hp, focus = "", name = shownName(row);
+      if (row.enemy) {
+        hp = row.enemy.hp;
+        if (/concentrat/i.test(row.enemy.conditions || "")) focus = "concentrating";
+      } else if (row.damage_recipient) {
+        const vitals = room.members?.find(m => m.member_id === row.damage_recipient)?.inspection?.vitals;
+        hp = vitals ? (vitals.current_hp ?? 0) + (vitals.temporary_hp || 0) : undefined;
+        if (vitals?.concentration) focus = "concentrating on " + vitals.concentration;
+      }
+      if (hp == null) continue;
+      seen.add(row.id);
+      const before = lastHp.get(row.id);
+      lastHp.set(row.id, hp);
+      if (before == null || hp >= before || !focus) continue;
+      const damage = before - hp;
+      checks.push({id: crypto.randomUUID(), row: row.id, enemy: Boolean(row.enemy),
+        text: name + " took " + damage + " damage while " + focus + ".", dc: Math.max(10, Math.floor(damage / 2))});
+    }
+    for (const id of [...lastHp.keys()]) if (!seen.has(id)) lastHp.delete(id);
+    while (checks.length > 6) checks.shift();
+    renderChecks();
+  }
+  function renderChecks() {
+    concentrationList.hidden = !checks.length;
+    concentrationList.replaceChildren(...checks.map(check => {
+      const item = make("li", null, "dm-concentration-check");
+      const text = make("span");
+      text.append(make("strong", "Concentration check · CON save DC " + check.dc), make("small", check.text + (check.enemy ? " Roll for it." : " Their sheet asks them to roll.")));
+      const dismiss = make("button", "Done");
+      dismiss.type = "button";
+      dismiss.setAttribute("aria-label", "Dismiss: " + check.text);
+      dismiss.onclick = () => { checks.splice(checks.indexOf(check), 1); renderChecks(); };
+      item.append(text, dismiss);
+      return item;
+    }));
+  }
+
   return async state => {
     room = state;
     panel.hidden = !room?.combat || room.ended;
+    if (!panel.hidden) watchConcentration();
     if (panel.hidden) {
       signature = null;
       damageSignature = null;

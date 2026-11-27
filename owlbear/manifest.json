@@ -1,6 +1,6 @@
 {
   "name": "Aurora Combat Tracker",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "manifest_version": 1,
   "description": "Links an Owlbear Rodeo room to the Aurora Combat Tracker running on the DM's Windows PC.",
   "author": "Aurora Combat Tracker",
