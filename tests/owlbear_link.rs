@@ -126,11 +126,12 @@ fn table_view_shows_only_what_players_may_see() {
     let rows = table["encounter"]["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 4);
     let text = table.to_string();
-    // No stat blocks, HP, AC, conditions, scores or notes leave the helper.
+    // No stat blocks, HP, AC, scores or notes leave the helper. Condition names do, for
+    // map markers, and there are none yet.
+    assert!(text.contains("\"conditions\":[]"), "{text}");
     for private in [
         "\"hp\"",
         "\"ac\"",
-        "conditions",
         "\"notes\"",
         "\"score\"",
         "\"stats\"",
@@ -149,6 +150,7 @@ fn table_view_shows_only_what_players_may_see() {
     );
     assert_eq!(hidden["template"]["name"], "Wolf");
     assert_eq!(hidden["template"]["size"], "Medium");
+    assert_eq!(hidden["template"]["type"], "Beast");
     let shown = rows.iter().find(|r| r["id"] == enemies[0]["id"]).unwrap();
     assert_eq!(shown["revealed"], true);
     assert_eq!(shown["name"], enemies[0]["enemy"]["alias"]);
@@ -166,6 +168,88 @@ fn table_view_shows_only_what_players_may_see() {
         service.table_view(PLAYER, room),
         Err(PartyError::Rejected(Rejection::Forbidden))
     ));
+
+    // Condition names for markers: free text and running timers, once each.
+    let mut enemy = enemies[0]["enemy"].clone();
+    enemy["conditions"] = json!("Poisoned, prone;  ");
+    enemy.as_object_mut().unwrap().remove("template");
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"enemy","id":enemies[0]["id"],"score":14,"enemy":enemy}),
+    );
+    for (name, remaining) in [("Frightened", 2), ("poisoned", 1)] {
+        edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"add_timer","id":enemies[0]["id"],"timer":{"id":Uuid::new_v4(),"name":name,"remaining":remaining,"ends":"end"}}),
+        );
+    }
+    let table = service.table_view(HOST, room).unwrap();
+    let shown = table["encounter"]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == enemies[0]["id"])
+        .unwrap()
+        .clone();
+    assert_eq!(
+        shown["conditions"],
+        json!(["Poisoned", "prone", "Frightened"])
+    );
+
+    // A player's token look: class and a small inline portrait, kept across a reconnect.
+    let portrait = "data:image/webp;base64,UklGRiQAAABXRUJQ";
+    let look = TokenLook {
+        class: "Artificer".into(),
+        portrait: Some(portrait.into()),
+    };
+    service.set_token_look(PLAYER, room, look).unwrap();
+    let player = |service: &RoomService| {
+        service.table_view(HOST, room).unwrap()["encounter"]["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["kind"] == "player")
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(player(&service)["look"]["class"], "Artificer");
+    assert_eq!(player(&service)["look"]["portrait"], portrait);
+    service.execute(PLAYER, &command(room, Resume)).unwrap();
+    assert_eq!(player(&service)["look"]["portrait"], portrait);
+    for bad in [
+        TokenLook {
+            class: "x".repeat(41),
+            portrait: None,
+        },
+        TokenLook {
+            class: String::new(),
+            portrait: Some("https://example.test/me.png".into()),
+        },
+        TokenLook {
+            class: String::new(),
+            portrait: Some("data:image/svg+xml;base64,PHN2Zz4=".into()),
+        },
+        TokenLook {
+            class: String::new(),
+            portrait: Some(format!(
+                "data:image/png;base64,{}",
+                "A".repeat(TokenLook::MAX_PORTRAIT)
+            )),
+        },
+        TokenLook {
+            class: String::new(),
+            portrait: Some("data:image/png;base64,AA\"><script>".into()),
+        },
+    ] {
+        assert!(matches!(
+            service.set_token_look(PLAYER, room, bad),
+            Err(PartyError::Rejected(Rejection::InvalidInput))
+        ));
+    }
 }
 
 #[test]

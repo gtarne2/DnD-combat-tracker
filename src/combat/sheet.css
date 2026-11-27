@@ -957,6 +957,14 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .portrait-editor { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 #portrait-preview { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; border: 2px solid #8d6f45; }
 .portrait-hint { color: var(--muted); font-size: 13px; }
+.portrait-crop { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.portrait-stage { width: min(300px, 70vw); aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #0c1119; cursor: grab; touch-action: none; border: 1px solid var(--line, #2b3442); }
+.portrait-stage:active { cursor: grabbing; }
+.portrait-stage:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.portrait-stage canvas { display: block; width: 100%; height: 100%; }
+.portrait-crop .focus-form { flex: 1 1 180px; }
+.portrait-crop input[type="range"] { width: 100%; }
+.portrait-share { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
 
 /* HP quick box: one number, four ways to apply it */
 .hp-quick { display: flex; align-items: stretch; gap: 5px; margin-top: 5px; }

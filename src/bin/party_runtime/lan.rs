@@ -33,6 +33,9 @@ pub enum Request {
         revision: u64,
         publication: Publication,
     },
+    Token {
+        look: TokenLook,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -237,6 +240,11 @@ async fn party(State(state): State<Shared>, Json(p): Json<Packet>) -> Result<Jso
         } => {
             host.service
                 .publish_ordered(who, p.room, publication, Some((session, revision)))
+                .map_err(failed)?;
+        }
+        Request::Token { look } => {
+            host.service
+                .set_token_look(who, p.room, look)
                 .map_err(failed)?;
         }
         Request::Clock { after } => {

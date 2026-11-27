@@ -39,6 +39,15 @@
 | Modified components | `src/fivetools.rs`, `src/bin/party_runtime/{mod,monster_library}.rs`, `launcher/{TrackerLauncher,PartySession}.cs`, `launcher/dm-dashboard.html`, `launcher/dm-monsters.js`, `tests/fivetools_import.rs`. |
 | Validation | Linux cloud: `cargo test --locked` passed, including the new `names_packs_from_the_file_without_details` test; the ignored real-file test named `bestiary-mm.json` as Monster Manual (2014) 2014, `bestiary-xmm.json` as Monster Manual (2025) 2024 and `bestiary-vgm.json` as Volo's Guide (7 `_copy` skips). `cargo check --locked --target x86_64-pc-windows-gnu --bins` passed. With the Linux preview helper and Playwright: a launch line listing a folder (MM, VGM, fluff and index files) and a missing path loaded 2 books and reported the missing path; a dashboard folder import of MM + XMM + `legendarygroups.json` reviewed 2 packs (1 replacing) and saved both; a single-file reimport showed Replace pack. Not run: the WinForms launcher layout on Windows. |
 | Next action | On Windows, add a 5etools `data\bestiary` folder on the launcher's first screen, host as DM, and open the monster library to confirm the books load and the launcher layout fits. |
+## Owlbear token art handoff (R80)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-xbu802`, branched from `dev` at `eed5708`. |
+| Completed | R80: player portraits as shared Owlbear tokens, per-class default icons, a portrait crop editor, art picks that update the map at once and become type or class defaults, companions placed beside their owner's token before the fight starts, and condition markers from Owlbear's own attachments. Extension 0.10.0. |
+| Modified components | `owlbear/tokens.js`, `owlbear/background.js`, `owlbear/popover.{html,js}`, `owlbear/token-class-*.png` and `token-player.png` (from `tools/build-class-tokens.cjs`), `src/party.rs`, `src/party/{wire,model,initiative}.rs`, `src/bin/party_runtime/{lan,mod}.rs`, `src/combat/portrait.{html,js}`, `src/combat/party.js`, `src/combat/html.rs` (`data-class`), `src/combat/sheet.css`. |
+| Validation | Linux cloud: `cargo test --locked` passed (the `owlbear_link` table test now covers conditions, creature type and token looks). `node tests/owlbear-tokens.cjs` passed with new checks for class icons, portraits, type defaults, live art updates, the cannon's free cell and condition markers. `node tests/browser-review.cjs` passed, and a Playwright run of the crop editor saved a portrait, reopened Adjust crop and produced a 6 KB WebP token. `cargo check --target x86_64-pc-windows-gnu --bins` passed. Not run: real Owlbear (the cloud cannot reach it) and Windows rehearsals. |
+| Next action | In real Owlbear: check that an inline WebP portrait is accepted as a token image and seen by players, that Art… opens on the class or creature type, that condition attachments sit right on 1- and 2-cell tokens, and that a Protector cannon appears beside its artificer before the fight starts. Republish gh-pages after merge. |
 
 ## Table rules handoff (R75–R77)
 

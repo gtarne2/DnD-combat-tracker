@@ -28,6 +28,80 @@ export function artKey(row) {
   return `companion:${row.member_id}:${row.local_id}`;
 }
 
+/** Classes with a bundled default token, by the slug in token-class-<slug>.png. */
+export const CLASS_TOKENS = ["artificer", "barbarian", "bard", "blood-hunter", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"];
+
+/** The first known class in an Aurora class field such as "Artificer (Battle Smith) / Wizard". */
+export function classSlug(text) {
+  const words = String(text || "").toLowerCase().replace(/[^a-z]+/g, " ");
+  let best = null;
+  for (const slug of CLASS_TOKENS) {
+    const at = words.indexOf(slug.replace("-", " "));
+    if (at >= 0 && (!best || at < best.at)) best = { slug, at };
+  }
+  return best?.slug || null;
+}
+
+/** A shared default for every row of the same kind: creature type for monsters, class for players. */
+export function groupKey(row) {
+  if (row.kind === "enemy") {
+    const type = String(row.template?.type || "").trim().toLowerCase();
+    return type ? `type:${type}` : null;
+  }
+  if (row.kind === "player") {
+    const slug = classSlug(row.look?.class);
+    return slug ? `class:${slug}` : null;
+  }
+  return null;
+}
+
+/** What Owlbear's asset picker searches for first: the creature type or class, which match its built-in art. */
+export function artSearch(row) {
+  if (row.kind === "enemy") return row.template?.type || row.template?.name || "";
+  if (row.kind === "player") {
+    const slug = classSlug(row.look?.class);
+    return slug ? slug.replace("-", " ") : row.name || "";
+  }
+  return row.name || "";
+}
+
+/** Remember art the DM picked for a row; it also becomes the default for its type or class if there is none. */
+export function chooseArt(row, download) {
+  saveArt(artKey(row), download);
+  const group = groupKey(row);
+  if (group && !loadArt()[group]) saveArt(group, download);
+}
+
+function portraitArt(url) {
+  const mime = url.slice(5, url.indexOf(";"));
+  return {
+    image: { url, mime, width: 160, height: 160 },
+    grid: { dpi: 160, offset: { x: 80, y: 80 } },
+    scale: { x: 1, y: 1 },
+    portrait: true,
+  };
+}
+
+/**
+ * The art a row's token should have, best first: the DM's pick for this row, the player's own
+ * portrait, the DM's pick for its creature type or class, the bundled class icon, a placeholder.
+ */
+export function artFor(row, art = loadArt()) {
+  if (art[artKey(row)]) return art[artKey(row)];
+  if (row.kind === "player" && row.look?.portrait && !refused.portraits.has(row.member_id)) return portraitArt(row.look.portrait);
+  const group = groupKey(row);
+  if (group && art[group]) return art[group];
+  if (row.kind === "player" && group) return placeholder(group.slice("class:".length), `token-class-`);
+  return placeholder(row.kind);
+}
+
+/** A short fingerprint of an image URL, kept in token metadata to notice art changes. */
+export function artTag(url) {
+  let hash = 5381;
+  for (let i = 0; i < url.length; i += 1) hash = ((hash * 33) ^ url.charCodeAt(i)) >>> 0;
+  return `${url.length.toString(36)}-${hash.toString(36)}`;
+}
+
 export function loadArt() {
   try { return JSON.parse(localStorage.getItem(ART_KEY) || "{}"); } catch { return {}; }
 }
@@ -57,16 +131,16 @@ function textFor(name) {
   return { plainText: name, richText: [{ type: "paragraph", children: [{ text: name }] }] };
 }
 
-function placeholder(kind) {
+function placeholder(kind, prefix = "token-") {
   return {
-    image: { url: `${BASE}token-${kind}.png`, mime: "image/png", width: 256, height: 256 },
+    image: { url: `${BASE}${prefix}${kind}.png`, mime: "image/png", width: 256, height: 256 },
     grid: { dpi: 256, offset: { x: 128, y: 128 } },
     scale: { x: 1, y: 1 },
   };
 }
 
 function buildToken(row, room, position, art, forceHidden = false) {
-  const chosen = art[artKey(row)] || placeholder(row.kind);
+  const chosen = artFor(row, art);
   const cells = row.kind === "enemy" ? cellsFor(row.template?.size) : 1;
   const base = chosen.scale || { x: 1, y: 1 };
   const name = publicName(row);
@@ -80,7 +154,7 @@ function buildToken(row, room, position, art, forceHidden = false) {
     .layer("CHARACTER")
     .visible(!hidden)
     .locked(false)
-    .metadata({ [LINK]: { room, row: row.id, kind: row.kind, created: true, revealed: !hidden } })
+    .metadata({ [LINK]: { room, row: row.id, kind: row.kind, created: true, revealed: !hidden, art: artTag(chosen.image.url) } })
     .build();
 }
 
@@ -100,7 +174,21 @@ export async function linkedRows(room) {
   return map;
 }
 
-/** Put tokens for the given rows in a row of cells around the DM's view centre. */
+/** The owner's token for a companion row, when it is on the map. */
+async function ownerToken(table, row, onMap) {
+  if (row.kind !== "companion") return null;
+  const owner = table.encounter.rows.find((r) => r.kind === "player" && r.member_id === row.member_id);
+  const id = owner && onMap[owner.id];
+  return id ? (await OBR.scene.items.getItems([id]))[0] || null : null;
+}
+
+// Cells around a token, nearest first: right, left, below, above, then the diagonals.
+const AROUND = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1], [2, 0], [-2, 0], [0, 2], [0, -2]];
+
+/**
+ * Put tokens for the given rows on the map. A companion goes in a free cell beside its owner's
+ * token when that token is on the map; the rest go in a row of cells around the DM's view centre.
+ */
 export async function addTokens(table, rowIds, { hidden = false, near = null } = {}) {
   if (!(await OBR.scene.isReady())) throw new Error("Open a scene in Owlbear first.");
   const room = table.room_id;
@@ -108,24 +196,69 @@ export async function addTokens(table, rowIds, { hidden = false, near = null } =
   const rows = table.encounter.rows.filter((row) => rowIds.includes(row.id) && !onMap[row.id]);
   if (!rows.length) return 0;
   const dpi = await OBR.scene.grid.getDpi();
-  const width = await OBR.viewport.getWidth();
-  const height = await OBR.viewport.getHeight();
-  // Beside a given token (one square to its right), or in the middle of the DM's view.
-  const centre = near ? { x: near.x + dpi, y: near.y } : await OBR.viewport.inverseTransformPoint({ x: width / 2, y: height / 2 });
   const art = loadArt();
-  const sizes = rows.map((row) => (row.kind === "enemy" ? cellsFor(row.template?.size) : 1));
-  const span = sizes.reduce((sum, cells) => sum + Math.max(1, cells), 0) * dpi;
-  let x = centre.x - span / 2;
   const items = [];
-  for (const [index, row] of rows.entries()) {
-    const cells = Math.max(1, sizes[index]);
-    const odd = cells % 2 === 1;
-    const spot = await OBR.scene.grid.snapPosition({ x: x + (cells * dpi) / 2, y: centre.y }, 1, !odd, odd);
+  const loose = [];
+  // Spots already taken by a character token or one placed in this call.
+  const characters = await OBR.scene.items.getItems((item) => item.layer === "CHARACTER");
+  const taken = characters.map((item) => item.position);
+  const free = (spot) => !taken.some((p) => Math.abs(p.x - spot.x) < dpi / 2 && Math.abs(p.y - spot.y) < dpi / 2);
+  for (const row of rows) {
+    const owner = await ownerToken(table, row, onMap);
+    if (!owner) {
+      loose.push(row);
+      continue;
+    }
+    let spot = null;
+    for (const [dx, dy] of AROUND) {
+      const at = await OBR.scene.grid.snapPosition({ x: owner.position.x + dx * dpi, y: owner.position.y + dy * dpi }, 1, false, true);
+      if (free(at)) { spot = at; break; }
+    }
+    spot ||= await OBR.scene.grid.snapPosition({ x: owner.position.x + dpi, y: owner.position.y }, 1, false, true);
+    taken.push(spot);
     items.push(buildToken(row, room, spot, art, hidden));
-    x += cells * dpi;
   }
-  await OBR.scene.items.addItems(items);
+  if (loose.length) {
+    const width = await OBR.viewport.getWidth();
+    const height = await OBR.viewport.getHeight();
+    // Beside a given token (one square to its right), or in the middle of the DM's view.
+    const centre = near ? { x: near.x + dpi, y: near.y } : await OBR.viewport.inverseTransformPoint({ x: width / 2, y: height / 2 });
+    const sizes = loose.map((row) => (row.kind === "enemy" ? cellsFor(row.template?.size) : 1));
+    const span = sizes.reduce((sum, cells) => sum + Math.max(1, cells), 0) * dpi;
+    let x = centre.x - span / 2;
+    for (const [index, row] of loose.entries()) {
+      const cells = Math.max(1, sizes[index]);
+      const odd = cells % 2 === 1;
+      const spot = await OBR.scene.grid.snapPosition({ x: x + (cells * dpi) / 2, y: centre.y }, 1, !odd, odd);
+      items.push(buildToken(row, room, spot, art, hidden));
+      x += cells * dpi;
+    }
+  }
+  await addWithFallback(items, rows, room, art, hidden);
   return items.length;
+}
+
+/**
+ * Owlbear may refuse an inline portrait. Then the tokens go in with the class icon instead,
+ * and the error is kept so the popover can say so.
+ */
+export const refused = { portraits: new Set() };
+async function addWithFallback(items, rows, room, art, hidden) {
+  try {
+    await OBR.scene.items.addItems(items);
+  } catch (error) {
+    const portraits = items.filter((item) => item.image?.url?.startsWith("data:"));
+    if (!portraits.length) throw error;
+    for (const item of portraits) {
+      const row = rows.find((r) => r.id === item.metadata[LINK].row);
+      refused.portraits.add(row.member_id);
+      const chosen = artFor({ ...row, look: { ...row.look, portrait: null } }, art);
+      item.image = chosen.image;
+      item.grid = chosen.grid;
+      item.metadata[LINK].art = artTag(chosen.image.url);
+    }
+    await OBR.scene.items.addItems(items);
+  }
 }
 
 /** Remove the tokens this extension created for the rows; unlink the DM's own tokens. */
@@ -212,6 +345,8 @@ export async function syncTokens(table) {
   const gone = linked.filter((item) => !rows.has(linkOf(item, room).row));
   if (gone.length) await unlinkOrDelete(gone, room);
 
+  await syncArt(linked, rows, room);
+
   const changes = [];
   for (const item of linked) {
     const link = linkOf(item, room);
@@ -241,6 +376,142 @@ export async function syncTokens(table) {
   // Read the tokens again: the updates above may have changed their visibility.
   const kept = await OBR.scene.items.getItems(linked.filter((item) => rows.has(linkOf(item, room).row)).map((item) => item.id));
   await syncRings(kept, rows, room, table.encounter);
+  await syncConditions(kept, rows, room);
+}
+
+// Condition markers use art the DM picks once per condition from Owlbear's asset library
+// (its default Attachments, such as Poisoned or Prone), kept in this browser.
+const CONDITION_ART_KEY = "aurora-obr-condition-art";
+const CONDITION = "condition:";
+/** The conditions of the rules, offered in the popover even before any enemy has them. */
+export const STANDARD_CONDITIONS = ["Blinded", "Charmed", "Deafened", "Exhaustion", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious", "Concentration", "Blessed", "Hasted"];
+
+export function conditionKey(name) {
+  return String(name || "").trim().toLowerCase().replace(/\s*\(.*\)\s*$/, "").replace(/\s+\d+$/, "");
+}
+
+export function loadConditionArt() {
+  try { return JSON.parse(localStorage.getItem(CONDITION_ART_KEY) || "{}"); } catch { return {}; }
+}
+
+export function saveConditionArt(name, download) {
+  const art = loadConditionArt();
+  if (download) art[conditionKey(name)] = { image: download.image, grid: download.grid, scale: download.scale };
+  else delete art[conditionKey(name)];
+  try { localStorage.setItem(CONDITION_ART_KEY, JSON.stringify(art)); } catch {}
+}
+
+function buildCondition(token, key, chosen, dpi) {
+  // Owlbear's attachments are drawn to fit one cell; grow them with the token's footprint.
+  const cells = Math.abs(token.scale?.x || 1) * ((token.image?.width || dpi) / (token.grid?.dpi || dpi));
+  const base = chosen.scale || { x: 1, y: 1 };
+  const footprint = Math.max(1, Math.round(cells));
+  return buildImage(chosen.image, chosen.grid)
+    .position(token.position)
+    .scale({ x: base.x * footprint, y: base.y * footprint })
+    .attachedTo(token.id)
+    .layer("ATTACHMENT")
+    .locked(true)
+    .disableHit(true)
+    .name(key)
+    .visible(token.visible)
+    .metadata({ [MARKER]: CONDITION + key })
+    .build();
+}
+
+/** Enemy tokens carry a marker for each condition that has art; the rest show nothing. */
+async function syncConditions(tokens, rows, room) {
+  const art = loadConditionArt();
+  const markers = (await markersFor(tokens.map((t) => t.id))).filter((m) => String(m.metadata[MARKER]).startsWith(CONDITION));
+  const dpi = await OBR.scene.grid.getDpi();
+  const add = [];
+  const remove = [];
+  const show = [];
+  for (const token of tokens) {
+    const row = rows.get(linkOf(token, room).row);
+    const wanted = new Set((row.kind === "enemy" ? row.conditions || [] : []).map(conditionKey).filter((key) => art[key]));
+    const mine = markers.filter((m) => m.attachedTo === token.id);
+    for (const marker of mine) {
+      const key = marker.metadata[MARKER].slice(CONDITION.length);
+      if (!wanted.has(key) || mine.find((m) => m.metadata[MARKER] === marker.metadata[MARKER]) !== marker) remove.push(marker.id);
+      else if (marker.visible !== token.visible) show.push({ id: marker.id, visible: token.visible });
+      wanted.delete(key);
+    }
+    for (const key of wanted) add.push(buildCondition(token, key, art[key], dpi));
+  }
+  if (remove.length) await OBR.scene.items.deleteItems(remove);
+  if (show.length) {
+    const byId = new Map(show.map((s) => [s.id, s.visible]));
+    await OBR.scene.items.updateItems(show.map((s) => s.id), (drafts) => {
+      for (const draft of drafts) draft.visible = byId.get(draft.id);
+    });
+  }
+  if (add.length) await OBR.scene.items.addItems(add);
+}
+
+/** Condition names on enemies in the encounter, for the popover's art list. */
+export function encounterConditions(table) {
+  const names = new Map();
+  for (const row of table?.encounter?.rows || []) {
+    for (const name of row.conditions || []) if (!names.has(conditionKey(name))) names.set(conditionKey(name), name);
+  }
+  return [...names.values()];
+}
+
+function applyArt(draft, row, chosen) {
+  const cells = row.kind === "enemy" ? cellsFor(row.template?.size) : 1;
+  const base = chosen.scale || { x: 1, y: 1 };
+  draft.image = { ...chosen.image };
+  draft.grid = { ...chosen.grid };
+  draft.scale = { x: base.x * cells, y: base.y * cells };
+  draft.metadata[LINK] = { ...draft.metadata[LINK], art: artTag(chosen.image.url) };
+}
+
+/**
+ * Tokens this extension placed follow art changes: a new pick in the popover, a player's new
+ * portrait, or a new class or type default. A token whose image was replaced in Owlbear itself
+ * (its image no longer matches the art we last set) is left as the DM made it.
+ */
+async function syncArt(linked, rows, room) {
+  const art = loadArt();
+  const stale = [];
+  for (const item of linked) {
+    const link = linkOf(item, room);
+    const row = rows.get(link.row);
+    if (!row || !link.created || !item.image?.url) continue;
+    const ours = !link.art || link.art === artTag(item.image.url);
+    const chosen = artFor(row, art);
+    if (ours && artTag(chosen.image.url) !== artTag(item.image.url)) stale.push({ id: item.id, row, chosen });
+  }
+  if (!stale.length) return;
+  const byId = new Map(stale.map((s) => [s.id, s]));
+  const update = (list) => OBR.scene.items.updateItems(list.map((s) => s.id), (drafts) => {
+    for (const draft of drafts) applyArt(draft, byId.get(draft.id).row, byId.get(draft.id).chosen);
+  });
+  try {
+    await update(stale);
+  } catch (error) {
+    const portraits = stale.filter((s) => s.chosen.portrait);
+    if (!portraits.length) throw error;
+    for (const s of portraits) refused.portraits.add(s.row.member_id);
+    const rest = stale.filter((s) => !s.chosen.portrait);
+    for (const s of portraits) rest.push({ ...s, chosen: artFor(s.row, art) });
+    for (const s of rest) byId.set(s.id, s);
+    await update(rest);
+  }
+}
+
+/** Put the art the DM just picked on that row's token now, even on a token the DM placed. */
+export async function applyPickedArt(table, rowId) {
+  const room = table.room_id;
+  const row = table.encounter.rows.find((r) => r.id === rowId);
+  const id = row && (await linkedRows(room))[row.id];
+  if (!id) return false;
+  const chosen = artFor(row);
+  await OBR.scene.items.updateItems([id], (drafts) => {
+    for (const draft of drafts) if (draft.type === "IMAGE") applyArt(draft, row, chosen);
+  });
+  return true;
 }
 
 // One ring per state, concentric and 10% smaller each, centred on the token's grid footprint.
@@ -278,7 +549,7 @@ async function syncRings(tokens, rows, room, encounter) {
   const markers = await markersFor(ids);
   // Older versions drew a text label or a skull badge. Those go.
   const known = new Set(RINGS.map((ring) => ring.kind));
-  const stale = markers.filter((marker) => !known.has(marker.metadata[MARKER]));
+  const stale = markers.filter((marker) => !known.has(marker.metadata[MARKER]) && !String(marker.metadata[MARKER]).startsWith(CONDITION));
   const dpi = await OBR.scene.grid.getDpi();
   const add = [];
   const remove = stale.map((marker) => marker.id);

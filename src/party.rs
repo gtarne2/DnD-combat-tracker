@@ -132,6 +132,11 @@ impl RoomService {
         match connection {
             ConnectionChange::None => (),
             ConnectionChange::Online(id) => {
+                // The token look outlives a reconnect, so the map keeps the player's portrait.
+                let token = self
+                    .live
+                    .get(&(cmd.room_id, id))
+                    .and_then(|p| p.token.clone());
                 self.live.insert(
                     (cmd.room_id, id),
                     Presence {
@@ -139,6 +144,7 @@ impl RoomService {
                         inspection: None,
                         publication_session: Uuid::new_v4(),
                         publication_revision: 0,
+                        token,
                     },
                 );
             }
@@ -193,6 +199,30 @@ impl RoomService {
             Publication::PartyNameOnly => None,
             other => Some(other),
         };
+        Ok(())
+    }
+
+    /// A connected player sets how their map token looks. Replaces the previous look.
+    pub fn set_token_look(
+        &mut self,
+        principal: Principal,
+        room_id: Uuid,
+        look: TokenLook,
+    ) -> Result<(), PartyError> {
+        if !look.valid() {
+            return Err(Rejection::InvalidInput.into());
+        }
+        let room = store::load(&self.db, room_id)?.ok_or(Rejection::UnknownRoom)?;
+        let id = room.active(principal)?;
+        if room.mode != HostMode::Dm {
+            return Err(Rejection::Forbidden.into());
+        }
+        let presence = self
+            .live
+            .get_mut(&(room_id, id))
+            .filter(|p| p.online)
+            .ok_or(Rejection::Disconnected)?;
+        presence.token = Some(look);
         Ok(())
     }
 
@@ -269,7 +299,21 @@ impl RoomService {
         if principal != Principal::LocalHost || room.mode != HostMode::Dm {
             return Err(Rejection::Forbidden.into());
         }
-        Ok(serde_json::json!({"room_id": room_id, "encounter": room.fight.table_view()}))
+        let mut encounter = room.fight.table_view();
+        // Player tokens use the class and portrait each connected player's sheet sent.
+        if let Some(rows) = encounter["rows"].as_array_mut() {
+            for row in rows.iter_mut().filter(|row| row["kind"] == "player") {
+                let look = row["member_id"]
+                    .as_str()
+                    .and_then(|id| id.parse::<Uuid>().ok())
+                    .and_then(|member| self.live.get(&(room_id, member)))
+                    .and_then(|presence| presence.token.as_ref());
+                if let Some(look) = look {
+                    row["look"] = serde_json::json!(look);
+                }
+            }
+        }
+        Ok(serde_json::json!({"room_id": room_id, "encounter": encounter}))
     }
 
     /// Replace the DM tabletop's record of who is inside each template. DM-only. Reports for

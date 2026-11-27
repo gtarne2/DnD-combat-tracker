@@ -119,6 +119,7 @@ function initiativeWriter(request) {
   const outgoing = document.createElement("p");
   if (hasSheet) panel.append(outgoing);
   const share = hasSheet ? setupPartySharing(panel, request) : null;
+  const tokenLook = hasSheet ? setupTokenLook(request) : null;
   const initiative = hasSheet ? partyInitiative.setup(request, refresh) : setupDmInitiative(request, refresh);
   let view;
   let membersKey = "";
@@ -361,6 +362,7 @@ function initiativeWriter(request) {
       const state = await request("state");
       view = state;
       if (hasSheet) share(state);
+      if (hasSheet) tokenLook(state);
       else renderDmParty(state);
       if (hasSheet) partyActions.setRoom(state);
       status.textContent = state.state + (state.role === "dm" ? " as DM" : "");
@@ -421,3 +423,35 @@ function initiativeWriter(request) {
   panel.addEventListener("toggle", () => { if (panel.open) refresh(); });
   poll();
 })();
+
+// The player's class and round portrait go to the DM's tracker for their Owlbear token. Sent
+// again after every reconnect (a new publication session) and whenever the portrait changes.
+function setupTokenLook(request) {
+  let session = null;
+  let sent = null;
+  let busy = false;
+  let again = false;
+  async function send() {
+    if (!session || !window.portraitToken) return;
+    if (busy) { again = true; return; }
+    busy = true;
+    try {
+      const look = await window.portraitToken.look();
+      const signature = JSON.stringify([session, look]);
+      if (signature !== sent) {
+        await request("token", look);
+        sent = signature;
+      }
+    } catch {
+      // Older DM helpers do not know this request; the token then keeps the class icon.
+    } finally {
+      busy = false;
+      if (again) { again = false; void send(); }
+    }
+  }
+  window.portraitToken?.onChange(() => { void send(); });
+  return state => {
+    const next = state?.dm_id && state.self_id && !state.ended ? state.publication_session || null : null;
+    if (next !== session) { session = next; void send(); }
+  };
+}
