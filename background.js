@@ -5,11 +5,12 @@ import OBR from "./obr-sdk-3.1.0.js";
 import { BridgeClient } from "./bridge-client.js";
 import { LINK, addTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
 import { autoMatch } from "./players.js";
+import { listenForDraws, syncTemplates } from "./template-sync.js";
 
 const POLL_MS = 2000;
 const BASE = new URL(".", import.meta.url).href;
 const channel = new BroadcastChannel("aurora-obr");
-const state = { role: null, connected: false, paired: false, table: null, onMap: {}, error: null, mapError: null, checkedAt: null };
+const state = { role: null, connected: false, paired: false, table: null, onMap: {}, error: null, mapError: null, mapNotes: [], checkedAt: null };
 let client = null;
 let badge = null;
 let syncing = false;
@@ -35,6 +36,7 @@ async function syncMap() {
     await syncTokens(state.table);
     state.onMap = await linkedRows(state.table.room_id);
     autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
+    state.mapNotes = await syncTemplates(state.table);
     state.mapError = null;
   } catch (error) {
     state.mapError = error.message || String(error);
@@ -149,6 +151,9 @@ OBR.onReady(async () => {
     client = new BridgeClient({ onChange: () => refresh() });
     createMenus();
     setInterval(refresh, POLL_MS);
+  } else {
+    // Players' extensions draw the templates they cast, so they own them.
+    listenForDraws();
   }
   publish();
   OBR.player.onChange((player) => {

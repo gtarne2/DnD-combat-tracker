@@ -140,8 +140,9 @@ function render() {
     renderRows(state.table);
     renderPlayers(state.table);
   }
-  $("map-error").hidden = !state.mapError;
-  $("map-error").textContent = state.mapError ? `Map: ${state.mapError}` : "";
+  const mapText = state.mapError ? `Map: ${state.mapError}` : (state.mapNotes || []).join(" ");
+  $("map-error").hidden = !mapText;
+  $("map-error").textContent = mapText;
   if (!state.connected) setSummary("Not connected. Open the bridge window.", "bad");
   else if (!state.paired) setSummary("Bridge open. Enter the pairing code.");
   else if (state.error) setSummary("Linked, but the last update failed.", "bad");
