@@ -1,5 +1,5 @@
 use aurora_combat_tracker::{
-    fivetools::{import_fivetools_pack, plain},
+    fivetools::{import_fivetools_file, import_fivetools_pack, plain},
     monsters::{Pack, PackInfo},
 };
 
@@ -202,6 +202,52 @@ fn rejects_files_without_importable_monsters() {
 }
 
 #[test]
+fn names_packs_from_the_file_without_details() {
+    let import =
+        import_fivetools_file("C:\\5etools\\data\\bestiary\\bestiary-tst.json", FILE).unwrap();
+    let info = &import.pack.info;
+    assert_eq!(info.id, "5etools-tst");
+    assert_eq!(info.source, "Test Book");
+    // The Lantern Mite prints 2024 initiative.
+    assert_eq!(info.edition, "2024");
+    assert!(info.attribution.contains("bestiary-tst"));
+
+    let classic = r#"{"monster": [{"name": "Old Wolf", "source": "MM", "cr": "1/4"},
+        {"name": "Guest", "source": "TST", "cr": "1"}, {"name": "Old Bear", "source": "MM", "cr": "1"}]}"#;
+    let info = import_fivetools_file("bestiary-mm.json", classic)
+        .unwrap()
+        .pack
+        .info;
+    assert_eq!(
+        (
+            info.id.as_str(),
+            info.source.as_str(),
+            info.edition.as_str()
+        ),
+        ("5etools-mm", "Monster Manual (2014)", "2014")
+    );
+    let modern = r#"{"monster": [{"name": "New Wolf", "source": "XMM", "cr": "1/4"}]}"#;
+    assert_eq!(
+        import_fivetools_file("x.json", modern)
+            .unwrap()
+            .pack
+            .info
+            .edition,
+        "2024"
+    );
+    let unnamed = r#"{"monster": [{"name": "Stray", "cr": "1"}]}"#;
+    assert_eq!(
+        import_fivetools_file("My Homebrew.json", unnamed)
+            .unwrap()
+            .pack
+            .info
+            .id,
+        "5etools-my-homebrew"
+    );
+    assert!(import_fivetools_file("legendarygroups.json", r#"{"legendaryGroup": []}"#).is_err());
+}
+
+#[test]
 fn duplicate_names_get_distinct_ids() {
     let file = r#"{"monster": [
         {"name": "Twin", "source": "TST", "action": [{"name": "Poke", "entries": ["Poke."]}, {"name": "Poke", "entries": ["Again."]}]},
@@ -233,7 +279,8 @@ fn renders_common_tags() {
 #[ignore]
 fn imports_local_bestiary_file() {
     let path = std::env::var("FIVETOOLS_FILE").expect("set FIVETOOLS_FILE");
-    let import = import_fivetools_pack(info(), &std::fs::read_to_string(path).unwrap()).unwrap();
+    let import = import_fivetools_file(&path, &std::fs::read_to_string(&path).unwrap()).unwrap();
+    println!("{:?}", import.pack.info);
     println!(
         "{} monsters, {} warnings",
         import.pack.monsters.len(),

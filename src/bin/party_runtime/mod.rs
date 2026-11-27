@@ -90,6 +90,9 @@ struct Launch {
     #[serde(default)]
     invite: String,
     bind: Option<Ipv4Addr>,
+    /// 5etools bestiary files and folders a DM room loads into its library on start.
+    #[serde(default)]
+    bestiary: Vec<String>,
 }
 #[derive(Clone)]
 enum Side {
@@ -104,6 +107,8 @@ struct Local {
     room: Uuid,
     binding: Uuid,
     monster_library: Option<std::path::PathBuf>,
+    /// The launcher's bestiary load: null with none listed, `done: false` while it runs.
+    bestiary: Arc<std::sync::Mutex<Value>>,
     vault: Vault,
     detached: Arc<AtomicBool>,
     publication_revision: Arc<AtomicU64>,
@@ -544,6 +549,17 @@ pub async fn serve() -> Result<(), Error> {
     let cap = Uuid::new_v4().to_string();
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
     let url = format!("http://{}/{cap}", listener.local_addr()?);
+    let monster_library = (role == "dm").then(|| directory.join("monster-library.sqlite3"));
+    let bestiary = Arc::new(std::sync::Mutex::new(Value::Null));
+    let sources = cfg.bestiary;
+    if let Some(path) = monster_library.clone().filter(|_| !sources.is_empty()) {
+        *bestiary.lock().unwrap() = json!({"done":false});
+        let report = bestiary.clone();
+        tokio::task::spawn_blocking(move || {
+            let result = monster_library::load_bestiary(&path, &sources);
+            *report.lock().unwrap() = result;
+        });
+    }
     let app = Router::new()
         .route("/{cap}/{action}", post(local).options(local))
         .layer(axum::extract::DefaultBodyLimit::max(1024 * 1024))
@@ -554,7 +570,8 @@ pub async fn serve() -> Result<(), Error> {
             status,
             room,
             binding,
-            monster_library: (role == "dm").then(|| directory.join("monster-library.sqlite3")),
+            monster_library,
+            bestiary,
             vault,
             detached: Arc::new(AtomicBool::new(false)),
             publication_revision: Arc::new(AtomicU64::new(0)),
