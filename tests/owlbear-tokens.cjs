@@ -38,6 +38,7 @@ function builder(type, extra) {
 export const buildImage = (image, grid) => builder("IMAGE", { image, grid });
 export const buildLabel = () => builder("LABEL", {});
 export const buildCurve = () => builder("CURVE", {});
+export const buildShape = () => builder("SHAPE", {});
 export const sent = [];
 export const party = { players: [], me: "me" };
 let listener = null;
@@ -120,13 +121,27 @@ async function main() {
     assert(tokenFor("w1").visible && tokenFor("w1").name === "Wolf A" && tokenFor("w1").text.plainText === "Wolf A", "reveal shows and names the token");
     const down = items().filter((i) => i.metadata[t.MARKER] === t.DOWN);
     assert(down.length === 1 && down[0].attachedTo === tokenFor("o1").id && down[0].layer === "ATTACHMENT", "down marker attached");
-    assert(down[0].type === "IMAGE" && down[0].image.url.endsWith("/marker-down.svg") && down[0].grid.dpi > 150, "down marker is a small badge, under a third of a square");
-    // A marker from an older version (a text label) is replaced by the badge.
+    assert(down[0].type === "SHAPE" && down[0].shapeType === "CIRCLE" && down[0].strokeColor === "#ff4d4d" && down[0].fillOpacity === 0 && down[0].disableHit, "down marker is a red ring");
+    assert(down[0].width === 150 && down[0].scale.x === 2, "the ring fits the large token's footprint");
+    // Markers from older versions (a text label, a skull badge) are replaced by the ring.
     scene.set("old-label", { id: "old-label", type: "LABEL", metadata: { [t.MARKER]: "down" }, attachedTo: tokenFor("o1").id, visible: true, position: { x: 0, y: 0 } });
+    scene.set("old-badge", { id: "old-badge", type: "IMAGE", metadata: { [t.MARKER]: "down-badge" }, attachedTo: tokenFor("o1").id, visible: true, position: { x: 0, y: 0 } });
     await t.syncTokens(table(rows));
-    assert(!scene.has("old-label"), "old text marker removed");
+    assert(!scene.has("old-label") && !scene.has("old-badge"), "old markers removed");
     await t.syncTokens(table(rows));
     assert(items().filter((i) => i.metadata[t.MARKER]).length === 1, "sync is idempotent");
+    // Whose turn it is: a yellow ring outside any other ring, which then moves inward.
+    const turnTable = { ...table(rows), encounter: { ...table(rows).encounter, current: "o1" } };
+    await t.syncTokens(turnTable);
+    const ringsOn = (id) => items().filter((i) => i.metadata[t.MARKER] && i.attachedTo === tokenFor(id).id);
+    const turn = ringsOn("o1").find((i) => i.metadata[t.MARKER] === t.TURN);
+    assert(turn && turn.strokeColor === "#ffd433" && turn.scale.x === 2, "current turn gets the outer yellow ring");
+    assert(Math.abs(ringsOn("o1").find((i) => i.metadata[t.MARKER] === t.DOWN).scale.x - 1.8) < 1e-9, "down ring moves inside the turn ring");
+    await t.syncTokens({ ...turnTable, encounter: { ...turnTable.encounter, current: "p1" } });
+    assert(!ringsOn("o1").some((i) => i.metadata[t.MARKER] === t.TURN) && ringsOn("p1").length === 1, "the turn ring follows the pointer");
+    assert(ringsOn("o1").find((i) => i.metadata[t.MARKER] === t.DOWN).scale.x === 2, "down ring returns outward");
+    await t.syncTokens({ ...turnTable, encounter: { ...turnTable.encounter, current: "p1", running: false } });
+    assert(!ringsOn("p1").length, "no turn ring when the encounter is not running");
 
     scene.set("mine", { id: "mine", type: "IMAGE", name: "My goblin", visible: true, metadata: { other: 1 }, position: { x: 0, y: 0 } });
     rows.push({ id: "g1", kind: "enemy", revealed: false, name: "Goblin", down: false, template: null });
