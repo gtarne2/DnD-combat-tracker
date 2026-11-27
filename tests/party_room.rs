@@ -278,6 +278,65 @@ fn grant_end_is_scoped_to_sender_and_survives_a_late_send() {
 }
 
 #[test]
+fn buff_offers_validate_and_end_with_their_source() {
+    let db = Database::new();
+    let mut service = db.open();
+    let (room, _, recipient) = roster(&mut service, HostMode::Party);
+    let grant_id = Uuid::new_v4();
+    let buff = StatBuff {
+        grant_id,
+        speed: 10,
+        ac: 0,
+        attack: 0,
+        attack_die: 0,
+        damage: 0,
+        save: 0,
+        save_die: 0,
+        seconds: std::num::NonZeroU32::new(3600),
+    };
+    let parsed: Effect = serde_json::from_value(json!({
+        "kind": "buff", "amount": {"grant_id": grant_id, "speed": 10, "seconds": 3600}
+    }))
+    .unwrap();
+    assert_eq!(parsed, Effect::Buff(buff));
+    let send = |effect| Send {
+        action_id: Uuid::new_v4(),
+        recipient,
+        source: "Longstrider".into(),
+        effect,
+    };
+    rejected(
+        service.execute(
+            FIRST,
+            &command(
+                room,
+                send(Effect::Buff(StatBuff {
+                    attack_die: 5,
+                    ..buff
+                })),
+            ),
+        ),
+        Rejection::InvalidInput,
+    );
+    let Receipt::Offer {
+        offer_id,
+        status: Status::Pending,
+    } = run(&mut service, room, FIRST, send(Effect::Buff(buff)))
+    else {
+        panic!("Expected a pending buff")
+    };
+    run(&mut service, room, SECOND, Claim { offer_id });
+    run(&mut service, room, SECOND, Accept { offer_id });
+    run(&mut service, room, FIRST, EndGrant { grant_id });
+    let offers = service.reconcile(SECOND, room).unwrap();
+    assert!(
+        offers
+            .iter()
+            .any(|o| o.offer_id == offer_id && o.status == Status::Ended)
+    );
+}
+
+#[test]
 fn replay_documented_wire_exchanges() {
     let db = Database::new();
     let mut service = db.open();

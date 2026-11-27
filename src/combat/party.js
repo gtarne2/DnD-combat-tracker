@@ -175,10 +175,11 @@ function initiativeWriter(request) {
       }
       if (choice === "retry") return false;
       const grant = offer.effect.kind === "grant" && offer.effect.amount;
+      const buff = offer.effect.kind === "buff" && offer.effect.amount;
       if (choice === "apply" && grant && !attackModifiers.eligibleTargets(grant.category).has(target)) {
         throw new Error("Choose an eligible attack on your sheet.");
       }
-      if (choice === "apply" && !grant && !encounterTracker.hp(previewEncounter.current())) {
+      if (choice === "apply" && !grant && !buff && !encounterTracker.hp(previewEncounter.current())) {
         throw new Error("Set your HP on the combat sheet before accepting this offer.");
       }
       await writeOffer(room, {kind: "claim", offer_id});
@@ -186,6 +187,19 @@ function initiativeWriter(request) {
         if (choice === "handled") return false;
         const progress = draft.progress ||= previewEncounter.emptyProgress();
         const {kind, amount} = offer.effect;
+        if (buff) {
+          // R79: the caster's buff lands on this sheet as an effect with its stat changes.
+          const mods = effectControls.fromWire(buff);
+          if (!mods) return false;
+          const sender = (view?.members || []).find(member => member.member_id === offer.sender);
+          const seconds = Number.isInteger(buff.seconds) && buff.seconds > 0 ? buff.seconds : null;
+          progress.effects ||= [];
+          progress.effects.push({id: ++progress.sequence, name: offer.source, target: "owner", category: "effect",
+            kind: seconds ? "seconds" : "manual", remaining: seconds, mods, partyOffer: offer_id,
+            notes: effectControls.describeMods(mods) + (sender ? " · From " + sender.name : "")});
+          previewEncounter.log(draft, "action", "Received " + offer.source + (sender ? " from " + sender.name : ""));
+          return "applying " + offer.source;
+        }
         if (grant) {
           (progress.partyGrants ||= {})[offer_id] = {...grant, target};
           previewEncounter.log(draft, "action", "Accepted " + offer.source);
@@ -224,7 +238,7 @@ function initiativeWriter(request) {
       if (recipients.some(member => member.member_id === previous)) field.value = previous;
     }
     const addressed = (state.offers || []).filter(offer => offer.effect.kind === "damage"
-      || hasSheet && ["healing", "temporary_hp", "grant"].includes(offer.effect.kind));
+      || hasSheet && ["healing", "temporary_hp", "grant", "buff"].includes(offer.effect.kind));
     if (!hasSheet) offers.parentElement.hidden = !addressed.length;
     const nextOffers = JSON.stringify([state.room_id, state.ended, members, addressed]);
     if (nextOffers !== offersKey) {
@@ -244,7 +258,8 @@ function initiativeWriter(request) {
         const names = displayName ? ` · ${incoming ? "From" : "To"} ${displayName}` : "";
         const heading = document.createElement("p");
         const grant = offer.effect.kind === "grant" && offer.effect.amount;
-        const mechanics = grant ? `${grant.category} attack · ${grant.attack} to hit · ${grant.damage} damage · ${{short_rest: "ends on short or long rest", long_rest: "ends on long rest", source_ends: "ends with source"}[grant.end_rule]}` : `${offer.effect.amount} ${effect}`;
+        const buff = offer.effect.kind === "buff" && offer.effect.amount;
+        const mechanics = buff ? effectControls.describeMods(effectControls.fromWire(buff)) || "Buff" : grant ? `${grant.category} attack · ${grant.attack} to hit · ${grant.damage} damage · ${{short_rest: "ends on short or long rest", long_rest: "ends on long rest", source_ends: "ends with source"}[grant.end_rule]}` : `${offer.effect.amount} ${effect}`;
         heading.textContent = `${offer.source} · ${mechanics}${names} · ${offer.status[0].toUpperCase() + offer.status.slice(1)}`;
         row.append(heading);
         function action(label, work) {
@@ -280,7 +295,7 @@ function initiativeWriter(request) {
           const correction = document.createElement("p");
           correction.textContent = incoming ? "The sender requests a correction. Review your activity and use Undo or adjust your sheet." : "Correction requested.";
           row.append(correction);
-        } else if (!incoming && offer.status === "accepted" && !grant && !state.ended) {
+        } else if (!incoming && offer.status === "accepted" && !grant && !buff && !state.ended) {
           action("Request reversal", () => writeOffer(state.room_id, {kind: "request_reversal", offer_id: offer.offer_id}));
         }
         return row;
@@ -289,7 +304,14 @@ function initiativeWriter(request) {
     if (hasSheet && !busy) {
       const saved = addressed.find(offer => offer.recipient === state.self_id && offer.status === "claimed"
         && previewEncounter.received(offer.offer_id));
-      if (saved) {
+      // A buff from another player applies itself: there is nothing to choose (R79).
+      const buff = !saved && !state.ended && addressed.find(offer => offer.recipient === state.self_id
+        && offer.effect.kind === "buff" && offer.status === "pending");
+      if (buff) {
+        setBusy(true);
+        decide(state.room_id, buff, "apply").catch(error => { feedback.textContent = error.message; })
+          .finally(() => { setBusy(false); });
+      } else if (saved) {
         setBusy(true);
         decide(state.room_id, saved, "retry").catch(error => { feedback.textContent = error.message; })
           .finally(() => { setBusy(false); });
@@ -302,12 +324,18 @@ function initiativeWriter(request) {
       await previewEncounter.transact(() => true);
     }
     for (const offer of state.offers || []) {
-      if (offer.effect.kind !== "grant" || offer.recipient !== state.self_id || offer.status !== "ended") continue;
+      if (!["grant", "buff"].includes(offer.effect.kind) || offer.recipient !== state.self_id || offer.status !== "ended") continue;
       const receipt = "end:" + offer.offer_id;
       if (previewEncounter.received(receipt)) continue;
       await previewEncounter.withWriter(() => {
         if (previewEncounter.received(receipt)) return;
-        const remove = draft => {
+        const remove = offer.effect.kind === "buff" ? draft => {
+          const effect = effectControls.entries(draft).find(entry => entry.partyOffer === offer.offer_id);
+          if (!effect || !effectControls.active(effect)) return false;
+          effect.ended = true;
+          effect.endedBySource = true;
+          return true;
+        } : draft => {
           if (!draft.progress?.partyGrants?.[offer.offer_id]) return false;
           delete draft.progress.partyGrants[offer.offer_id];
           return true;

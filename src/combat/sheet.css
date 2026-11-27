@@ -1025,3 +1025,12 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 #concentration-reminder { width: min(94vw, 440px); }
 /* The concentration reminder floats over the sheet without blocking it. */
 #concentration-reminder[open] { position: fixed; inset: 70px 0 auto; margin: 0 auto; z-index: 50; box-shadow: 0 10px 30px rgba(0, 0, 0, .55); border: 1px solid var(--gold); }
+/* R79: effect stat changes and boosted stats */
+.effect-mod-fields { border: 1px solid var(--line); border-radius: var(--control-round); padding: 4px 8px; }
+.effect-mod-fields[open] { padding-bottom: 8px; }
+.effect-mod-hint { color: var(--muted); font-size: 12px; margin: 4px 0 6px; }
+.effect-mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.effect-mod-grid :is(input, select) { display: block; width: 100%; }
+.effect-mods { color: var(--teal); font-size: 12px; }
+.stat-boosted { color: var(--teal) !important; }
+.stat-boost-note { display: block; color: var(--teal); font-size: 11px; font-weight: 600; margin-top: 2px; }

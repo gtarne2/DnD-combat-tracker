@@ -718,6 +718,7 @@ impl CombatSheet {
                     .and_then(|spell| spell.name.as_deref())
                     .unwrap_or(name),
                 spell.and_then(|spell| spell.source.as_deref()),
+                option.spell_level,
             );
             option.detail("School", option.spell_options.school.clone());
             option.detail("Trigger", option.spell_options.trigger.clone());
