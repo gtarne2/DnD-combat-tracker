@@ -3,7 +3,7 @@
 // it over a BroadcastChannel, because they close often.
 import OBR from "./obr-sdk-3.1.0.js";
 import { BridgeClient } from "./bridge-client.js";
-import { LINK, addTokens, adoptPlayerTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
+import { LINK, addTokens, adoptPlayerTokens, applyPickedArt, linkToken, linkedRows, refused, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
 import { autoMatch } from "./players.js";
 import { insideReports, listenForDraws, syncTemplates } from "./template-sync.js";
 
@@ -46,6 +46,7 @@ async function syncMap() {
     const matches = autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
     if (await adoptPlayerTokens(state.table, matches)) state.onMap = await linkedRows(state.table.room_id);
     state.mapNotes = await syncTemplates(state.table);
+    if (refused.portraits.size) state.mapNotes.push("Owlbear would not take a player portrait as a token, so the class icon is used. Pick art with Art… instead.");
     await reportInside();
     state.mapError = null;
   } catch (error) {
@@ -56,28 +57,48 @@ async function syncMap() {
 }
 
 // Once the encounter is running, a monster added to the tracker is put on the map, hidden
-// until the DM reveals it, and a companion summoned mid-fight (such as an Eldritch Cannon) is
-// put beside its owner's token. Rows that were there when the link started are left to the DM.
+// until the DM reveals it. Monster rows that were there when the link started are left to the DM.
+//
+// A companion (such as an Eldritch Cannon) goes beside its owner's token as soon as that token
+// is on the map, whether or not the fight has started. Each companion is placed once per
+// encounter, so one the DM removes from the map stays off it.
+const PLACED_KEY = "aurora-obr-placed:";
+function placedCompanions(key) {
+  try { return new Set(JSON.parse(localStorage.getItem(PLACED_KEY + key) || "[]")); } catch { return new Set(); }
+}
+function rememberPlaced(key, ids) {
+  try {
+    // Only the current encounter matters; older entries go.
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PLACED_KEY) && k !== PLACED_KEY + key) localStorage.removeItem(k);
+    }
+    localStorage.setItem(PLACED_KEY + key, JSON.stringify([...ids]));
+  } catch {}
+}
+
 async function placeNewRows(table) {
   const encounter = table.encounter;
   const key = `${table.room_id}/${encounter.id}`;
-  const ids = encounter.rows.filter((row) => row.kind !== "player").map((row) => row.id);
-  if (!seen || seen.key !== key) {
-    seen = { key, ids: new Set(ids) };
-    return;
-  }
-  const fresh = encounter.rows.filter((row) => row.kind !== "player" && !seen.ids.has(row.id));
-  if (!fresh.length) return;
-  for (const row of fresh) seen.ids.add(row.id);
-  if (!encounter.running || !(await OBR.scene.isReady())) return;
-  const enemies = fresh.filter((row) => row.kind === "enemy").map((row) => row.id);
-  if (enemies.length) await addTokens(table, enemies, { hidden: true });
+  if (!(await OBR.scene.isReady())) return;
+  const enemies = encounter.rows.filter((row) => row.kind === "enemy").map((row) => row.id);
+  if (!seen || seen.key !== key) seen = { key, ids: new Set(enemies) };
+  const fresh = enemies.filter((id) => !seen.ids.has(id));
+  for (const id of fresh) seen.ids.add(id);
+  if (fresh.length && encounter.running) await addTokens(table, fresh, { hidden: true });
+
   const onMap = await linkedRows(table.room_id);
-  for (const row of fresh.filter((r) => r.kind === "companion")) {
+  const placed = placedCompanions(key);
+  const ready = encounter.rows.filter((row) => {
+    if (row.kind !== "companion" || placed.has(row.id)) return false;
+    if (onMap[row.id]) return true; // Already there: remember it, so a later removal sticks.
     const owner = encounter.rows.find((r) => r.kind === "player" && r.member_id === row.member_id);
-    const token = owner && onMap[owner.id] ? (await OBR.scene.items.getItems([onMap[owner.id]]))[0] : null;
-    await addTokens(table, [row.id], { near: token?.position });
-  }
+    return Boolean(owner && onMap[owner.id]);
+  });
+  if (!ready.length) return;
+  await addTokens(table, ready.filter((row) => !onMap[row.id]).map((row) => row.id));
+  for (const row of ready) placed.add(row.id);
+  rememberPlaced(key, placed);
 }
 
 async function reportInside() {
@@ -149,6 +170,8 @@ channel.onmessage = async (event) => {
   }
   if (msg.type === "add") await answer(msg, () => addTokens(needTable(), msg.rows || []));
   if (msg.type === "remove") await answer(msg, () => removeTokens(needTable().room_id, msg.rows || []));
+  // The popover saved new art for a row: put it on that row's token now.
+  if (msg.type === "art") await answer(msg, () => applyPickedArt(needTable(), msg.row));
   if (msg.type === "link") {
     await answer(msg, async () => {
       const table = needTable();
