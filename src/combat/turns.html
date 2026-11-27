@@ -19,7 +19,7 @@
       <button type="button" id="start-encounter" hidden>Start Encounter</button>
       <button type="button" id="undo-turn" disabled>Undo</button>
     </div>
-    <div class="focus-form encounter-extras"><button type="button" id="action-economy-open">Turn actions</button><button type="button" data-dialog="encounter-library">Rosters and archive</button><button type="button" data-dialog="encounter-activity">Activity</button></div>
+    <div class="focus-form encounter-extras"><button type="button" data-dialog="encounter-library">Rosters and archive</button><button type="button" data-dialog="encounter-activity">Activity</button></div>
     <span id="undo-label" hidden></span>
     <span id="encounter-storage"></span>
   </div>
@@ -41,7 +41,7 @@
   </form>
 </dialog>
 <dialog id="action-economy" aria-labelledby="action-economy-title">
-  <div class="dialog-heading"><h2 id="action-economy-title">Turn actions</h2><form method="dialog"><button>Close</button></form></div>
+  <div class="dialog-heading"><h2 id="action-economy-title">Companion turn actions</h2><form method="dialog"><button>Close</button></form></div>
   <label>Participant <select id="economy-participant"></select></label>
   <label><input type="checkbox" id="economy-enabled"> Track Action, Bonus Action, and Reaction</label>
   <p>Uses reset at the start of the participant's turn. Enable an override for the next use of a specific action type.</p>

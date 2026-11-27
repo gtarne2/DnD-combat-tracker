@@ -171,9 +171,19 @@ function setupMonsterLibrary(request, addToEncounter) {
     [el("monster-size"), s => s.details?.sizes?.length ? s.details.sizes : [s.size]],
     [el("monster-challenge"), s => [s.challenge],compareChallenge]
   ];
-  let loaded, pendingImport, packMode, editing, busy = false;
+  // "All packs" (the default when there are several) searches every pack at once. `loaded` is
+  // the chosen single pack, for export and new templates; each match carries its own pack.
+  const ALL = "*";
+  let loaded, packIds = [], entries = [], pendingImport, packMode, editing, busy = false;
   const api = (action, data) => request("monsters/" + action,data);
-  const monster = () => loaded?.pack.monsters.find(m => m.id === matches.value);
+  // Options keep the monster ID as their value and name their pack in a data attribute, since
+  // two packs may reuse an ID.
+  const entryKey = (source, m) => source.pack.info.id + "::" + m.id;
+  const entry = () => {
+    const option = matches.selectedOptions[0];
+    return option && entries.find(e => e.monster.id === option.value && e.source.pack.info.id === option.dataset.pack);
+  };
+  const monster = () => entry()?.monster;
   preview.className = "monster-stat-block";
   for (const button of document.querySelectorAll("[data-close]")) {
     button.onclick = () => button.closest("dialog").close();
@@ -201,9 +211,9 @@ function setupMonsterLibrary(request, addToEncounter) {
   };
 
   function selection() {
-    const selected = monster();
+    const selected = monster(), source = entry()?.source;
     const score = add.elements.score;
-    const selectionId = selected ? loaded.revision + ":" + selected.id : "";
+    const selectionId = selected ? source.revision + ":" + entryKey(source, selected) : "";
     if (score.dataset.template !== selectionId) {
       score.dataset.template = selectionId;
       score.value = selected?.stats.details?.initiative?.score ?? 0;
@@ -214,33 +224,45 @@ function setupMonsterLibrary(request, addToEncounter) {
     el("monster-new").disabled = !loaded;
     el("monster-edit").disabled = !selected;
     add.querySelector("button").disabled = !selected;
-    renderMonsterStatBlock(preview, selected && {pack:loaded.pack.info,monster:selected});
+    renderMonsterStatBlock(preview, selected && {pack:source.pack.info,monster:selected});
     preview.hidden = !selected;
   }
 
-  function populateMatches(selected = matches.value) {
+  function populateMatches(selected = entry() ? entryKey(entry().source, entry().monster) : "") {
     const tokens = search.value.trim().toLowerCase().split(/\s+/);
-    const visible = (loaded?.pack.monsters || []).filter(m => {
+    const many = packIds.length > 1 && !loaded;
+    const visible = entries.filter(({monster: m}) => {
       const name = m.name.toLowerCase();
       return tokens.every(token => name.includes(token))
         && filters.every(([field, values]) => !field.value || values(m.stats).includes(field.value));
-    }).sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-    matches.replaceChildren(...visible.map(m => Object.assign(new Option(
-      [m.name,loaded.pack.info.edition,m.stats.challenge ? "CR " + m.stats.challenge : m.stats.creature_type || "Template"]
-        .filter(Boolean).join(" · "),m.id), {title:m.id})));
-    matches.value = visible.some(m => m.id === selected) ? selected : visible[0]?.id ?? "";
+    }).sort((a,b) => a.monster.name.localeCompare(b.monster.name) || a.source.pack.info.edition.localeCompare(b.source.pack.info.edition)
+      || a.monster.id.localeCompare(b.monster.id));
+    matches.replaceChildren(...visible.map(({source, monster: m}) => {
+      const option = new Option([m.name,source.pack.info.edition,m.stats.challenge ? "CR " + m.stats.challenge : m.stats.creature_type || "Template",many ? source.pack.info.source : ""]
+        .filter(Boolean).join(" · "),m.id);
+      option.title = m.id;
+      option.dataset.pack = source.pack.info.id;
+      return option;
+    }));
+    // `selected` is a pack::monster key, or a bare monster ID after saving a template.
+    const index = visible.findIndex(e => entryKey(e.source, e.monster) === selected || e.monster.id === selected);
+    matches.selectedIndex = visible.length ? Math.max(0, index) : -1;
     selection();
   }
 
   async function loadPack(selected) {
-    try { loaded = packChoice.value ? await api("get", packChoice.value) : null; }
-    catch (error) { packChoice.value = loaded?.pack.info.id ?? ""; throw error; }
+    const ids = packChoice.value === ALL ? packIds : packChoice.value ? [packChoice.value] : [];
+    let sources;
+    try { sources = await Promise.all(ids.map(id => api("get", id))); }
+    catch (error) { packChoice.value = loaded?.pack.info.id ?? (packIds.length > 1 ? ALL : ""); throw error; }
+    loaded = packChoice.value === ALL ? null : sources[0] || null;
+    entries = sources.flatMap(source => source.pack.monsters.map(monster => ({source, monster})));
     const info = loaded?.pack.info;
     el("monster-attribution").textContent = info
       ? [info.attribution,monsterLicense(info.license)].filter(Boolean).join(" · ") : "";
     el("monster-pack-credits").hidden = !loaded;
     for (const [field, values, compare] of filters) {
-      const options = [...new Set((loaded?.pack.monsters || []).flatMap(m => values(m.stats)).filter(Boolean))].sort(compare);
+      const options = [...new Set(entries.flatMap(e => values(e.monster.stats)).filter(Boolean))].sort(compare);
       field.replaceChildren(new Option("All",""), ...options.map(value => new Option(value,value)));
     }
     populateMatches(selected);
@@ -248,8 +270,11 @@ function setupMonsterLibrary(request, addToEncounter) {
 
   async function reload(packId = packChoice.value, selected) {
     const packs = await api("list");
-    packChoice.replaceChildren(...packs.map(({info}) => new Option(monsterPackLabel(info),info.id)));
-    packChoice.value = packs.some(({info}) => info.id === packId) ? packId : packs[0]?.info.id ?? "";
+    packIds = packs.map(({info}) => info.id);
+    packChoice.replaceChildren(...(packs.length > 1 ? [new Option("All packs", ALL)] : []),
+      ...packs.map(({info}) => new Option(monsterPackLabel(info),info.id)));
+    packChoice.value = packId === ALL && packs.length > 1 ? ALL : packIds.includes(packId) ? packId
+      : packs.length > 1 ? ALL : packIds[0] ?? "";
     await loadPack(selected);
     if (!packs.length) status.textContent = "Import a pack or create one to add monsters.";
   }
@@ -402,7 +427,7 @@ function setupMonsterLibrary(request, addToEncounter) {
   };
 
   el("monster-new").onclick = () => openTemplate(loaded);
-  el("monster-edit").onclick = () => openTemplate(loaded,monster());
+  el("monster-edit").onclick = () => openTemplate(entry().source,monster());
   submit(templateForm, async () => {
     const f = templateForm.elements;
     const stats = JSON.parse(f.details.value);
@@ -433,7 +458,8 @@ function setupMonsterLibrary(request, addToEncounter) {
   submit(add, async () => {
     const selected = monster();
     if (!selected) return;
-    const template = {schema_version:loaded.pack.schema_version,pack:loaded.pack.info,revision:loaded.revision,monster:selected};
+    const {source} = entry();
+    const template = {schema_version:source.pack.schema_version,pack:source.pack.info,revision:source.revision,monster:selected};
     const {count,score,alias} = add.elements;
     const edit = {kind:"add_monsters",template,count:count.valueAsNumber,score:score.valueAsNumber};
     if (alias.value.trim()) edit.alias = alias.value.trim();

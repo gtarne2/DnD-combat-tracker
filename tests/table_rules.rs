@@ -327,3 +327,50 @@ fn timed_enemy_conditions_count_down_by_turn() {
     let exported = serde_json::to_value(service.export_encounter(HOST, room).unwrap()).unwrap();
     assert!(exported.to_string().contains("Frightened"));
 }
+
+#[test]
+fn the_dm_can_take_a_player_out_of_the_encounter() {
+    let (_db, mut service) = open();
+    let room = Uuid::new_v4();
+    let (wolves, wren) = room_with_wolves(&mut service, room);
+    // Players cannot remove rows, and the DM cannot remove a missing one.
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            PLAYER,
+            json!({"kind":"remove","id":wren})
+        )
+        .is_err()
+    );
+    assert!(
+        try_edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"remove","id":Uuid::new_v4()})
+        )
+        .is_err()
+    );
+    edit(&mut service, room, HOST, json!({"kind":"remove","id":wren}));
+    let rows = board(&service, room)["rows"].as_array().unwrap().clone();
+    assert!(!rows.iter().any(|r| r["name"] == "Wren"));
+    assert_eq!(rows.len(), 1 + wolves.len());
+    // Wren can rejoin from their sheet.
+    assert!(
+        !service.poll(ALLY, room, 0).unwrap().combat.unwrap()["joined"]
+            .as_bool()
+            .unwrap()
+    );
+    edit(
+        &mut service,
+        room,
+        ALLY,
+        json!({"kind":"submit","score":9,"companions":[]}),
+    );
+    assert!(
+        service.poll(ALLY, room, 0).unwrap().combat.unwrap()["joined"]
+            .as_bool()
+            .unwrap()
+    );
+}

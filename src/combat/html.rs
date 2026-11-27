@@ -247,10 +247,13 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_layout(&mut html, sheet);
     html.push_str("<p><label><input type=\"checkbox\" id=\"guidance-without-concentration\"> Guidance does not require concentration at my table</label></p><button type=\"button\" data-dialog=\"encounter-settings\">Optional initiative settings</button> <button type=\"button\" data-dialog=\"portrait-dialog\">Character portrait</button>");
     html.push_str("</dialog>");
+    // portrait.html leaves its dialog open for this closing tag. Settings must come after it,
+    // or it nests inside the closed portrait dialog and opens invisibly, blocking the page.
     html.push_str(include_str!("portrait.html"));
+    html.push_str("</dialog>");
     html.push_str(include_str!("settings.html"));
     html.push_str(
-        "</dialog><section class=\"sheet-page\" id=\"character-dialog\" data-view-scroll=\"character\" aria-labelledby=\"character-page-title\" hidden><h2 id=\"character-page-title\">Character</h2>",
+        "<section class=\"sheet-page\" id=\"character-dialog\" data-view-scroll=\"character\" aria-labelledby=\"character-page-title\" hidden><h2 id=\"character-page-title\">Character</h2>",
     );
     render_character_reference(&mut html, &sheet.profile);
     render_full_sheet(&mut html, &sheet.profile);

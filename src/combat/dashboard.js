@@ -209,8 +209,11 @@
       run.disabled = true;
       unavailable = true;
       reason = turnLimit;
-      summary = "Turn action unavailable";
+      // Off-turn rows stay quiet: the button is dimmed and the heading shows whose turn it is.
+      // A spent action gets a small tag naming it.
+      summary = /already used/.test(turnLimit) ? turnLimit.replace(" already used.", " used").replace("Bonus Action", "Bonus") : "";
     }
+    badge.classList.toggle("turn-badge", Boolean(turnLimit) && !cast?.hasAttribute("data-ritual-cast"));
     card.classList.toggle("option-unavailable", unavailable);
     availability.textContent = reason;
     availability.hidden = !reason;

@@ -17,6 +17,11 @@
       <label><input type="checkbox" data-dm-setting="assistDefault"> Start monster actions in Assist mode</label>
     </fieldset>
     <fieldset class="dm-settings-group">
+      <legend>Players</legend>
+      <label><input type="checkbox" data-dm-setting="autoSeat"> Add connected players to the encounter automatically</label>
+      <p class="dm-waiting-hint">Each player is seated with a d20 plus their shared initiative bonus. They can replace it with their own roll from their sheet. A player you remove stays out of that encounter.</p>
+    </fieldset>
+    <fieldset class="dm-settings-group">
       <legend>Layout</legend>
       <label><input type="checkbox" data-dm-setting="openMore"> Keep "More options" sections open</label>
     </fieldset>
@@ -70,7 +75,7 @@
         <div class="dm-toolbar" role="group" aria-label="More enemy options">
           <button data-edit="duplicate"><svg class="icon" aria-hidden="true"><use href="#gi-files"/></svg><span>Duplicate</span></button>
           <button data-edit="group"><svg class="icon" aria-hidden="true"><use href="#gi-tabletop-players"/></svg><span>Group initiative by name</span></button>
-          <button data-edit="remove" class="dm-danger-quiet"><svg class="icon" aria-hidden="true"><use href="#gi-skull-crossed-bones"/></svg><span>Remove enemy</span></button>
+          <button data-edit="remove" class="dm-danger-quiet"><svg class="icon" aria-hidden="true"><use href="#gi-skull-crossed-bones"/></svg><span class="dm-label">Remove enemy</span></button>
         </div>
         <div class="dm-toolbar dm-fixes" role="group" aria-label="Turn fixes">
           <span class="dm-group-label">Fix order</span>

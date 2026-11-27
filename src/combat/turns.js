@@ -141,7 +141,8 @@ const encounterTracker = (() => {
     byId("start-encounter").hidden = running || party;
     // Party rooms: only the owner of the current row ends it; the DM runs everything else.
     const endTurn = byId("end-my-turn");
-    endTurn.hidden = !(sharedClock && running && mine(active));
+    // A row without an ID comes from a clock with no matching room view; there is nothing to end.
+    endTurn.hidden = !(sharedClock && running && mine(active) && active.id);
     endTurn.dataset.row = endTurn.hidden ? "" : active.id;
     endTurn.textContent = active?.key === "owner" ? "End Turn" : "End " + (active?.name || "") + "'s turn";
     const banner = byId("party-encounter");

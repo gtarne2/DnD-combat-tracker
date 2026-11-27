@@ -2,7 +2,7 @@
 // dmSettings.get(name) and listen for "dm-settings-change".
 const dmSettings = (() => {
   const KEY = "aurora-dm-settings-v1";
-  const DEFAULTS = {autoSaves: true, assistDefault: false, openMore: false};
+  const DEFAULTS = {autoSaves: true, assistDefault: false, openMore: false, autoSeat: true};
   const values = {...DEFAULTS};
   try { Object.assign(values, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
   const dialog = document.getElementById("dm-settings");

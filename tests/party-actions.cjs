@@ -30,9 +30,10 @@ module.exports = async function reviewActions({host, hostPage, guest, guestPage,
   await hostPage.evaluate(() => previewEncounter.transact(draft => {
     draft.companions = {cards:[{id:1, name:"Eldritch Cannon - Protector", currentHp:12, maxHp:12,
       remaining:10, timerUnit:"rounds", turn:"owner"}], sequence:1, seen:[], owner:null};
-    draft.progress.economyEnabled = {owner:true};
     return true;
   }));
+  // Track the owner's actions in this solo encounter, from the sheet's Settings.
+  await hostPage.evaluate(() => { const box = document.querySelector('[data-sheet-setting="trackActionsSolo"]'); if (!box.checked) box.click(); });
 
   let holdThird = true;
   const tempRoute = route => {
@@ -117,7 +118,8 @@ module.exports = async function reviewActions({host, hostPage, guest, guestPage,
   assert.equal((await progress(hostPage)).used["Spell slot:1"],1);
   console.log("Combat healing cast survived response loss and reload with one slot and one heal.");
 
-  await hostPage.evaluate(() => encounterTracker.update(p => {p.economyEnabled.owner = false; return true;}));
+  // Turn tracking off in Settings.
+  await hostPage.evaluate(() => document.querySelector('[data-sheet-setting="trackActions"]').click());
   await row(hostPage,"Restoring Touch").locator("[data-feature-use]").click();
   const pool = hostPage.locator("#feature-amount-form");
   await pool.locator("[name=recipient]").selectOption(remote(guestId));

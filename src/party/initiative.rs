@@ -1645,11 +1645,20 @@ impl Fight {
                 )?;
             }
             Edit::Remove { id } => {
-                let i = rows
+                let row = rows
                     .iter()
-                    .position(|r| r.id == *id && r.member().is_none())
+                    .find(|r| r.id == *id)
                     .ok_or(Rejection::InvalidInput)?;
-                rows.remove(i);
+                match &row.actor {
+                    // The DM takes a player out of this encounter, with their companions. They
+                    // can rejoin by submitting initiative from their sheet.
+                    Participant::Player { member, .. } => {
+                        let member = *member;
+                        rows.retain(|r| r.member() != Some(member));
+                    }
+                    Participant::Enemy(_) => rows.retain(|r| r.id != *id),
+                    Participant::Companion { .. } => return Err(Rejection::InvalidInput),
+                }
             }
             Edit::Reveal { id, revealed } => {
                 let row = rows

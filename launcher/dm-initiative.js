@@ -135,6 +135,36 @@ function setupDmInitiative(request, refresh) {
       return item;
     }));
     if (focused) waitingList.querySelector(`input[data-seat="${CSS.escape(focused)}"]`)?.focus({preventScroll:true});
+    autoSeat(members);
+  }
+  // Players are in almost every fight, so connected players join each encounter on their own
+  // with a d20 plus their shared initiative bonus. One at a time, once per player and
+  // encounter; a player the DM removes stays out of that encounter.
+  const DISMISSED = "aurora-dm-dismissed-players-v1";
+  const tried = new Set();
+  function dismissed() {
+    try { return JSON.parse(localStorage.getItem(DISMISSED) || "{}"); } catch { return {}; }
+  }
+  function dismiss(member) {
+    const all = dismissed(), id = room.combat.id;
+    all[id] = [...new Set([...(all[id] || []), member])];
+    // Keep the last few encounters only.
+    const keys = Object.keys(all);
+    for (const old of keys.slice(0, Math.max(0, keys.length - 20))) delete all[old];
+    try { localStorage.setItem(DISMISSED, JSON.stringify(all)); } catch {}
+  }
+  function autoSeat(members) {
+    if (busy || !room?.combat || !dmSettings.get("autoSeat")) return;
+    const out = new Set(dismissed()[room.combat.id] || []);
+    const next = members.find(m => m.online && !out.has(m.member_id) && !tried.has(room.combat.id + "/" + m.member_id));
+    if (!next) return;
+    tried.add(room.combat.id + "/" + next.member_id);
+    const bonus = next.inspection?.vitals?.initiative;
+    const score = monsterAssist.die(20) + (Number.isInteger(bonus) ? bonus : 0);
+    queueMicrotask(async () => {
+      if (await change({kind:"seat", member:next.member_id, score}))
+        status.textContent = "Added " + next.name + " to the encounter at " + score + ". They can replace it with their own roll.";
+    });
   }
   let cardKey;
   function renderEnemyCard(row) {
@@ -347,7 +377,7 @@ function setupDmInitiative(request, refresh) {
     const index = board.rows.indexOf(row);
     const allowed = {start:!board.running && board.rows.length, next:board.running, end:board.running,
       move_up:index > 0 && row.score === board.rows[index-1].score, correct:board.running && row,
-      edit:enemy, duplicate:enemy, reveal:enemy, remove:enemy, group:enemy, add:true,
+      edit:enemy, duplicate:enemy, reveal:enemy, remove:enemy || Boolean(row?.damage_recipient), group:enemy, add:true,
       load:!board.running && board.saves.length, new:!board.running};
     for (const b of panel.querySelectorAll("[data-edit]")) b.disabled = busy || !allowed[b.dataset.edit];
     el("dm-export-encounter").disabled = busy || !board.rows.length;
@@ -357,6 +387,7 @@ function setupDmInitiative(request, refresh) {
     renderMonsterStatBlock(statBlock.querySelector("div"), enemy?.template);
     const reveal = panel.querySelector("[data-edit=reveal]");
     reveal.querySelector(".dm-label").textContent = enemy?.revealed ? "Hide" : "Reveal";
+    panel.querySelector("[data-edit=remove] .dm-label").textContent = row && !enemy ? "Remove from encounter" : "Remove enemy";
     reveal.querySelector("use").setAttribute("href", enemy?.revealed ? "#gi-invisible" : "#gi-eyeball");
     el("dm-advance").querySelector("button").disabled = busy || !board.running;
     el("dm-save").querySelector("button").disabled = busy;
@@ -408,6 +439,10 @@ function setupDmInitiative(request, refresh) {
     const row = selected();
     if (kind === "load") change({kind,name:el("dm-saves").value});
     else if (kind === "reveal") change({kind,id:row.id,revealed:!row.enemy.revealed});
+    else if (kind === "remove" && row.damage_recipient) {
+      dismiss(row.damage_recipient);
+      change({kind,id:row.id});
+    }
     else if (["remove","duplicate","move_up","group","correct"].includes(kind)) change({kind,id:row.id});
     else change({kind});
   });

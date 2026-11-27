@@ -20,6 +20,16 @@
 | Validation | Passed `cargo build --release --locked --offline --bins` with cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`, then `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows`. The shortcut resolves to the updated `target/release`. Passed `node --check src/combat/party.js`, `node --check tests/party-launcher.cjs`, and `git diff --check`. Passed `node tests/party-launcher.cjs --lifecycle` and `node tests/party-launcher.cjs --review-refresh` with Windows Chrome and current-user DPAPI. A packaged duplicate-launch smoke and a native fixture smoke also passed. The native smoke advanced the idle clock and checked wake grace, active host protection, shutdown after room end, and job cleanup while stdin was open. |
 | Next action | During the Windows playtest, close all Aurora tabs after solo or joined play and confirm the launcher exits after five minutes. Also check physical two-PC play with the host dashboard closed and reopened from the tray. |
 
+## Playtest round four handoff (R78)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-5nan8g` (PR #15), from `dev` at `eed5708`. |
+| Completed | R78: leftover DM clock cleanup on the sheet, auto-seating connected players (DM setting `autoSeat`) and DM removal of player rows, turn-action tracking moved to Settings (`trackActionsSolo` added), the Settings dialog nesting fix, a quieter spent-action tag, the area damage box width, and "All packs" in the monster library. Launcher exe version details (PR #15's first commit). Other round-four items run in separate threads: Owlbear tokens and art, bestiary import, targeted spell buffs. |
+| Modified components | `src/combat/{party-initiative,turns,action-economy,dashboard,settings}.js`, `src/combat/{settings,turns}.html`, `src/combat/html.rs`, `src/combat/sheet.css`, `src/party/initiative.rs` (`Edit::Remove` for player rows), `launcher/dm-{initiative,monsters,dashboard}.js`, `launcher/dm-dashboard.html`, `launcher/TrackerLauncher.cs`, `tests/{table_rules,combat_sheet}.rs`, `tests/{browser-review,party-actions}.cjs`. |
+| Validation | See the PR #15 description for the exact runs. |
+| Next action | On Windows: start a DM room with no encounter and check a player's rail says "Waiting for the DM"; check players are seated automatically and that removing one keeps them out; open the sheet's ⚙ Settings; add a monster from "All packs". |
+
 ## Table rules handoff (R75–R77)
 
 | Field | Record |
