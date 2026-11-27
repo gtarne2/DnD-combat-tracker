@@ -19,6 +19,16 @@
 | Validation | Passed `cargo build --release --locked --offline --bins` with cached GNU Rust, w64devkit and `RUSTFLAGS=-C link-self-contained=yes`, then `launcher\build.cmd` and `launcher\build.cmd target\tracker-windows`. The shortcut resolves to the updated `target/release`. Passed `node --check src/combat/party.js`, `node --check tests/party-launcher.cjs`, and `git diff --check`. Passed `node tests/party-launcher.cjs --lifecycle` and `node tests/party-launcher.cjs --review-refresh` with Windows Chrome and current-user DPAPI. A packaged duplicate-launch smoke and a native fixture smoke also passed. The native smoke advanced the idle clock and checked wake grace, active host protection, shutdown after room end, and job cleanup while stdin was open. |
 | Next action | During the Windows playtest, close all Aurora tabs after solo or joined play and confirm the launcher exits after five minutes. Also check physical two-PC play with the host dashboard closed and reopened from the tray. |
 
+## Template looks handoff (R73)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-8jt2en`, branched from `claude/project-thread-kxsu4h` (PR #11) at `097f821`. |
+| Completed | R73. Textured and faded spell templates in Owlbear with an outline style per look, the look sent from the sheet, 56 procedural textures, and extension 0.8.0. |
+| Modified components | `owlbear/template-art.js` and `owlbear/effects/` (new), `owlbear/templates.js`, `owlbear/template-sync.js`, `owlbear/manifest.json`, `tools/build-template-art.py` (new), `tools/build-mechanics-overlay.cjs`, `content/mechanics/{curated,overlay}.json`, `src/mechanics.rs`, `src/combat/spell_options.rs`, `src/combat/html.rs`, `src/combat/concentration.js`, `src/party/initiative.rs`, `tests/owlbear-tokens.cjs`, `tests/owlbear_link.rs`, `tests/mechanics_overlay.rs`. |
+| Validation | Linux cloud: `cargo test --locked --offline` and `node tests/owlbear-tokens.cjs` passed. Textures were checked in a canvas mock-up, not in Owlbear. Not run: a real Owlbear room, so image scale, attachment rotation and click-through are unconfirmed there. |
+| Next action | In Owlbear, cast Fireball, Cone of Cold, Lightning Bolt, Spirit Guardians and Fog Cloud. Check each texture lines up with its outline, follows a drag and a rotate, and that clicking the area still selects the outline. Delete one by hand and check its texture goes too. |
+
 ## Mechanics overlay handoff (R71)
 
 | Field | Record |

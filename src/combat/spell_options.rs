@@ -16,6 +16,9 @@ pub struct SpellOptions {
     pub damage_type: Option<&'static str>,
     /// Template fill colour as `#rrggbb`, from the mechanics overlay.
     pub colour: Option<String>,
+    /// Map template look, such as "fire" or "mist", from the mechanics overlay or the damage
+    /// type. The Owlbear extension picks a texture and outline style from it.
+    pub look: Option<String>,
     /// True when the tracker's mechanics overlay matched this imported spell.
     pub overlay: bool,
 }
@@ -226,6 +229,7 @@ impl SpellOptions {
             }
         }
         self.colour = overlay.template_colour(entry, self.damage_type);
+        self.look = overlay.template_look(name, entry, self.damage_type);
     }
 
     pub(super) fn read(
@@ -337,6 +341,7 @@ impl SpellOptions {
             save: spell_save(&plain),
             damage_type: damage_type(&plain),
             colour: None,
+            look: None,
             overlay: false,
         }
     }

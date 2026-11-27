@@ -144,6 +144,8 @@ const overlay = {
   about: "Aurora Combat Tracker mechanics overlay. Names, book codes and measurements only; no rules text. Used only for spells the player has imported.",
   generated_from: "5etools-src data/spells (structure only) and content/mechanics/curated.json",
   damage_colours: curated.damage_colours,
+  // Map template looks (textures) for spells whose damage type does not say, by name.
+  spell_looks: curated.spell_looks || {},
   books: Object.fromEntries(Object.entries(books).sort(([a], [b]) => a.localeCompare(b))),
   spells,
   // Feature timing, companion variants and companion hit points are hand-written only.

@@ -1,6 +1,7 @@
 // Stage O3: keeps Owlbear's template drawings in step with the room's templates.
 import OBR from "./obr-sdk-3.1.0.js";
-import { CHANNEL, TEMPLATE, buildTemplate, drawSpec, isShape, pixelsPerFoot, placement, tokenCells, validSpec } from "./templates.js";
+import { CHANNEL, TEMPLATE, buildTemplateItems, drawSpec, isShape, pixelsPerFoot, placement, tokenCells, validSpec } from "./templates.js";
+import { ART } from "./template-art.js";
 import { loadMatches } from "./players.js";
 import { outline, rowsInside } from "./inside.js";
 
@@ -28,9 +29,16 @@ export async function syncTemplates(table, now = Date.now()) {
   const room = table.room_id;
   const wanted = (table.encounter.templates || []).filter((t) => isShape(t.shape));
   const ids = new Set(wanted.map((t) => t.id));
-  const items = await OBR.scene.items.getItems((item) => item.metadata?.[TEMPLATE]?.room === room);
+  // One read for outlines and art, so art drawn a moment ago is never taken for an orphan.
+  const all = await OBR.scene.items.getItems((item) => item.metadata?.[TEMPLATE]?.room === room || item.metadata?.[ART]?.room === room);
+  const items = all.filter((item) => item.metadata[TEMPLATE]?.room === room);
+  const art = all.filter((item) => !item.metadata[TEMPLATE] && item.metadata[ART]?.room === room);
   const present = new Set(items.map((item) => item.metadata[TEMPLATE].id));
   const stale = items.filter((item) => !ids.has(item.metadata[TEMPLATE].id)).map((item) => item.id);
+  // Art goes with its outline. Owlbear deletes attached items with their parent, but art left
+  // behind by a hand deletion or an older drawing is cleared here too.
+  const live = new Set([...present].filter((id) => ids.has(id)));
+  for (const item of art) if (!live.has(item.metadata[ART].id)) stale.push(item.id);
   if (stale.length) await OBR.scene.items.deleteItems(stale);
 
   const drawn = loadDrawn(room);
@@ -56,14 +64,14 @@ export async function syncTemplates(table, now = Date.now()) {
       }
       const aimToken = template.aim ? byRow.get(template.aim) : null;
       const place = placement(template, { id: token.id, position: token.position, cells: tokenCells(token) }, aimToken?.position || null, dpi, perFoot);
-      const spec = drawSpec(room, template, place);
+      const spec = drawSpec(room, template, place, dpi);
       const player = players.find((p) => matches[p.id] === template.member_id);
       const since = asked.get(template.id);
       if (player && since === undefined) {
         asked.set(template.id, now);
         await OBR.broadcast.sendMessage(CHANNEL, { type: "draw", to: player.id, spec }, { destination: "REMOTE" });
       } else if (!player || now - since >= ANSWER_MS) {
-        mine.push(buildTemplate(spec));
+        mine.push(...buildTemplateItems(spec));
         drawn.add(template.id);
         asked.delete(template.id);
       }
@@ -85,7 +93,7 @@ export function listenForDraws() {
     const spec = msg.spec;
     const existing = await OBR.scene.items.getItems((item) => item.metadata?.[TEMPLATE]?.room === spec.room && item.metadata[TEMPLATE].id === spec.id);
     if (existing.length) return;
-    await OBR.scene.items.addItems([buildTemplate(spec)]);
+    await OBR.scene.items.addItems(buildTemplateItems(spec));
   });
 }
 

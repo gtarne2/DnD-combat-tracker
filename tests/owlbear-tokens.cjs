@@ -80,7 +80,7 @@ const table = (rows) => ({ room_id: ROOM, encounter: { id: "e", revision: 1, run
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aurora-obr-tokens-"));
   try {
-    for (const name of ["tokens.js", "players.js", "templates.js", "template-sync.js", "inside.js"]) fs.copyFileSync(path.join(extension, name), path.join(dir, name));
+    for (const name of ["tokens.js", "players.js", "templates.js", "template-sync.js", "template-art.js", "inside.js"]) fs.copyFileSync(path.join(extension, name), path.join(dir, name));
     fs.writeFileSync(path.join(dir, "obr-sdk-3.1.0.js"), SDK);
     fs.writeFileSync(path.join(dir, "package.json"), '{"type":"module"}');
     const sdk = await import(pathToFileURL(path.join(dir, "obr-sdk-3.1.0.js")).href);
@@ -214,20 +214,47 @@ async function main() {
     assert(tp.pixelsPerFoot(150, { parsed: { multiplier: 10, unit: "ft" } }) === 15 && tp.pixelsPerFoot(150, null) === 30, "grid scale");
     assert(!tp.validSpec({ room: "r", id: "x", name: "n", colour: "red", position: { x: 0, y: 0 }, rotation: 0, points: [] }), "bad specs are refused");
 
-    const fireball = { id: "t1", caster: "p1", member_id: "m1", spell: "Fireball", shape: "sphere", size: 20, lasts: "turn", aim: "w1" };
+    const fireball = { id: "t1", caster: "p1", member_id: "m1", spell: "Fireball", shape: "sphere", size: 20, lasts: "turn", aim: "w1", look: "fire" };
     const withTemplates = (templates) => ({ ...table([casterRow, target]), encounter: { ...table([casterRow, target]).encounter, templates } });
     const templateItems = () => items().filter((i) => i.metadata[tp.TEMPLATE]);
+    const ta = await import(pathToFileURL(path.join(dir, "template-art.js")).href);
+    const artItems = () => items().filter((i) => i.metadata[ta.ART]);
+
+    // Looks: every textured look has an image for each outline.
+    for (const look of Object.keys(ta.LOOKS)) {
+      for (const mask of ["disc", "cone", "rect", "line"]) {
+        assert(fs.existsSync(path.join(extension, "effects", `${look}-${mask}.png`)), `texture ${look}-${mask}.png exists`);
+      }
+    }
+    assert(ta.maskFor("cylinder") === "disc" && ta.maskFor("cube") === "rect" && ta.maskFor("line") === "line" && ta.maskFor("cone") === "cone", "texture outline per shape");
+    const coneSpec = { room: ROOM, id: "c", name: "Cone of Cold", colour: "#ff7043", fill: "#74c0fc", shape: "cone", look: "cold", dpi: 150, ...cone };
+    assert(tp.validSpec(coneSpec) && !tp.validSpec({ ...coneSpec, look: "Fire!" }) && !tp.validSpec({ ...coneSpec, shape: "blob" }), "look and shape are checked");
+    const [coneCurve, coneArt] = tp.buildTemplateItems(coneSpec);
+    assert(coneCurve.metadata[tp.TEMPLATE] && !coneArt.metadata[tp.TEMPLATE] && coneArt.metadata[ta.ART].id === "c", "art carries art metadata only");
+    assert(coneArt.type === "IMAGE" && coneArt.image.url.endsWith("effects/cold-cone.png") && coneArt.attachedTo === coneCurve.id && coneArt.disableHit === true, "textured look is an attached, click-through image");
+    assert(coneArt.grid.offset.x === 0 && coneArt.grid.offset.y === 192 && coneArt.scale.x === 3 && coneArt.scale.y === 3, "cone texture sits on the apex and spans the cone");
+    assert(coneArt.zIndex < coneCurve.zIndex && coneArt.rotation === coneCurve.rotation, "art sits under the outline and turns with it");
+    const ballArt = tp.buildTemplateItems({ ...coneSpec, shape: "sphere", look: "radiant", ...ball })[1];
+    assert(ballArt.grid.offset.x === 192 && ballArt.image.url.endsWith("radiant-disc.png") && ballArt.scale.x === 1200 / 150, "sphere texture is centred");
+    const plain = tp.buildTemplateItems({ ...coneSpec, look: undefined });
+    assert(plain.length === 4 && plain.slice(1).every((i) => i.type === "CURVE" && i.fillColor === "#74c0fc" && i.disableHit) && plain[2].points[1].x === 450 * 0.5, "no texture: a stepped fade in the fill colour");
+    const lineArt = tp.buildTemplateItems({ ...coneSpec, shape: "line", look: "lightning", ...north })[1];
+    assert(lineArt.image.url.endsWith("lightning-line.png") && lineArt.scale.x === 20 && lineArt.scale.y === 150 / (150 / 8) && lineArt.grid.offset.y === 64, "line texture spans the line");
+    const lineFade = tp.buildTemplateItems({ ...coneSpec, look: "slashing", shape: "line", ...north });
+    assert(lineFade[3].points[2].x === 3000 * 0.25 && lineFade[3].points[2].y === 75, "a line fades along its length only");
 
     // No matched player: the DM's extension draws it at once, on the aimed token.
     await ts.syncTemplates(withTemplates([fireball]), 1000);
     assert(templateItems().length === 1 && templateItems()[0].position.x === wolfToken.position.x, "DM draws an unmatched caster's template at the aim");
     assert(JSON.stringify(templateItems()[0].metadata) === JSON.stringify({ [tp.TEMPLATE]: { room: ROOM, id: "t1" } }), "template metadata holds only IDs");
+    assert(artItems().length === 1 && artItems()[0].attachedTo === templateItems()[0].id && artItems()[0].image.url.endsWith("fire-disc.png"), "fire texture drawn with the template");
     await ts.syncTemplates(withTemplates([fireball]), 2000);
     assert(templateItems().length === 1, "drawn once");
     // Deleted by hand: not redrawn. Dropped by the room: removed.
     scene.delete(templateItems()[0].id);
     await ts.syncTemplates(withTemplates([fireball]), 3000);
     assert(templateItems().length === 0, "a template deleted by hand is not redrawn");
+    assert(artItems().length === 0, "its art is cleared too");
 
     // A matched player's extension is asked to draw it, and draws it when the DM asked.
     p.saveMatch(ROOM, "obr-lark", "m1");
@@ -260,6 +287,7 @@ async function main() {
     assert(notes.length === 1 && /token/.test(notes[0]), "note for a caster without a token");
     await ts.syncTemplates(withTemplates([]), 31000);
     assert(templateItems().length === 0, "templates the room dropped are removed");
+    assert(artItems().length === 0, "and their art");
 
 
     // Who is inside (O4): hand counts by the half-square rule on a 150 px, 5 ft grid.

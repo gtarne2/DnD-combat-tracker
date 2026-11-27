@@ -22,6 +22,9 @@ struct OverlayFile {
     schema: u32,
     #[serde(default)]
     damage_colours: HashMap<String, String>,
+    /// Map template look by spell name, for spells whose damage type does not pick one.
+    #[serde(default)]
+    spell_looks: HashMap<String, String>,
     #[serde(default)]
     books: HashMap<String, String>,
     #[serde(default)]
@@ -186,6 +189,8 @@ impl OverlayArea {
 
 pub struct Overlay {
     damage_colours: HashMap<String, String>,
+    /// Normalized spell name to its map template look, such as "mist".
+    spell_looks: HashMap<String, String>,
     /// Normalized book name to 5etools code.
     books: HashMap<String, String>,
     /// Normalized spell name to its editions.
@@ -230,6 +235,11 @@ fn colour(value: &str) -> bool {
         && value[1..].chars().all(|ch| ch.is_ascii_hexdigit())
 }
 
+/// A look name the Owlbear extension can draw: lowercase letters, such as "fire".
+fn look_name(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 20 && value.chars().all(|ch| ch.is_ascii_lowercase())
+}
+
 fn valid_area(area: &OverlayArea) -> bool {
     (1..=1000).contains(&area.size)
         && area
@@ -266,6 +276,12 @@ impl Overlay {
                 .damage_colours
                 .into_iter()
                 .filter(|(_, value)| colour(value))
+                .collect(),
+            spell_looks: file
+                .spell_looks
+                .into_iter()
+                .filter(|(_, value)| look_name(value))
+                .map(|(name, look)| (normalize(&name), look))
                 .collect(),
             books: file
                 .books
@@ -333,6 +349,28 @@ impl Overlay {
                     .iter()
                     .find_map(|kind| self.damage_colour(kind).map(str::to_owned))
             })
+    }
+
+    /// The map template look for a spell: the overlay's look for its name, then the damage
+    /// type the player's description names, then the first damage type the entry lists. The
+    /// Owlbear extension draws a texture for the looks it knows and a plain fade otherwise.
+    pub fn template_look(
+        &self,
+        name: &str,
+        entry: Option<&SpellMechanics>,
+        damage_type: Option<&str>,
+    ) -> Option<String> {
+        self.spell_looks
+            .get(&normalize(name))
+            .cloned()
+            .or_else(|| damage_type.map(str::to_ascii_lowercase))
+            .or_else(|| {
+                entry?
+                    .damage_types
+                    .first()
+                    .map(|kind| kind.to_ascii_lowercase())
+            })
+            .filter(|look| look_name(look))
     }
 
     /// When a feature is used, if the overlay knows it for the import's book.
