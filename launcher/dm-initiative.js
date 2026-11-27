@@ -79,6 +79,7 @@ function setupDmInitiative(request, refresh) {
       if (enemy?.template?.pack.edition) sub.push(enemy.template.pack.edition);
       if (row.shared?.length) sub.push("with " + row.shared.join(", "));
       if (enemy?.conditions) sub.push(enemy.conditions);
+      for (const timer of enemy?.timers || []) sub.push(timer.remaining ? timer.name + " (" + timer.remaining + ")" : timer.name + " ended");
       body.append(make("span", sub.join(" · "), "dm-turn-sub"));
       let hp = enemy ? {current:enemy.hp, max:enemy.max_hp} : null;
       if (!enemy && row.damage_recipient) {
@@ -209,40 +210,132 @@ function setupDmInitiative(request, refresh) {
       for (const condition of enemy.conditions.split(/\s*,\s*/).filter(Boolean)) tags.append(make("span", condition, "dm-tag dm-condition"));
       card.append(tags);
     }
+    if (enemy.timers?.length) card.append(timerTags(row));
+    card.append(timerForm(row));
     if (enemy.notes) card.append(make("p", enemy.notes, "dm-enemy-notes"));
   }
   // Quick damage and healing for the selected enemy, without opening Edit enemy. The typed
-  // amount survives the dashboard's refresh.
-  let quickAmount = "", quickFocus = false;
+  // amount survives the dashboard's refresh. A damage type applies the enemy's imported
+  // immunities, resistances and vulnerabilities; "Magical" decides clauses such as "from
+  // nonmagical attacks".
+  let quickAmount = "", quickFocus = false, quickType = "", quickMagical = false;
   function quickHp(row) {
     const enemy = row.enemy;
+    const defenses = enemy.template?.monster.stats.defenses;
     const box = make("form", null, "dm-quick-hp");
     const amount = Object.assign(document.createElement("input"), {type:"number", min:1, max:100000, value:quickAmount, placeholder:"Amount"});
     amount.setAttribute("aria-label", "HP change for " + shownName(row));
     amount.oninput = () => { quickAmount = amount.value; };
     amount.onfocus = () => { quickFocus = true; };
     amount.onblur = () => { quickFocus = false; };
+    const type = document.createElement("select");
+    type.setAttribute("aria-label", "Damage type");
+    type.append(new Option("Any type", ""), ...monsterAssist.DAMAGE_TYPES.map(t => new Option(t.charAt(0).toUpperCase() + t.slice(1), t)));
+    type.value = quickType;
+    const magicalBox = Object.assign(document.createElement("input"), {type:"checkbox", checked:quickMagical});
+    const magical = make("label", null, "dm-quick-magical");
+    magical.append(magicalBox, " Magical or silvered");
+    magical.title = "For clauses such as \"from nonmagical attacks\". Spells count as magical.";
+    const hint = make("span", "", "dm-quick-defense");
+    const check = () => monsterAssist.defense(defenses, type.value, {magical: magicalBox.checked});
+    const show = () => {
+      const result = check();
+      magical.hidden = !result.qualified;
+      const value = amount.valueAsNumber;
+      hint.textContent = result.note ? result.note + (Number.isInteger(value) && value > 0 ? ": " + value + " → " + result.apply(value) : "") : "";
+    };
+    type.onchange = () => { quickType = type.value; show(); };
+    magicalBox.onchange = () => { quickMagical = magicalBox.checked; show(); };
+    amount.addEventListener("input", show);
+    show();
     const apply = async sign => {
       const value = amount.valueAsNumber;
       if (!Number.isInteger(value) || value < 1 || enemy.hp == null) {
         status.textContent = enemy.hp == null ? "Set this enemy's HP in Edit enemy first." : "Type a whole number first.";
         return;
       }
-      const hp = sign < 0 ? Math.max(0, enemy.hp - value) : Math.min(enemy.max_hp ?? Number.MAX_SAFE_INTEGER, enemy.hp + value);
+      const result = sign < 0 ? check() : {note: "", apply: n => n};
+      const taken = result.apply(value);
+      const hp = sign < 0 ? Math.max(0, enemy.hp - taken) : Math.min(enemy.max_hp ?? Number.MAX_SAFE_INTEGER, enemy.hp + value);
       const next = {revealed:enemy.revealed, hp, max_hp:enemy.max_hp, ac:enemy.ac};
       for (const name of ["name","alias","conditions","notes"]) next[name] = enemy[name] ?? "";
       if (await change({kind:"enemy", id:row.id, score:row.score, enemy:next})) {
         quickAmount = "";
-        status.textContent = (sign < 0 ? "Damaged " : "Healed ") + shownName(row) + " by " + value + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
+        const why = result.note && taken !== value ? " (" + value + ", " + result.note + ")" : "";
+        status.textContent = (sign < 0 ? "Damaged " + shownName(row) + " by " + taken + why : "Healed " + shownName(row) + " by " + value) + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
       }
     };
     const damage = Object.assign(make("button", "Damage"), {type:"submit", disabled:busy});
     const heal = Object.assign(make("button", "Heal"), {type:"button", disabled:busy});
     heal.onclick = () => apply(1);
     box.onsubmit = event => { event.preventDefault(); apply(-1); };
-    box.append(amount, damage, heal);
+    box.append(amount, type, magical, damage, heal, hint);
     if (quickFocus) queueMicrotask(() => amount.focus({preventScroll:true}));
     return box;
+  }
+  // Timed conditions (R77): each counts the start or end of a chosen creature's turn, like the
+  // player sheet's turn effects. Ended ones stay until the DM clears them.
+  const CONDITIONS = ["Blinded","Charmed","Deafened","Frightened","Grappled","Incapacitated","Invisible","Paralyzed","Petrified","Poisoned","Prone","Restrained","Stunned","Unconscious","Concentrating"];
+  let timerDraft = {name:"", remaining:"1", ends:"end", anchor:""};
+  function timerLabel(timer, rows) {
+    if (!timer.remaining) return timer.name + " · ended";
+    const whose = timer.anchor ? (rows.find(r => r.id === timer.anchor) ? shownName(rows.find(r => r.id === timer.anchor)) + "'s" : "its") : "its";
+    return timer.name + " · " + timer.remaining + " × " + (timer.ends === "start" ? "start of " : "end of ") + whose + " turn";
+  }
+  function timerTags(row) {
+    const rows = room.combat.rows;
+    const tags = make("div", null, "dm-tags dm-timers");
+    for (const timer of row.enemy.timers || []) {
+      const tag = make("span", null, "dm-tag dm-condition dm-timer" + (timer.remaining ? "" : " dm-timer-ended"));
+      tag.append(make("span", timerLabel(timer, rows)));
+      const remove = make("button", "×", "dm-timer-remove");
+      remove.type = "button";
+      remove.disabled = busy;
+      remove.setAttribute("aria-label", "Clear " + timer.name);
+      remove.onclick = () => change({kind:"remove_timer", id:row.id, timer:timer.id});
+      tag.append(remove);
+      tags.append(tag);
+    }
+    return tags;
+  }
+  function timerForm(row) {
+    const rows = room.combat.rows;
+    const fold = make("details", null, "dm-timer-add");
+    fold.append(make("summary", "Add a timed condition"));
+    const form = make("form", null, "dm-timer-form");
+    const name = Object.assign(document.createElement("input"), {required:true, maxLength:60, value:timerDraft.name, placeholder:"Condition"});
+    name.setAttribute("aria-label", "Timed condition");
+    name.setAttribute("list", "dm-condition-names");
+    const list = document.createElement("datalist");
+    list.id = "dm-condition-names";
+    list.append(...CONDITIONS.map(c => new Option(c)));
+    const count = Object.assign(document.createElement("input"), {type:"number", required:true, min:1, max:1000, value:timerDraft.remaining});
+    count.setAttribute("aria-label", "Turns");
+    const ends = document.createElement("select");
+    ends.setAttribute("aria-label", "Counts at");
+    ends.append(new Option("× end of turn", "end"), new Option("× start of turn", "start"));
+    ends.value = timerDraft.ends;
+    const anchor = document.createElement("select");
+    anchor.setAttribute("aria-label", "Whose turn");
+    anchor.append(new Option("its own", ""), ...rows.filter(r => r.id !== row.id).map(r => new Option(shownName(r) + "'s", r.id)));
+    anchor.value = rows.some(r => r.id === timerDraft.anchor && r.id !== row.id) ? timerDraft.anchor : "";
+    const keep = () => Object.assign(timerDraft, {name:name.value, remaining:count.value, ends:ends.value, anchor:anchor.value});
+    for (const input of [name, count, ends, anchor]) input.addEventListener("input", keep);
+    const add = make("button", "Add");
+    add.disabled = busy;
+    form.onsubmit = async event => {
+      event.preventDefault();
+      keep();
+      const timer = {id:crypto.randomUUID(), name:name.value.trim(), remaining:count.valueAsNumber, ends:ends.value};
+      if (anchor.value) timer.anchor = anchor.value;
+      if (await change({kind:"add_timer", id:row.id, timer})) {
+        timerDraft = {name:"", remaining:"1", ends:timerDraft.ends, anchor:""};
+        status.textContent = "Added " + timer.name + " to " + shownName(row) + ".";
+      }
+    };
+    form.append(name, list, count, ends, anchor, add);
+    fold.append(form, make("small", "Counts down each time the chosen turn starts or ends, and with each round of advanced time. \"Until the end of its next turn\", added on its own turn, is 2.", "dm-muted"));
+    return fold;
   }
   const renderActions = setupMonsterActions(el, change, id => { order.value = id; controls(); });
 
@@ -447,20 +540,15 @@ function setupDmInitiative(request, refresh) {
     const score = find(details?.ability_scores);
     return Number.isInteger(score) ? Math.floor((score - 10) / 2) : null;
   }
+  // Spells are magical, so "from nonmagical attacks" clauses do not apply to them.
   function defense(row, type) {
-    const defenses = row.enemy?.template?.monster.stats.defenses;
-    if (!defenses || !type) return {factor: 1, note: ""};
-    const names = text => !text || /nonmagical/i.test(text) ? false : new RegExp("\\b" + type + "\\b", "i").test(text);
-    if (names(defenses.immunities)) return {factor: 0, note: "immune to " + type};
-    if (names(defenses.resistances)) return {factor: .5, note: "resists " + type};
-    if (names(defenses.vulnerabilities)) return {factor: 2, note: "vulnerable to " + type};
-    return {factor: 1, note: ""};
+    return monsterAssist.defense(row.enemy?.template?.monster.stats.defenses, type, {magical: true});
   }
   function areaAmount(area, row, outcome) {
     if (outcome === "table") return 0;
     let amount = area.amount;
     if (outcome === "succeeded") amount = area.save?.on_success === "half" ? Math.floor(amount / 2) : 0;
-    return Math.floor(amount * defense(row, area.damage_type).factor);
+    return defense(row, area.damage_type).apply(amount);
   }
   const rollNow = new Set();
   document.addEventListener("dm-settings-change", () => { areasKey = null; if (room?.combat) renderAreas(); });
@@ -565,6 +653,20 @@ function setupDmInitiative(request, refresh) {
         roll.onclick = () => { rollNow.add(area.id); areasKey = null; renderAreas(); };
         actions.append(roll);
       }
+      // One click for the whole group: everyone failed (full damage) or everyone saved
+      // (half or none). Companions stay at the table.
+      if (area.save) for (const [label, outcome] of [["All failed", "failed"], ["All saved", "succeeded"]]) {
+        const all = make("button", label);
+        all.type = "button";
+        all.disabled = busy;
+        all.title = outcome === "failed" ? "Full damage to every target" : (area.save.on_success === "half" ? "Half damage to every target" : "No damage to any target");
+        all.onclick = () => {
+          for (const input of inputs) if (input.choice.outcome !== "table") Object.assign(input.choice, {outcome, amount: null});
+          areasKey = null;
+          renderAreas();
+        };
+        actions.append(all);
+      }
       actions.append(apply, dismiss);
       box.append(actions);
       return box;
@@ -583,7 +685,7 @@ function setupDmInitiative(request, refresh) {
       let hp, focus = "", name = shownName(row);
       if (row.enemy) {
         hp = row.enemy.hp;
-        if (/concentrat/i.test(row.enemy.conditions || "")) focus = "concentrating";
+        if (/concentrat/i.test(row.enemy.conditions || "") || (row.enemy.timers || []).some(t => t.remaining && /concentrat/i.test(t.name))) focus = "concentrating";
       } else if (row.damage_recipient) {
         const vitals = room.members?.find(m => m.member_id === row.damage_recipient)?.inspection?.vitals;
         hp = vitals ? (vitals.current_hp ?? 0) + (vitals.temporary_hp || 0) : undefined;
