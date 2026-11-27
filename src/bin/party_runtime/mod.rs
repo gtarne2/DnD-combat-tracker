@@ -1,6 +1,7 @@
 mod lan;
 mod monster_library;
 mod owlbear;
+pub mod player;
 mod vault;
 use aurora_combat_tracker::party::initiative::FightEdit;
 use aurora_combat_tracker::party::interruptions::{Reply, WindowRef};
@@ -444,10 +445,27 @@ async fn guest(
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 pub async fn serve() -> Result<(), Error> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
     let mut line = String::new();
     std::io::stdin().lock().read_line(&mut line)?;
     let cfg: Launch = serde_json::from_str(&line)?;
+    let (ready, server) = start(cfg).await?;
+    println!("{ready}");
+    std::io::stdout().flush()?;
+    // A closed launcher pipe (including a launcher crash) releases both listeners.
+    std::thread::spawn(|| {
+        let mut stop = String::new();
+        let _ = std::io::stdin().read_line(&mut stop);
+        std::process::exit(0);
+    });
+    server.await
+}
+
+/// Opens the party binding and the loopback sheet service. Returns the launcher's ready line
+/// (`{"url","role"}`) and the service, which runs until the process exits.
+async fn start(
+    cfg: Launch,
+) -> Result<(Value, impl std::future::Future<Output = Result<(), Error>>), Error> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     if cfg.mode != "resume"
         && (cfg.name.trim().is_empty()
             || cfg.name.chars().count() > 120
@@ -455,10 +473,7 @@ pub async fn serve() -> Result<(), Error> {
     {
         return Err("Enter a display name of 1 to 120 characters".into());
     }
-    let directory =
-        std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA").ok_or("Missing app data")?)
-            .join("Aurora Combat Tracker");
-    std::fs::create_dir_all(&directory)?;
+    let directory = crate::app_data()?;
     let vault = Vault::new(&directory, cfg.profile)?;
     let (mut saved, new) = match cfg.mode.as_str() {
         "resume" => (
@@ -583,14 +598,9 @@ pub async fn serve() -> Result<(), Error> {
             publication_revision: Arc::new(AtomicU64::new(0)),
             owlbear,
         });
-    println!("{}", json!({"url":url,"role":role}));
-    std::io::stdout().flush()?;
-    // A closed launcher pipe (including a launcher crash) releases both listeners.
-    std::thread::spawn(|| {
-        let mut stop = String::new();
-        let _ = std::io::stdin().read_line(&mut stop);
-        std::process::exit(0);
-    });
-    axum::serve(listener, app).await?;
-    Ok(())
+    let server = async move {
+        axum::serve(listener, app).await?;
+        Ok(())
+    };
+    Ok((json!({"url":url,"role":role}), server))
 }
