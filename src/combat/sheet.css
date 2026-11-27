@@ -355,8 +355,12 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 .party-template > p:first-child button { margin-left: auto; }
 .party-template button { font-size: .85em; }
 .party-template-note { font-size: .85em; opacity: .8; }
-.party-template-targets { display: flex; flex-wrap: wrap; gap: 2px 10px; }
-.party-template-targets details { flex-basis: 100%; }
+.party-template-targets { display: grid; gap: 2px; }
+.party-template-targets label { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.party-template-targets details { display: grid; gap: 2px; }
+.party-template-targets details > label { padding-left: 4px; }
+.party-template-damage { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.party-template-damage input { width: 7ch; }
 #spell-turn-reminder, #attack-sequence { color: var(--teal); margin: 3px 0; }
 #attack-riders button, #attack-outcome button { padding: 2px 5px; }
 #rest-summary, #rest-hp { margin: 6px 0; }
@@ -564,7 +568,9 @@ dialog::backdrop { background: #050a13bb; }
   .combat-sidebar #encounter { flex: none; }
   .sidebar-reference { display: flex; flex-direction: column; }
   .sidebar-reference > section {
-    min-height: 76px; overflow: auto; overscroll-behavior: contain; scroll-padding-top: 36px;
+    /* No overscroll containment here: a section that can't scroll itself must pass wheel and
+       touchpad scrolling on to the sidebar around it. */
+    min-height: 76px; overflow: auto; scroll-padding-top: 36px;
     scrollbar-color: #415269 var(--well);
   }
   .sidebar-reference > section > .rail-heading { position: sticky; top: 0; z-index: 1; background: var(--panel); }
@@ -714,8 +720,12 @@ body:not([data-session-page="combat"]) #encounter { display: none; }
 #companion-roster-dialog #companion-roster-content { overflow: visible; }
 #companion-roster-dialog #add-companion { max-width: 400px; }
 #companion-roster-dialog #companion-cards { grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); align-items: start; }
-.companion-damage { display: flex; align-items: end; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
-.companion-damage input { display: block; width: 4.25em; }
+.companion-damage { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.companion-damage .hp-adjust-label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; }
+.companion-damage input { width: 4.25em; }
+.companion-command { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.companion-command small { color: var(--muted); font-size: 12px; }
+.companion-card dl { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
 #protector-description { white-space: pre-line; margin-bottom: 10px; }
 #protector-form input[type=number] { width: 8em; }
 #protector-targets { border: 1px solid var(--line); margin: 10px 0; }
@@ -968,3 +978,33 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .hp-card > h3 { padding-right: 90px; }
 #concentration .focus-status h2 { min-height: 20px; }
 @media (min-width: 1080px) { .compact-combat #concentration { padding-top: 3px; } }
+
+/* Turn action chips on the combat rail and the Settings dialog. */
+.economy-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-right: 6px; }
+.economy-chip { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line); }
+.economy-chip[data-state=ready] { color: #8fd6a8; border-color: #2f6a48; background: #142a20; }
+.economy-chip[data-state=spent] { color: var(--muted); background: transparent; text-decoration: line-through; }
+.economy-chip[data-state=waiting] { color: var(--muted); background: transparent; opacity: .7; }
+.economy-chip:disabled { cursor: default; }
+.workspace-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; }
+.workspace-title .economy-chips { margin-right: 0; }
+.turn-flag { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #1b1406; background: var(--gold); letter-spacing: .02em; }
+.combat-workspace.is-my-turn { border-color: var(--gold) !important; box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(239, 197, 118, .22); }
+#sheet-settings { max-width: 520px; }
+.settings-group { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+.settings-group legend { padding: 0 4px; font-weight: 600; }
+.settings-group label { display: block; margin: 4px 0; }
+.settings-hint, .settings-note { color: var(--muted); font-size: 13px; margin: 2px 0 6px; }
+.more-options > summary { color: var(--muted); font-size: 13px; margin: 6px 0; }
+.settings-trigger { min-width: 0; padding-inline: 8px; font-size: 15px; line-height: 1; }
+.hint { color: var(--muted); font-size: 12px; }
+#protector-rules p { white-space: pre-line; font-size: 12px; color: var(--muted); }
+.protector-amount { display: flex; align-items: end; flex-wrap: wrap; gap: 6px; }
+#protector-targets label { display: flex; align-items: center; gap: 6px; }
+.companion-card .companion-damage { flex-wrap: nowrap; }
+.companion-card .companion-damage input { width: 3.5em; min-width: 0; }
+.companion-card .companion-damage button { padding: 3px 6px; font-size: 12px; }
+/* Summon variants are chosen in the option details; the narrow list row shows only Create. */
+.option-row .option-execute:not(.show-variants) [data-summon-variant] { display: none; }
+.option-row [data-summon-create] { font-size: 12px; }
+.option-inspector [data-summon-variant] { max-width: 14em; }

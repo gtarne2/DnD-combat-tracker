@@ -97,6 +97,7 @@ const partyInitiative = (() => {
     let busy = false;
     let choices = "";
     let order = "";
+    let companionSync = "";
     async function change(edit) {
       if (busy || !view?.combat) return;
       busy = true;
@@ -189,6 +190,18 @@ const partyInitiative = (() => {
           label.append(input); target.append(label);
         }
       }
+      // A companion summoned, destroyed or dismissed mid-fight joins or leaves this sheet's
+      // entry in the shared encounter, so the DM sees it. New ones act on this turn unless the
+      // sheet gives them their own initiative.
+      if (state.combat.joined && mine && !busy) {
+        const want = cards.map(c => c.id).sort((a, b) => a - b).join();
+        const have = (mine.companions || []).map(c => c.local_id).sort((a, b) => a - b).join();
+        if (want !== have && companionSync !== want + "/" + have) {
+          companionSync = want + "/" + have;
+          submit(mine.score);
+        }
+      }
+      syncAuras(state, mine, cards);
       leave.hidden = !state.combat.joined;
       correct.hidden = !sheet.progress?.partyClock?.repair;
       const signature = JSON.stringify([state.combat.rows, state.combat.running, state.combat.current, state.combat.round, state.combat.joined, companionsAtTable()]);
@@ -197,6 +210,47 @@ const partyInitiative = (() => {
         document.dispatchEvent(new Event("preview-encounter-change"));
       }
     };
+  }
+  // A Protector cannon shows its 10-foot healing range on the map for as long as it is
+  // around, as a template centred on the cannon's token. Its inside list picks the allies a
+  // Protector activation reaches.
+  const AURA = "Protector aura";
+  const auraPending = new Set();
+  const isProtector = card => /ELDRITCH_CANNON_PROTECTOR$/i.test(card.templateId || "") || /^Eldritch Cannon\b.*Protector\b/i.test(card.name || "");
+  function syncAuras(state, mine, cards) {
+    if (!state.combat.joined || !mine) return;
+    const submitted = new Set((mine.companions || []).map(c => c.local_id));
+    const wanted = cards.filter(card => isProtector(card) && submitted.has(card.id));
+    const auras = (state.combat.templates || []).filter(t => t.anchor != null && t.spell === AURA);
+    for (const card of wanted) {
+      if (auras.some(t => t.anchor === card.id) || auraPending.has(card.id)) continue;
+      auraPending.add(card.id);
+      templateEdit({kind:"place_template", template:{id:crypto.randomUUID(), spell:AURA, shape:"emanation", size:10, lasts:"removed", anchor:card.id}})
+        .catch(() => {}).finally(() => setTimeout(() => auraPending.delete(card.id), 5000));
+    }
+    for (const aura of auras) {
+      if (wanted.some(card => card.id === aura.anchor) || clearing.has(aura.id)) continue;
+      clearing.add(aura.id);
+      templateEdit({kind:"clear_template", id:aura.id}).catch(() => clearing.delete(aura.id));
+    }
+  }
+  // Sheet target IDs (see partyActions.targets) inside a cannon's aura, the cannon included,
+  // or null while the map has not reported.
+  function auraTargets(cardId) {
+    const combat = board();
+    const aura = (combat?.templates || []).find(t => t.anchor === cardId && t.spell === AURA);
+    if (!aura || !Array.isArray(aura.inside)) return null;
+    const byRow = new Map();
+    for (const row of combat.rows) {
+      if (row.key === "owner") {
+        byRow.set(row.id, "owner");
+        for (const [local, id] of Object.entries(row.companion_rows || {})) byRow.set(id, String(local));
+      } else if (row.key?.startsWith("companion:")) byRow.set(row.id, row.key.slice(10));
+      else if (row.member_id) byRow.set(row.id, "party:" + view.room_id + ":" + row.member_id);
+    }
+    const result = new Set([String(cardId)]);
+    for (const id of aura.inside) if (byRow.has(id)) result.add(byRow.get(id));
+    return result;
   }
   // Owlbear spell templates. The room keeps them; the DM's Owlbear extension draws them.
   const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"around me"};
@@ -263,7 +317,8 @@ const partyInitiative = (() => {
   }
   function renderTemplates() {
     const host = document.getElementById("party-templates");
-    const templates = lastTemplates;
+    // Companion auras live on the map; the Protector dialog uses them.
+    const templates = lastTemplates.filter(t => t.anchor == null);
     // Visible rows only; the server already leaves unrevealed enemies out of the suggestions.
     const rows = (board()?.rows || []).filter(row => row.score !== null || row.key === "owner");
     for (const id of picks.keys()) if (!templates.some(t => t.id === id)) picks.delete(id);
@@ -271,6 +326,13 @@ const partyInitiative = (() => {
       [...picks].map(([id, p]) => [id, p.key, p.edited, [...p.chosen], p.rolled])]);
     if (host.dataset.signature === signature) return;
     host.dataset.signature = signature;
+    // Keep focus in the damage box or a checkbox across the rebuild, so typing is not lost.
+    const focusLabel = host.contains(document.activeElement) ? document.activeElement.getAttribute("aria-label") : null;
+    queueMicrotask(() => {
+      if (!focusLabel) return;
+      const again = [...host.querySelectorAll("[aria-label]")].find(node => node.getAttribute("aria-label") === focusLabel);
+      again?.focus();
+    });
     host.hidden = !templates.length;
     host.replaceChildren(...templates.map(template => {
       const card = document.createElement("div");
@@ -305,7 +367,7 @@ const partyInitiative = (() => {
           pick.edited = true;
           renderTemplates();
         };
-        label.append(input, " " + rowName(row) + (suggested.has(row.id) ? "" : " (not on the map's list)"));
+        label.append(input, document.createTextNode(rowName(row)));
         return label;
       };
       const listed = rows.filter(row => suggested.has(row.id) || pick.chosen.has(row.id));
@@ -348,23 +410,37 @@ const partyInitiative = (() => {
   // The damage line, the send button and the outcome of the latest application.
   function areaControls(template, pick, chosen, rows) {
     const nodes = [];
+    let send = null;
     const sent = lastAreas.filter(area => area.template === template.id);
     const latest = sent[sent.length - 1];
-    if (pick.rolled == null || pick.sentRoll === pick.rolled) {
-      pick.rolled = rollDice(template.damage);
+    // The damage box starts empty unless the player asked the sheet to roll for them. It keeps
+    // its number after sending; a zone spell clears it once the DM applies the last send.
+    const auto = sheetSettings.get("autoRollArea");
+    if (pick.rolled === undefined) pick.rolled = auto ? rollDice(template.damage) : null;
+    if (latest?.results && pick.resetFor !== latest.id) {
+      if (pick.resetFor !== undefined || pick.sentRoll !== undefined) pick.rolled = auto ? rollDice(template.damage) : null;
+      pick.resetFor = latest.id;
       pick.sentRoll = undefined;
     }
     const line = document.createElement("p");
     line.className = "party-template-damage";
     const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
       + (template.save.on_success === "half" ? ", half on a success" : ", none on a success") : "";
-    const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? ""});
+    const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? "", placeholder:"Total"});
     amount.setAttribute("aria-label", template.spell + " damage");
-    amount.onchange = () => { pick.rolled = amount.valueAsNumber; };
-    const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button", textContent:"Reroll", title:"Roll " + template.damage + " again"});
+    amount.oninput = () => {
+      pick.rolled = amount.value === "" ? null : amount.valueAsNumber;
+      send.disabled = blocked();
+    };
+    const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button",
+      textContent: pick.rolled == null ? "Roll" : "Reroll", title:"Roll " + template.damage});
     reroll.onclick = () => { pick.rolled = rollDice(template.damage); renderTemplates(); };
-    line.append("Damage " + template.damage + " = ", amount, " " + (template.damage_type || "") + save + " ", reroll);
-    nodes.push(line);
+    // The rule on its own line, then the total and the roll button.
+    const rule = document.createElement("p");
+    rule.className = "party-template-note";
+    rule.textContent = template.damage + " " + (template.damage_type || "") + save;
+    line.append("Damage ", amount, " ", reroll);
+    nodes.push(rule, line);
     const names = new Map(rows.map(row => [row.id, rowName(row)]));
     if (latest) {
       const outcome = document.createElement("p");
@@ -377,9 +453,9 @@ const partyInitiative = (() => {
     // Instant spells are sent once. Zone spells can be sent again on later turns.
     const repeat = template.lasts === "concentration";
     const pending = latest && !latest.results;
-    const send = Object.assign(document.createElement("button"), {type:"button",
-      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM",
-      disabled: !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled)});
+    const blocked = () => !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled);
+    send = Object.assign(document.createElement("button"), {type:"button",
+      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM", disabled: blocked()});
     send.onclick = async () => {
       send.disabled = true;
       try {
@@ -398,6 +474,7 @@ const partyInitiative = (() => {
     // Rows a cone or line can point at. Hidden enemies are left out.
     targets: () => (board()?.rows || []).filter(row => row.key !== "owner" && row.score !== null).map(row => ({id:row.id, name:row.name})),
     place: template => templateEdit({kind:"place_template", template}),
+    auraTargets,
   };
   // The shared encounter as this player sees it, whether or not they have joined it yet.
   function board() {

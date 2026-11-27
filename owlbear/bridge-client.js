@@ -35,6 +35,9 @@ export class BridgeClient {
   constructor({ onChange = () => {}, timeoutMs = 10000 } = {}) {
     this.window = null;
     this.origin = null;
+    // Every bridge window that answered. If the DM opens a second one and closes either,
+    // requests move to whichever is still open.
+    this.windows = [];
     this.token = read(TOKEN_KEY);
     this.pending = new Map();
     this.onChange = onChange;
@@ -45,7 +48,13 @@ export class BridgeClient {
   }
 
   get connected() {
-    return Boolean(this.window && !this.window.closed);
+    this.windows = this.windows.filter((entry) => !entry.win.closed);
+    if (!this.window || this.window.closed) {
+      const next = this.windows[this.windows.length - 1];
+      this.window = next ? next.win : null;
+      this.origin = next ? next.origin : null;
+    }
+    return Boolean(this.window);
   }
   get paired() {
     return Boolean(this.token);
@@ -61,10 +70,13 @@ export class BridgeClient {
       return;
     }
     if (msg.type === "aurora-obr-ready") {
-      const fresh = this.window !== event.source;
+      this.windows = this.windows.filter((entry) => entry.win !== event.source && !entry.win.closed);
+      this.windows.push({ win: event.source, origin: event.origin });
+      // Keep using a window that still works; a second one waits as a spare.
+      if (this.window && !this.window.closed) return;
       this.window = event.source;
       this.origin = event.origin;
-      if (fresh) this.onChange("connected");
+      this.onChange("connected");
       return;
     }
     if (msg.type === "aurora-obr-response" && event.source === this.window) {
@@ -83,6 +95,7 @@ export class BridgeClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        this.windows = this.windows.filter((entry) => entry.win !== this.window);
         this.window = null;
         this.onChange("disconnected");
         reject(new Error("The bridge window stopped answering. Open it again from the Aurora panel."));

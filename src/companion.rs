@@ -120,6 +120,12 @@ pub fn companion_templates(character: &ImportedCharacter) -> Vec<CompanionTempla
 
 const CANNON: &str = "ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON";
 
+/// Features whose action creates one of several companion variants (the sheet offers a Create
+/// button and lets the player choose the variant).
+pub fn is_summon_feature(id: &str) -> bool {
+    id == CANNON
+}
+
 fn templates(character: &ImportedCharacter) -> BTreeMap<String, CompanionDetails> {
     let mut templates: BTreeMap<_, _> = character
         .companion_definitions

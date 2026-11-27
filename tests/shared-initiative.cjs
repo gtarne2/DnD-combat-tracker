@@ -111,7 +111,7 @@ module.exports = async function sharedInitiative({launch,pageFor,open,api}) {
   await eventually(board,s=>s.rows.filter(r=>r.enemy).every(r=>r.score===10),"Group initiative");
   assert.deepEqual((await board()).rows.filter(r=>r.enemy).map(r=>r.enemy.hp),[81,81,4]);
   await dmButton("Reveal").click();
-  await eventually(()=>state(first),s=>s.combat.rows.some(r=>r.name===alias),"Public alias");
+  await eventually(()=>state(first),s=>s.combat.rows.some(r=>r.name===alias+" 1"),"Public alias");
   await dmButton("Hide").click();
   const scrubbed = await eventually(()=>state(first),s=>s.combat.rows.filter(r=>r.name==="DM turn").length===3,"Hidden enemy");
   assert.equal(scrubbed.combat.rows.filter(r=>r.name==="DM turn").every(r=>r.score===null && !r.enemy),true);

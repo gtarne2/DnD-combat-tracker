@@ -32,6 +32,10 @@ internal sealed class TrackerLauncher : Form
     private string characterPath;
     private RefreshBridge bridge;
     private PartySession party;
+    // A DM room kept running while this PC also opens a player sheet, for testing both sides
+    // on one machine. Its dashboard bridge stays with it.
+    private PartySession hostedParty;
+    private RefreshBridge hostedBridge;
     private readonly Stopwatch lifecycleTick = Stopwatch.StartNew();
     private readonly Stopwatch hostProbe = new Stopwatch();
     private bool checkingHost;
@@ -112,6 +116,13 @@ internal sealed class TrackerLauncher : Form
                 MessageBox.Show(error.Message, "Could not reopen session", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         });
+        trayMenu.Items.Add("Reopen DM dashboard", null, delegate {
+            if (hostedBridge == null) return;
+            try { OpenBrowser(hostedBridge.PreviewPath); hostedBridge.KeepAlive(); }
+            catch (Exception error) {
+                MessageBox.Show(error.Message, "Could not reopen the DM dashboard", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        });
         trayMenu.Items.Add("Exit refresh service", null, delegate { Close(); });
         tray.ContextMenuStrip = trayMenu;
         tray.DoubleClick += delegate { ShowLauncher(); };
@@ -122,6 +133,7 @@ internal sealed class TrackerLauncher : Form
             lifecycle.Dispose();
             if (bridge != null) bridge.Dispose();
             if (party != null) party.Dispose();
+            DisposeHosted();
             partyMenu.Dispose();
             tray.Dispose();
             trayMenu.Dispose();
@@ -160,12 +172,22 @@ internal sealed class TrackerLauncher : Form
     {
         // After sleep, let browsers renew their lease before evaluating idle shutdown.
         if (lifecycleTick.Elapsed >= TimeSpan.FromSeconds(30) && bridge != null) bridge.KeepAlive();
+        if (lifecycleTick.Elapsed >= TimeSpan.FromSeconds(30) && hostedBridge != null) hostedBridge.KeepAlive();
         lifecycleTick.Restart();
         if (activate.WaitOne(0)) ShowLauncher();
         if (Visible || !selection.Enabled || bridge == null || !bridge.IsIdle || checkingHost) return;
 
         var currentBridge = bridge;
         var currentParty = party;
+        var currentHosted = hostedParty;
+        if (currentHosted != null)
+        {
+            if (hostProbe.IsRunning && hostProbe.Elapsed < TimeSpan.FromSeconds(15)) return;
+            hostProbe.Restart();
+            checkingHost = true;
+            try { if (await currentHosted.HasActiveRoom()) return; }
+            finally { checkingHost = false; }
+        }
         if (currentParty != null && currentParty.IsHosting)
         {
             if (hostProbe.IsRunning && hostProbe.Elapsed < TimeSpan.FromSeconds(15)) return;
@@ -318,6 +340,7 @@ internal sealed class TrackerLauncher : Form
                 party.Dispose();
                 party = null;
             }
+            if (mode == "dm" || mode == "resume-dm") DisposeHosted();
             selection.Enabled = false;
             UpdateButtons();
             status.Text = "Connecting party...";
@@ -334,7 +357,17 @@ internal sealed class TrackerLauncher : Form
                 lobbyBridge = null;
                 tray.Visible = true;
                 Hide();
-            } else if (!await OpenSheet(candidate)) return;
+            } else {
+                // Joining as a player keeps a DM room on this PC running beside the sheet.
+                if (party != null && party.Role == "dm") {
+                    DisposeHosted();
+                    hostedParty = party;
+                    hostedBridge = bridge;
+                    party = null;
+                    bridge = null;
+                }
+                if (!await OpenSheet(candidate)) return;
+            }
             if (party != null) party.Dispose();
             party = candidate;
             candidate = null;
@@ -351,6 +384,14 @@ internal sealed class TrackerLauncher : Form
         }
     }
 
+    private void DisposeHosted()
+    {
+        if (hostedBridge != null) hostedBridge.Dispose();
+        if (hostedParty != null) hostedParty.Dispose();
+        hostedBridge = null;
+        hostedParty = null;
+    }
+
     private async Task<bool> OpenSheet(PartySession attached = null)
     {
         selection.Enabled = false;
@@ -365,6 +406,14 @@ internal sealed class TrackerLauncher : Form
             if (IsDisposed)
                 return false;
             OpenBrowser(preview);
+            // A solo sheet on the DM's PC leaves the DM room running.
+            if (attached == null && party != null && party.Role == "dm") {
+                DisposeHosted();
+                hostedParty = party;
+                hostedBridge = bridge;
+                party = null;
+                bridge = null;
+            }
             if (bridge != null) bridge.Dispose();
             bridge = candidate;
             candidate = null;

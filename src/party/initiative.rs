@@ -60,6 +60,17 @@ pub struct AreaTemplate {
     pub damage_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub save: Option<AreaSave>,
+    /// The caster's companion the template is centred on, by its sheet ID, such as a
+    /// Protector cannon's aura. None centres it on the caster.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<u32>,
+}
+
+/// A stable map ID for a companion that acts on its owner's turn and so has no row of its
+/// own. Owlbear tokens and inside reports use it like a row ID.
+pub fn companion_map_id(owner_row: Uuid, local_id: u32) -> Uuid {
+    let salt = (u128::from(local_id) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15_f39c_c060_5ced_c835);
+    Uuid::from_u128(owner_row.as_u128() ^ salt)
 }
 
 /// The saving throw an area spell asks for.
@@ -242,6 +253,9 @@ pub enum Edit {
         template: Box<Snapshot>,
         count: u32,
         score: i32,
+        /// The name players see once revealed. Empty or absent means the monster's name.
+        #[serde(default)]
+        alias: Option<String>,
     },
     Duplicate {
         id: Uuid,
@@ -563,8 +577,19 @@ impl Row {
                 name, companions, ..
             } => {
                 row["name"] = json!(name);
+                row["member_id"] = json!(self.player());
                 if self.member() == Some(viewer) {
                     row["companions"] = json!(companions);
+                    row["companion_rows"] = json!(
+                        companions
+                            .iter()
+                            .filter(|c| c.initiative.is_none())
+                            .map(|c| (
+                                c.local_id.to_string(),
+                                companion_map_id(self.id, c.local_id)
+                            ))
+                            .collect::<BTreeMap<_, _>>()
+                    );
                 }
                 if dm {
                     row["damage_recipient"] = json!(self.player());
@@ -642,6 +667,76 @@ pub struct Clock {
     pub wrap: bool,
     pub seconds: u32,
     pub rounds: u32,
+}
+
+/// "Bandit 2" is ("Bandit", Some(2)); a name without a trailing number is itself.
+fn name_stem(value: &str) -> (&str, Option<u32>) {
+    match value.rsplit_once(' ') {
+        Some((stem, digits))
+            if !stem.trim().is_empty()
+                && !digits.starts_with('0')
+                && digits.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            match digits.parse::<u32>() {
+                Ok(n) if n > 0 && n < 1000 => (stem, Some(n)),
+                _ => (value, None),
+            }
+        }
+        _ => (value, None),
+    }
+}
+/// Give enemies added from index `added` onward a number when another enemy already uses
+/// the same name, so "Bandit" becomes "Bandit 1" and the newcomers "Bandit 2", "Bandit 3".
+/// Names (the DM's) and aliases (the players') are numbered separately. Existing numbers stay.
+fn number_duplicates(rows: &mut [Row], added: usize) {
+    for field in [0, 1] {
+        for index in added..rows.len() {
+            let pick = |row: &Row| match &row.actor {
+                Participant::Enemy(enemy) => Some(if field == 0 {
+                    enemy.name.clone()
+                } else {
+                    enemy.alias.clone()
+                }),
+                _ => None,
+            };
+            let Some(mine) = pick(&rows[index]) else {
+                continue;
+            };
+            let stem = name_stem(&mine).0.to_string();
+            if stem.trim().is_empty() {
+                continue;
+            }
+            let others: Vec<usize> = (0..rows.len())
+                .filter(|&i| i < index && pick(&rows[i]).is_some_and(|v| name_stem(&v).0 == stem))
+                .collect();
+            if others.is_empty() {
+                continue;
+            }
+            let mut highest = 0;
+            for &i in &others {
+                let value = pick(&rows[i]).unwrap_or_default();
+                match name_stem(&value).1 {
+                    Some(n) => highest = highest.max(n),
+                    None => {
+                        highest = highest.max(1);
+                        set(&mut rows[i], field, format!("{stem} 1"));
+                    }
+                }
+            }
+            set(&mut rows[index], field, format!("{stem} {}", highest + 1));
+        }
+    }
+    fn set(row: &mut Row, field: u8, value: String) {
+        if let Participant::Enemy(enemy) = &mut row.actor {
+            if label(&value) {
+                if field == 0 {
+                    enemy.name = value;
+                } else {
+                    enemy.alias = value;
+                }
+            }
+        }
+    }
 }
 
 pub(super) fn label(value: &str) -> bool {
@@ -775,7 +870,7 @@ impl Fight {
     /// Map-facing projection for the DM's virtual tabletop link (Owlbear Rodeo): row IDs,
     /// kinds, revealed names, the turn pointer, and for enemies whether they are down plus the
     /// monster template's key, name and size for token art. No HP, AC, conditions, scores,
-    /// notes or stat blocks. Unrevealed enemies carry no alias.
+    /// notes or stat blocks. Enemies carry their player-facing alias, never the DM's name.
     pub fn table_view(&self) -> Value {
         let rows: Vec<Value> = self
             .position
@@ -787,7 +882,9 @@ impl Fight {
                         "id": row.id,
                         "kind": "enemy",
                         "revealed": enemy.revealed,
-                        "name": enemy.revealed.then_some(&enemy.alias),
+                        // Hidden tokens keep the name players will see on reveal; Owlbear does not
+                        // show hidden items to players.
+                        "name": &enemy.alias,
                         "down": enemy.hp == Some(0),
                     });
                     // For the DM's own extension only: which art to use and how big the token is.
@@ -812,20 +909,34 @@ impl Fight {
                     "local_id": local_id, "name": name,
                 }),
             })
+            .chain(
+                self.shared_companions()
+                    .map(|(id, member, local_id, name)| {
+                        json!({
+                            "id": id, "kind": "companion", "member_id": member,
+                            "local_id": local_id, "name": name, "shared": true,
+                        })
+                    }),
+            )
             .collect();
         // Templates name their caster's row so the extension can place them at its token.
         let templates: Vec<Value> = self
             .templates
             .iter()
             .filter_map(|t| {
-                let caster = self
-                    .position
-                    .rows
-                    .iter()
-                    .find(|r| r.player() == Some(t.member))?;
                 let template = &t.template;
+                let caster = match template.anchor {
+                    Some(local) => self.companion_spot(t.member, local)?,
+                    None => {
+                        self.position
+                            .rows
+                            .iter()
+                            .find(|r| r.player() == Some(t.member))?
+                            .id
+                    }
+                };
                 Some(json!({
-                    "id": template.id, "caster": caster.id, "member_id": t.member,
+                    "id": template.id, "caster": caster, "member_id": t.member,
                     "spell": template.spell, "shape": template.shape, "size": template.size,
                     "width": template.width, "lasts": template.lasts, "aim": template.aim,
                 }))
@@ -1015,11 +1126,52 @@ impl Fight {
     pub(super) fn shown_to_players(&self, id: Uuid) -> bool {
         self.position.rows.iter().any(|row| {
             row.id == id && !matches!(&row.actor, Participant::Enemy(enemy) if !enemy.revealed)
-        })
+        }) || self.shared_companions().any(|(map_id, ..)| map_id == id)
     }
 
     pub(super) fn has_row(&self, id: Uuid) -> bool {
         self.position.rows.iter().any(|row| row.id == id)
+            || self.shared_companions().any(|(map_id, ..)| map_id == id)
+    }
+
+    /// Companions that act on their owner's turn: (map ID, owner member, local ID, name).
+    fn shared_companions(&self) -> impl Iterator<Item = (Uuid, Uuid, u32, &str)> {
+        self.position.rows.iter().flat_map(|row| {
+            let (member, companions) = match &row.actor {
+                Participant::Player {
+                    member, companions, ..
+                } => (Some(*member), companions.as_slice()),
+                _ => (None, &[][..]),
+            };
+            companions
+                .iter()
+                .filter(|c| c.initiative.is_none())
+                .filter_map(move |c| {
+                    Some((
+                        companion_map_id(row.id, c.local_id),
+                        member?,
+                        c.local_id,
+                        c.name.as_str(),
+                    ))
+                })
+        })
+    }
+
+    /// The row or map ID a companion is drawn at.
+    fn companion_spot(&self, member: Uuid, local: u32) -> Option<Uuid> {
+        self.position
+            .rows
+            .iter()
+            .find(|r| {
+                matches!(&r.actor, Participant::Companion { member: m, local_id, .. }
+                    if *m == member && *local_id == local)
+            })
+            .map(|r| r.id)
+            .or_else(|| {
+                self.shared_companions()
+                    .find(|(_, m, l, _)| *m == member && *l == local)
+                    .map(|(id, ..)| id)
+            })
     }
 
     pub fn edit(
@@ -1119,7 +1271,16 @@ impl Fight {
                 }
             }
             Edit::PlaceTemplate { template } => {
+                let anchored = template.anchor.is_none_or(|local| {
+                    rows.iter().any(|r| match &r.actor {
+                        Participant::Player {
+                            member, companions, ..
+                        } => *member == actor && companions.iter().any(|c| c.local_id == local),
+                        _ => false,
+                    })
+                });
                 if !valid_template(template)
+                    || !anchored
                     || !rows.iter().any(|r| r.player() == Some(actor))
                     || template
                         .aim
@@ -1204,6 +1365,7 @@ impl Fight {
                 if !valid_enemy(enemy) {
                     return Err(Rejection::InvalidInput);
                 }
+                let added = rows.len();
                 if let Some(id) = id {
                     let row = rows
                         .iter_mut()
@@ -1226,24 +1388,33 @@ impl Fight {
                         }),
                         actions: Actions::default(),
                     });
+                    number_duplicates(rows, added);
                 }
             }
             Edit::AddMonsters {
                 template,
                 count,
                 score,
+                alias,
             } => {
-                if !(1..=100).contains(count) || template.validate().is_err() {
+                let alias = alias
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|a| !a.is_empty())
+                    .unwrap_or(&template.monster.name)
+                    .to_string();
+                if !(1..=100).contains(count) || template.validate().is_err() || !label(&alias) {
                     return Err(Rejection::InvalidInput);
                 }
                 let stats = &template.monster.stats;
+                let added = rows.len();
                 for _ in 0..*count {
                     rows.push(Row {
                         id: Uuid::new_v4(),
                         score: *score,
                         actor: Participant::Enemy(Enemy {
                             name: template.monster.name.clone(),
-                            alias: template.monster.name.clone(),
+                            alias: alias.clone(),
                             revealed: false,
                             hp: stats.hp,
                             max_hp: stats.hp,
@@ -1255,6 +1426,7 @@ impl Fight {
                         actions: Actions::default(),
                     });
                 }
+                number_duplicates(rows, added);
             }
             Edit::Duplicate { id } => {
                 let mut row = rows
@@ -1265,6 +1437,8 @@ impl Fight {
                 row.id = Uuid::new_v4();
                 row.actions.duplicate();
                 rows.push(row);
+                let added = rows.len() - 1;
+                number_duplicates(rows, added);
             }
             Edit::MonsterAction { id, action } => {
                 let targets = rows
@@ -1320,7 +1494,8 @@ impl Fight {
                     if let Participant::Enemy(other) = &r.actor {
                         let matches = match (&enemy.template, &other.template) {
                             (Some(a), Some(b)) => a.same_template(b),
-                            (None, None) => enemy.name == other.name,
+                            // Numbered copies (Bandit 1, Bandit 2) group together.
+                            (None, None) => name_stem(&enemy.name).0 == name_stem(&other.name).0,
                             _ => false,
                         };
                         if matches {

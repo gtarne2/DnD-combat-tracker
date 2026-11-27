@@ -2,6 +2,7 @@ function setupMonsterActions(el, change, selectRow) {
   const panel = el("dm-monster-actions");
   const picker = el("dm-action-rule");
   const mode = el("dm-action-mode");
+  if (dmSettings.get("assistDefault")) mode.value = "assist";
   const dialog = el("dm-action-dialog");
   const form = el("dm-action-form");
   const fields = el("dm-action-fields");
@@ -208,10 +209,18 @@ function setupMonsterActions(el, change, selectRow) {
     el("dm-current-actions").hidden = !current?.enemy || row.id === current.id;
     el("dm-actions-actor").textContent = row.name + (row.id === current?.id ? " · Current turn" : "") + " · "
       + (mode.value === "assist" ? "Assist" : "Manual");
+    // Each pill is a quick table override: click to mark it spent or ready again.
     const pills = ["action", "bonus", "reaction"].map(key => {
-      const pill = make("span", labels[key] + " " + (actions[key] ? "ready" : "spent"));
+      const pill = Object.assign(make("button", labels[key] + " " + (actions[key] ? "ready" : "spent")),
+        {type:"button", disabled:busy, title:(actions[key] ? "Mark " : "Mark ready: ") + labels[key].toLowerCase() + (actions[key] ? " as spent" : "")});
       pill.className = "dm-pill";
       pill.dataset.state = actions[key] ? "ready" : "spent";
+      pill.setAttribute("aria-pressed", String(!actions[key]));
+      pill.onclick = () => change({kind:"monster_action", id:row.id, action:{kind:"correct_budget",
+        action:key === "action" ? !actions.action : actions.action,
+        bonus:key === "bonus" ? !actions.bonus : actions.bonus,
+        reaction:key === "reaction" ? !actions.reaction : actions.reaction,
+        legendary_max:actions.legendary_max, legendary_left:actions.legendary_left, legendary_reset:actions.legendary_reset}});
       return pill;
     });
     if (actions.legendary_max) {
@@ -240,7 +249,8 @@ function setupMonsterActions(el, change, selectRow) {
       entry.input.strikes.forEach((strike, index) => {
         const power = actions.rules.find(rule => rule.id === strike.rule);
         const number = index + 1;
-        const target = strike.target_note || targetName(state, strike.target) || (strike.target ? "Removed target" : "No specific target");
+        const named = targetName(state, strike.target) || (strike.target ? "Removed target" : "No specific target");
+        const target = strike.target_note ? named + " (" + strike.target_note + ")" : named;
         const recipient = entry.recipients == null
           ? board.rows.find(r => r.id === strike.target)?.damage_recipient : entry.recipients[strike.id];
         const member = state.members?.find(m => m.member_id === recipient);
@@ -632,6 +642,11 @@ function setupMonsterActions(el, change, selectRow) {
         target.id, rows.some(other => other.id !== target.id && other.name === target.name)
           ? target.name + " · " + target.id.slice(0, 8) : target.name
       ])]);
+      const recent = [...(actor.actions.history || [])].sort((a, b) => b.round - a.round)
+        .flatMap(entry => [...entry.input.strikes].reverse().map(strike => strike.target))
+        .find(target => target && rows.some(row => row.id === target));
+      const players = rows.filter(row => !row.enemy && (row.damage_recipient || !room.combat.rows.includes(row)));
+      const defaultTarget = recent || (players.length === 1 ? players[0].id : "");
       const add = Object.assign(make("button", "Add strike or target"), {type:"button"});
       const remove = Object.assign(make("button", "Remove last strike"), {type:"button"});
       function addStrike(ruleId) {
@@ -640,11 +655,19 @@ function setupMonsterActions(el, change, selectRow) {
         const rule = actor.actions.rules.find(r => r.id === ruleId);
         group.append(make("legend", "Strike " + (entries.length + 1) + " · " + rule.name));
         if (ruleId !== power.id) group.append(make("p", rule.text));
-        const target = field(group, "Target", select(choices));
-        const targetNote = field(group, "Private target detail", text(120));
+        // Start from the last creature this monster struck, or the only player, so damage can
+        // reach a player without picking the target every time.
+        const target = field(group, "Target", select(choices, defaultTarget));
         const total = field(group, "Physical roll total", number(null, -2147483648, 2147483647));
         const outcome = field(group, "Table outcome", select(outcomes));
+        // Rarely used fields wait under More options.
+        const extra = make("details");
+        extra.className = "dm-more";
+        extra.open = dmSettings.get("openMore");
+        extra.append(make("summary", "More options"));
+        const targetNote = field(extra, "Private target detail", text(120));
         const assist = strikeFields(group, rule, () => target.value, total, outcome, localMode);
+        group.append(extra);
         target.onchange = assist.update;
         strikeBox.append(group);
         entries.push({group, update:assist.update, read:() => ({
@@ -670,7 +693,12 @@ function setupMonsterActions(el, change, selectRow) {
         controls.append(add, remove);
         box.append(controls);
       }
-      const note = field(box, "Private note or ruling override", text(1000, true));
+      const noteBox = make("details");
+      noteBox.className = "dm-more";
+      noteBox.open = dmSettings.get("openMore");
+      noteBox.append(make("summary", "Private note or ruling override"));
+      box.append(noteBox);
+      const note = field(noteBox, "Private note or ruling override", text(1000, true));
       const update = () => entries.forEach(strike => strike.update());
       localMode.onchange = update;
       const readAction = () => ({kind:"record", action:{

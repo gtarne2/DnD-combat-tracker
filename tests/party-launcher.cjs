@@ -72,6 +72,10 @@ async function pageFor(name,info,{localOnly=false,waitForHeartbeat=false}={}) {
     || name === "observer" && process.argv.includes("--monster-damage"))) {
     await profile.addInitScript(() => Object.defineProperty(navigator, "locks", {value: undefined}));
   }
+  // Scenarios reach every dashboard control, so keep the "More options" sections open.
+  if (name === "dm") await profile.addInitScript(() => {
+    try { if (!localStorage.getItem("aurora-dm-settings-v1")) localStorage.setItem("aurora-dm-settings-v1", JSON.stringify({openMore:true})); } catch {}
+  });
   const page=await profile.newPage();
   // Exercise the copy button without replacing the Windows user's clipboard.
   await page.addInitScript(()=>Object.defineProperty(navigator,"clipboard",{value:{writeText:async text=>{window.copiedInvitation=text;}}}));

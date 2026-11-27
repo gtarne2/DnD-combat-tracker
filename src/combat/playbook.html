@@ -16,9 +16,11 @@
   <div class="dialog-heading"><h2 id="protector-heading">Activate Protector</h2><form method="dialog"><button>Cancel</button></form></div>
   <form id="protector-form">
     <p id="protector-description"></p>
-    <label>Rolled temporary HP <input name="amount" type="number" min="1" max="4294967295" required></label>
+    <details id="protector-rules" class="more-options" hidden><summary>Cannon rules</summary><p></p></details>
+    <p class="protector-amount"><label>Temporary HP <input name="amount" type="number" min="1" max="4294967295" required></label> <button type="button" id="protector-roll" class="quiet-button">Roll 1d8 + modifier</button></p>
     <fieldset id="protector-targets"><legend>Recipients in range</legend></fieldset>
-    <p>Recipients keep their higher temporary HP total.</p>
+    <p id="protector-aura-note" class="hint"></p>
+    <p class="hint">Recipients keep their higher temporary HP total.</p>
     <p id="protector-feedback" role="status"></p>
     <div class="focus-form companion-edit-actions">
       <button name="mode" value="record" formnovalidate>Record activation only</button>

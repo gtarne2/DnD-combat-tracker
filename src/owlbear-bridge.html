@@ -109,11 +109,15 @@ if (!host) {
       show("The Owlbear tab was closed. You can close this window.", "bad");
       return;
     }
-    if (!partner || Date.now() - lastHeard > 8000) {
+    // A reloaded Owlbear tab leaves the old frame closed. The extension polls every 2 seconds,
+    // so 4 seconds of silence also means the partner is gone.
+    let gone = !partner;
+    try { gone = gone || partner.closed; } catch { gone = true; }
+    if (gone || Date.now() - lastHeard > 4000) {
       if (partner) show("Waiting for Owlbear to reconnect…");
       hello();
     }
-  }, 3000);
+  }, 1000);
 }
 </script>
 </body>

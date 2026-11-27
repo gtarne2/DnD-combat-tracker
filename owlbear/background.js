@@ -3,7 +3,7 @@
 // it over a BroadcastChannel, because they close often.
 import OBR from "./obr-sdk-3.1.0.js";
 import { BridgeClient } from "./bridge-client.js";
-import { LINK, addTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
+import { LINK, addTokens, adoptPlayerTokens, linkToken, linkedRows, removeTokens, syncTokens, unlinkToken } from "./tokens.js";
 import { autoMatch } from "./players.js";
 import { insideReports, listenForDraws, syncTemplates } from "./template-sync.js";
 
@@ -15,10 +15,12 @@ let insideTimer = null;
 const POLL_MS = 2000;
 const BASE = new URL(".", import.meta.url).href;
 const channel = new BroadcastChannel("aurora-obr");
-const state = { role: null, connected: false, paired: false, table: null, onMap: {}, error: null, mapError: null, mapNotes: [], checkedAt: null };
+const state = { role: null, connected: false, paired: false, table: null, onMap: {}, error: null, mapError: null, mapNotes: [], checkedAt: null, startedAt: Date.now() };
 let client = null;
 let badge = null;
 let syncing = false;
+// Rows seen in this encounter, so a monster or companion added mid-fight gets a token.
+let seen = null;
 
 function publish() {
   state.connected = Boolean(client && client.connected);
@@ -38,9 +40,11 @@ async function syncMap() {
   if (!state.table || syncing) return;
   syncing = true;
   try {
+    await placeNewRows(state.table);
     await syncTokens(state.table);
     state.onMap = await linkedRows(state.table.room_id);
-    autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
+    const matches = autoMatch(state.table.room_id, await OBR.party.getPlayers(), state.table.encounter.rows);
+    if (await adoptPlayerTokens(state.table, matches)) state.onMap = await linkedRows(state.table.room_id);
     state.mapNotes = await syncTemplates(state.table);
     await reportInside();
     state.mapError = null;
@@ -48,6 +52,31 @@ async function syncMap() {
     state.mapError = error.message || String(error);
   } finally {
     syncing = false;
+  }
+}
+
+// Once the encounter is running, a monster added to the tracker is put on the map, hidden
+// until the DM reveals it, and a companion summoned mid-fight (such as an Eldritch Cannon) is
+// put beside its owner's token. Rows that were there when the link started are left to the DM.
+async function placeNewRows(table) {
+  const encounter = table.encounter;
+  const key = `${table.room_id}/${encounter.id}`;
+  const ids = encounter.rows.filter((row) => row.kind !== "player").map((row) => row.id);
+  if (!seen || seen.key !== key) {
+    seen = { key, ids: new Set(ids) };
+    return;
+  }
+  const fresh = encounter.rows.filter((row) => row.kind !== "player" && !seen.ids.has(row.id));
+  if (!fresh.length) return;
+  for (const row of fresh) seen.ids.add(row.id);
+  if (!encounter.running || !(await OBR.scene.isReady())) return;
+  const enemies = fresh.filter((row) => row.kind === "enemy").map((row) => row.id);
+  if (enemies.length) await addTokens(table, enemies, { hidden: true });
+  const onMap = await linkedRows(table.room_id);
+  for (const row of fresh.filter((r) => r.kind === "companion")) {
+    const owner = encounter.rows.find((r) => r.kind === "player" && r.member_id === row.member_id);
+    const token = owner && onMap[owner.id] ? (await OBR.scene.items.getItems([onMap[owner.id]]))[0] : null;
+    await addTokens(table, [row.id], { near: token?.position });
   }
 }
 
@@ -61,10 +90,10 @@ async function reportInside() {
   lastInside = { key, at: Date.now() };
 }
 
-// A template or token moved: update the suggestion once things settle for half a second.
+// A template or token moved: update the suggestion once a drag pauses.
 function insideSoon() {
   clearTimeout(insideTimer);
-  insideTimer = setTimeout(() => reportInside().catch(() => {}), 500);
+  insideTimer = setTimeout(() => reportInside().catch(() => {}), 150);
 }
 
 async function refresh() {

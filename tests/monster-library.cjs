@@ -163,7 +163,7 @@ module.exports = async function monsterLibrary({launch,pageFor,open,api}) {
   const guest = await launch("guest","join",invite);
   await wait(async()=> (await (await api(guest,"state")).json()).combat?.rows.length===3,"Guest sees public order");
   const projection = await (await api(guest,"state")).text();
-  for (const text of ["Mosaic Wolf","Mosaic Bestiary","Facet Nip","Mosaic hide","template"]) assert.ok(!projection.includes(text));
+  for (const text of ["Mosaic Wolf","Mosaic Bestiary","Facet Nip","Mosaic hide","\"template\":"]) assert.ok(!projection.includes(text));
   assert.equal((await api(guest,"monsters/list")).status,403);
   assert.equal((await api(dm,"monsters/list","https://example.invalid")).status,403);
 

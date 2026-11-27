@@ -188,6 +188,12 @@
         summary = "Level required";
       }
     }
+    const summon = tools.querySelector("[data-summon-create]");
+    if (summon) {
+      const busy = actionEconomy.reason(state, "owner", "action");
+      summon.disabled = Boolean(busy);
+      summon.title = busy || "";
+    }
     if (charges) {
       unavailable = charges.uses === 0 || charges.requiresAttunement;
       reason = charges.requiresAttunement ? tools.dataset.attunementNote : reason;

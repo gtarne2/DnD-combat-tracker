@@ -2,13 +2,18 @@
 //
 // Each token carries LINK metadata naming the tracker room and row. Metadata is visible to
 // every player, so it holds IDs and the last applied reveal state, never names or stats.
-import OBR, { buildImage, buildLabel } from "./obr-sdk-3.1.0.js";
+// Token names are the player-facing alias even while hidden: Owlbear does not show hidden
+// items to players, and the name is what they will see on reveal.
+import OBR, { buildImage } from "./obr-sdk-3.1.0.js";
 
 export const LINK = "com.aurora-tracker/link";
 export const MARKER = "com.aurora-tracker/marker";
 const BASE = new URL(".", import.meta.url).href;
 const ART_KEY = "aurora-obr-art";
 const HIDDEN_NAME = "Enemy";
+/** Marker metadata for the down badge. */
+export const DOWN = "down-badge";
+const BADGE_CELLS = 0.35;
 const CELLS = { tiny: 0.5, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
 
 /** Art is remembered per monster template, player or companion. */
@@ -37,9 +42,9 @@ export function cellsFor(size) {
   return CELLS[String(size || "").trim().toLowerCase()] || 1;
 }
 
-/** The name players may see on a token. */
+/** The name players see on a token once it is visible. */
 export function publicName(row) {
-  if (row.kind === "enemy") return row.revealed && row.name ? row.name : HIDDEN_NAME;
+  if (row.kind === "enemy") return row.name || HIDDEN_NAME;
   return row.name || "Unknown";
 }
 
@@ -55,12 +60,12 @@ function placeholder(kind) {
   };
 }
 
-function buildToken(row, room, position, art) {
+function buildToken(row, room, position, art, forceHidden = false) {
   const chosen = art[artKey(row)] || placeholder(row.kind);
   const cells = row.kind === "enemy" ? cellsFor(row.template?.size) : 1;
   const base = chosen.scale || { x: 1, y: 1 };
   const name = publicName(row);
-  const hidden = row.kind === "enemy" && !row.revealed;
+  const hidden = row.kind === "enemy" && (forceHidden || !row.revealed);
   return buildImage(chosen.image, chosen.grid)
     .name(name)
     .plainText(name)
@@ -91,7 +96,7 @@ export async function linkedRows(room) {
 }
 
 /** Put tokens for the given rows in a row of cells around the DM's view centre. */
-export async function addTokens(table, rowIds) {
+export async function addTokens(table, rowIds, { hidden = false, near = null } = {}) {
   if (!(await OBR.scene.isReady())) throw new Error("Open a scene in Owlbear first.");
   const room = table.room_id;
   const onMap = await linkedRows(room);
@@ -100,7 +105,8 @@ export async function addTokens(table, rowIds) {
   const dpi = await OBR.scene.grid.getDpi();
   const width = await OBR.viewport.getWidth();
   const height = await OBR.viewport.getHeight();
-  const centre = await OBR.viewport.inverseTransformPoint({ x: width / 2, y: height / 2 });
+  // Beside a given token (one square to its right), or in the middle of the DM's view.
+  const centre = near ? { x: near.x + dpi, y: near.y } : await OBR.viewport.inverseTransformPoint({ x: width / 2, y: height / 2 });
   const art = loadArt();
   const sizes = rows.map((row) => (row.kind === "enemy" ? cellsFor(row.template?.size) : 1));
   const span = sizes.reduce((sum, cells) => sum + Math.max(1, cells), 0) * dpi;
@@ -110,7 +116,7 @@ export async function addTokens(table, rowIds) {
     const cells = Math.max(1, sizes[index]);
     const odd = cells % 2 === 1;
     const spot = await OBR.scene.grid.snapPosition({ x: x + (cells * dpi) / 2, y: centre.y }, 1, !odd, odd);
-    items.push(buildToken(row, room, spot, art));
+    items.push(buildToken(row, room, spot, art, hidden));
     x += cells * dpi;
   }
   await OBR.scene.items.addItems(items);
@@ -142,13 +148,38 @@ async function unlinkOrDelete(items, room) {
   }
 }
 
-/** Link a token the DM already placed to a tracker row. */
+/** Link a token the DM already placed to a tracker row. A hidden enemy's token is hidden. */
 export async function linkToken(itemId, room, row) {
+  const revealed = row.kind !== "enemy" || Boolean(row.revealed);
   await OBR.scene.items.updateItems([itemId], (drafts) => {
     for (const draft of drafts) {
-      draft.metadata[LINK] = { room, row: row.id, kind: row.kind, created: false, revealed: row.kind !== "enemy" || row.revealed };
+      draft.metadata[LINK] = { room, row: row.id, kind: row.kind, created: false, revealed };
+      if (row.kind === "enemy") draft.visible = revealed;
     }
   });
+}
+
+/**
+ * Link each tracker player's own token without a click: an unlinked character token created
+ * by the Owlbear player matched to that tracker player. Skipped when there are several.
+ */
+export async function adoptPlayerTokens(table, matches) {
+  if (!(await OBR.scene.isReady())) return 0;
+  const room = table.room_id;
+  const onMap = await linkedRows(room);
+  const waiting = table.encounter.rows.filter((row) => row.kind === "player" && !onMap[row.id]);
+  if (!waiting.length) return 0;
+  const free = await OBR.scene.items.getItems((item) => item.layer === "CHARACTER" && !item.metadata?.[LINK]);
+  let linked = 0;
+  for (const row of waiting) {
+    const owners = Object.keys(matches).filter((player) => matches[player] === row.member_id);
+    const mine = free.filter((item) => owners.includes(item.createdUserId));
+    if (mine.length !== 1) continue;
+    await linkToken(mine[0].id, room, row);
+    free.splice(free.indexOf(mine[0]), 1);
+    linked += 1;
+  }
+  return linked;
 }
 
 export async function unlinkToken(itemId, room) {
@@ -164,7 +195,7 @@ async function markersFor(ids) {
 /**
  * Bring linked tokens in line with the tracker: names and visibility follow reveals, a
  * removed row loses its token (or its link, for a token the DM placed), and a downed enemy
- * gets a small "Down" label attached under it.
+ * gets a small badge attached to it.
  */
 export async function syncTokens(table) {
   if (!(await OBR.scene.isReady())) return;
@@ -195,8 +226,8 @@ export async function syncTokens(table) {
           draft.name = change.name;
           if (draft.text) Object.assign(draft.text, textFor(change.name));
         }
-        // A reveal shows the token; hiding again only hides tokens this extension placed.
-        if (change.reveal && (change.revealed || draft.metadata[LINK].created)) draft.visible = change.revealed;
+        // Reveal and hide follow the tracker for every linked token, placed or adopted.
+        if (change.reveal) draft.visible = change.revealed;
         draft.metadata[LINK] = { ...draft.metadata[LINK], revealed: change.revealed };
       }
     });
@@ -204,7 +235,11 @@ export async function syncTokens(table) {
 
   // Read the tokens again: the updates above may have changed their visibility.
   const kept = await OBR.scene.items.getItems(linked.filter((item) => rows.has(linkOf(item, room).row)).map((item) => item.id));
+  // Older versions used a large text label. Replace those with the small badge.
+  const outdated = (await markersFor(kept.map((item) => item.id))).filter((marker) => marker.metadata[MARKER] !== DOWN);
+  if (outdated.length) await OBR.scene.items.deleteItems(outdated.map((marker) => marker.id));
   const markers = await markersFor(kept.map((item) => item.id));
+  const dpi = await OBR.scene.grid.getDpi();
   const marked = new Set(markers.map((marker) => marker.attachedTo));
   const visibility = new Map(kept.map((item) => [item.id, item.visible]));
   const add = [];
@@ -214,20 +249,22 @@ export async function syncTokens(table) {
     const row = rows.get(linkOf(item, room).row);
     if (!row) continue;
     if (row.down && !marked.has(item.id)) {
+      // A small skull badge on the token's lower right, about a third of a square across.
+      const cells = row.kind === "enemy" ? cellsFor(row.template?.size) : 1;
+      const corner = Math.max(1, cells) * dpi * 0.35;
       add.push(
-        buildLabel()
-          .plainText("Down")
-          .position({ x: item.position.x, y: item.position.y })
+        buildImage(
+          { url: `${BASE}marker-down.svg`, mime: "image/svg+xml", width: 64, height: 64 },
+          { dpi: 64 / BADGE_CELLS, offset: { x: 32, y: 32 } },
+        )
+          .name("Down")
+          .position({ x: item.position.x + corner, y: item.position.y + corner })
           .attachedTo(item.id)
           .layer("ATTACHMENT")
-          .backgroundColor("#7f1d1d")
-          .backgroundOpacity(0.85)
-          .fillColor("#ffffff")
-          .pointerHeight(0)
           .locked(true)
           .disableHit(true)
           .visible(item.visible)
-          .metadata({ [MARKER]: "down" })
+          .metadata({ [MARKER]: DOWN })
           .build(),
       );
     }

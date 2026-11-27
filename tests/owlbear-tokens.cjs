@@ -93,7 +93,7 @@ async function main() {
     assert(t.cellsFor("Large") === 2 && t.cellsFor("gargantuan") === 4 && t.cellsFor(undefined) === 1, "sizes");
 
     let rows = [
-      { id: "w1", kind: "enemy", revealed: false, name: null, down: false, template: wolf },
+      { id: "w1", kind: "enemy", revealed: false, name: "Wolf A", down: false, template: wolf },
       { id: "o1", kind: "enemy", revealed: true, name: "Ogre A", down: false, template: ogre },
       { id: "p1", kind: "player", member_id: "m1", name: "Lark" },
       { id: "c1", kind: "companion", member_id: "m1", local_id: 1, name: "Steel Defender" },
@@ -103,7 +103,7 @@ async function main() {
     assert((await t.addTokens(table(rows), ["w1"])) === 0, "a row with a token is not added twice");
 
     const hidden = tokenFor("w1");
-    assert(hidden.visible === false && hidden.name === "Enemy" && hidden.text.plainText === "Enemy", "unrevealed enemy goes in hidden and unnamed");
+    assert(hidden.visible === false && hidden.name === "Wolf A" && hidden.text.plainText === "Wolf A", "unrevealed enemy goes in hidden, under the name players will see");
     assert(hidden.image.url.endsWith("/token-enemy.png"), "placeholder art for a template without art");
     const big = tokenFor("o1");
     assert(big.visible && big.name === "Ogre A" && big.scale.x === 2, "revealed large enemy named and two cells");
@@ -118,28 +118,39 @@ async function main() {
     rows[1] = { ...rows[1], down: true };
     await t.syncTokens(table(rows));
     assert(tokenFor("w1").visible && tokenFor("w1").name === "Wolf A" && tokenFor("w1").text.plainText === "Wolf A", "reveal shows and names the token");
-    const down = items().filter((i) => i.metadata[t.MARKER] === "down");
+    const down = items().filter((i) => i.metadata[t.MARKER] === t.DOWN);
     assert(down.length === 1 && down[0].attachedTo === tokenFor("o1").id && down[0].layer === "ATTACHMENT", "down marker attached");
+    assert(down[0].type === "IMAGE" && down[0].image.url.endsWith("/marker-down.svg") && down[0].grid.dpi > 150, "down marker is a small badge, under a third of a square");
+    // A marker from an older version (a text label) is replaced by the badge.
+    scene.set("old-label", { id: "old-label", type: "LABEL", metadata: { [t.MARKER]: "down" }, attachedTo: tokenFor("o1").id, visible: true, position: { x: 0, y: 0 } });
+    await t.syncTokens(table(rows));
+    assert(!scene.has("old-label"), "old text marker removed");
     await t.syncTokens(table(rows));
     assert(items().filter((i) => i.metadata[t.MARKER]).length === 1, "sync is idempotent");
 
     scene.set("mine", { id: "mine", type: "IMAGE", name: "My goblin", visible: true, metadata: { other: 1 }, position: { x: 0, y: 0 } });
-    rows.push({ id: "g1", kind: "enemy", revealed: false, name: null, down: false, template: null });
+    rows.push({ id: "g1", kind: "enemy", revealed: false, name: "Goblin", down: false, template: null });
     await t.linkToken("mine", ROOM, rows[4]);
     await t.syncTokens(table(rows));
-    assert(scene.get("mine").name === "My goblin" && scene.get("mine").visible, "a hand-placed token keeps its name and is not hidden");
-
-    // Hiding again only hides tokens this extension placed.
-    rows[0] = { ...rows[0], revealed: false, name: null };
+    assert(scene.get("mine").name === "My goblin" && !scene.get("mine").visible, "a hand-placed token keeps its name and hides with its hidden row");
+    rows[4] = { ...rows[4], revealed: true };
     await t.syncTokens(table(rows));
-    assert(!tokenFor("w1").visible && tokenFor("w1").name === "Enemy", "re-hidden enemy hidden again");
+    assert(scene.get("mine").visible, "a linked hand-placed token shows on reveal");
+    rows[4] = { ...rows[4], revealed: false };
+    await t.syncTokens(table(rows));
+    assert(!scene.get("mine").visible, "and hides again");
+
+    // Hiding again hides the token and keeps its name.
+    rows[0] = { ...rows[0], revealed: false };
+    await t.syncTokens(table(rows));
+    assert(!tokenFor("w1").visible && tokenFor("w1").name === "Wolf A", "re-hidden enemy hidden again");
 
     // A downed hidden enemy's marker hides and shows with its token.
     rows[0] = { ...rows[0], down: true };
     await t.syncTokens(table(rows));
     const marker = () => items().find((i) => i.metadata[t.MARKER] && i.attachedTo === tokenFor("w1").id);
     assert(marker() && marker().visible === false, "marker on a hidden token is hidden");
-    rows[0] = { ...rows[0], revealed: true, name: "Wolf A" };
+    rows[0] = { ...rows[0], revealed: true };
     await t.syncTokens(table(rows));
     assert(marker().visible === true, "marker shows on reveal");
     rows[0] = { ...rows[0], down: false };
@@ -169,6 +180,14 @@ async function main() {
     assert(p.loadMatches(ROOM)["obr-2"] === "m2" && Object.keys(p.loadMatches("other")).length === 0, "manual match per room");
     p.saveMatch(ROOM, "obr-2", "");
     assert(!p.loadMatches(ROOM)["obr-2"], "clearing a match");
+
+    // A matched player's own token is linked to their row without a click.
+    const lark = { id: "p9", kind: "player", member_id: "m1", name: "Lark" };
+    scene.set("lark-token", { id: "lark-token", type: "IMAGE", layer: "CHARACTER", createdUserId: "obr-1", name: "Lark", visible: true, metadata: {}, position: { x: 0, y: 0 } });
+    scene.set("dm-token", { id: "dm-token", type: "IMAGE", layer: "CHARACTER", createdUserId: "dm", name: "Orc", visible: true, metadata: {}, position: { x: 0, y: 0 } });
+    assert((await t.adoptPlayerTokens(table([lark]), p.loadMatches(ROOM))) === 1, "player token adopted");
+    assert(scene.get("lark-token").metadata[t.LINK]?.row === "p9" && !scene.get("dm-token").metadata[t.LINK], "only the matched player's token is linked");
+    assert((await t.adoptPlayerTokens(table([lark]), p.loadMatches(ROOM))) === 0, "adoption happens once");
 
     // Spell templates (O3).
     const tp = await import(pathToFileURL(path.join(dir, "templates.js")).href);

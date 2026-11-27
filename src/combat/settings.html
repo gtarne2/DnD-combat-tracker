@@ -1,0 +1,15 @@
+<dialog id="sheet-settings" aria-labelledby="sheet-settings-title">
+  <div class="dialog-heading"><h2 id="sheet-settings-title">Settings</h2><form method="dialog"><button>Close</button></form></div>
+  <p class="settings-note">Saved in this browser for every character.</p>
+  <fieldset class="settings-group">
+    <legend>Turn tracking</legend>
+    <label><input type="checkbox" data-sheet-setting="trackActions"> Track my action, bonus action and reaction in the DM's initiative</label>
+    <p class="settings-hint">Spent actions show on the combat rail. Click one to mark it ready again when the table rules otherwise.</p>
+  </fieldset>
+  <fieldset class="settings-group">
+    <legend>Assists</legend>
+    <label><input type="checkbox" data-sheet-setting="autoRollArea"> Roll area spell damage for me</label>
+    <p class="settings-hint">When off, type the damage you rolled at the table, or use the Roll button on the spell's card.</p>
+  </fieldset>
+  <p id="sheet-settings-status" class="focus-feedback" role="status"></p>
+</dialog>

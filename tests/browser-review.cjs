@@ -599,7 +599,8 @@ async function main() {
     assert.equal(attackSize.height, castSize.height);
     const headerTools = await compact.locator(".command-tools").boundingBox();
     const layoutButton = await compact.getByRole("button", {name: "Layout", exact: true}).boundingBox();
-    assert.ok(headerTools.x > 1000 && headerTools.width < 300);
+    // Find, Session, the Settings gear and Layout fit in a narrow group at the right.
+    assert.ok(headerTools.x > 1000 && headerTools.width < 340);
     assert.equal(headerTools.x + headerTools.width, layoutButton.x + layoutButton.width);
     const height = await compact.locator("#all-options").evaluate((list) => list.clientHeight);
     assert.ok(height > 203, `Expected more than 203px of actions, saw ${height}px`);

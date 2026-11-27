@@ -141,7 +141,7 @@ fn table_view_shows_only_what_players_may_see() {
     let hidden = rows.iter().find(|r| r["id"] == enemies[1]["id"]).unwrap();
     assert_eq!(hidden["kind"], "enemy");
     assert_eq!(hidden["revealed"], false);
-    assert!(hidden["name"].is_null());
+    assert_eq!(hidden["name"], enemies[1]["enemy"]["alias"]);
     assert_eq!(hidden["down"], false);
     assert_eq!(
         hidden["template"]["key"],
@@ -754,4 +754,179 @@ fn an_area_spell_resolves_through_the_dm_queue() {
         json!({"kind":"dismiss_area","id":again}),
     );
     assert_eq!(board(&service, room)["areas"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn enemies_with_the_same_name_are_numbered_and_can_have_an_alias() {
+    let db = Database(std::env::temp_dir().join(format!("aurora-obr-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = Uuid::new_v4();
+    service
+        .execute(
+            HOST,
+            &command(
+                room,
+                Create {
+                    mode: HostMode::Dm,
+                    name: "Warden".into(),
+                },
+            ),
+        )
+        .unwrap();
+    let names = |service: &RoomService| -> Vec<(String, String)> {
+        board(service, room)["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| {
+                let enemy = r.get("enemy")?;
+                Some((
+                    enemy["name"].as_str()?.to_string(),
+                    enemy["alias"].as_str()?.to_string(),
+                ))
+            })
+            .collect()
+    };
+    let pair = |name: &str, alias: &str| (name.to_string(), alias.to_string());
+    // One alone keeps its name.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":1,"score":14}),
+    );
+    assert_eq!(names(&service), [pair("Wolf", "Wolf")]);
+    // A second one numbers both, and a third continues the count.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":2,"score":14}),
+    );
+    assert_eq!(
+        names(&service),
+        [
+            pair("Wolf 1", "Wolf 1"),
+            pair("Wolf 2", "Wolf 2"),
+            pair("Wolf 3", "Wolf 3")
+        ]
+    );
+    // Duplicate takes the next number.
+    let first = board(&service, room)["rows"][0]["id"].clone();
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"duplicate","id":first}),
+    );
+    assert_eq!(names(&service).last().unwrap(), &pair("Wolf 4", "Wolf 4"));
+    // An alias from the monster library names what players see; the DM keeps the stat block name.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":2,"score":10,"alias":"Grey hound"}),
+    );
+    let all = names(&service);
+    assert!(all.contains(&pair("Wolf 5", "Grey hound 1")), "{all:?}");
+    assert!(all.contains(&pair("Wolf 6", "Grey hound 2")), "{all:?}");
+    // A blank alias falls back to the monster's name.
+    edit(
+        &mut service,
+        room,
+        HOST,
+        json!({"kind":"add_monsters","template":wolf(),"count":1,"score":9,"alias":"  "}),
+    );
+    assert!(names(&service).contains(&pair("Wolf 7", "Wolf 5")));
+}
+
+#[test]
+fn a_shared_companion_has_a_map_spot_and_can_anchor_an_aura() {
+    use aurora_combat_tracker::party::InsideReport;
+    use aurora_combat_tracker::party::initiative::companion_map_id;
+    let db = Database(std::env::temp_dir().join(format!("aurora-obr-{}.sqlite3", Uuid::new_v4())));
+    let mut service = RoomService::open(&db.0).unwrap();
+    let room = Uuid::new_v4();
+    service
+        .execute(
+            HOST,
+            &command(
+                room,
+                Create {
+                    mode: HostMode::Dm,
+                    name: "Warden".into(),
+                },
+            ),
+        )
+        .unwrap();
+    service
+        .execute(
+            PLAYER,
+            &command(
+                room,
+                Join {
+                    name: "Lark".into(),
+                },
+            ),
+        )
+        .unwrap();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"submit","score":15,"companions":[{"local_id":4,"name":"Eldritch Cannon — Protector","initiative":null}]}),
+    );
+    let lark: Uuid =
+        serde_json::from_value(board(&service, room)["rows"][0]["id"].clone()).unwrap();
+    let cannon = companion_map_id(lark, 4);
+    assert_ne!(cannon, lark);
+
+    // The map gets a companion row for the cannon, though it shares Lark's turn.
+    let table = service.table_view(HOST, room).unwrap();
+    let rows = table["encounter"]["rows"].as_array().unwrap();
+    let spot = rows.iter().find(|r| r["id"] == json!(cannon)).unwrap();
+    assert_eq!(spot["kind"], "companion");
+    assert_eq!(spot["shared"], true);
+    // The owner's sheet learns the cannon's map ID; Lark's row names its member.
+    let mine = service.poll(PLAYER, room, 0).unwrap().combat.unwrap();
+    assert_eq!(mine["rows"][0]["companion_rows"]["4"], json!(cannon));
+    assert!(mine["rows"][0]["member_id"].is_string());
+
+    // An aura anchored on the cannon is drawn at the cannon, not at Lark.
+    let aura = Uuid::new_v4();
+    edit(
+        &mut service,
+        room,
+        PLAYER,
+        json!({"kind":"place_template","template":{"id":aura,"spell":"Protector aura","shape":"emanation","size":10,"lasts":"removed","anchor":4}}),
+    );
+    let table = service.table_view(HOST, room).unwrap();
+    assert_eq!(table["encounter"]["templates"][0]["caster"], json!(cannon));
+    // Inside reports may name the cannon's map ID.
+    service
+        .report_inside(
+            HOST,
+            room,
+            vec![InsideReport {
+                template: aura,
+                rows: vec![lark, cannon],
+            }],
+        )
+        .unwrap();
+    let mine = service.poll(PLAYER, room, 0).unwrap().combat.unwrap();
+    assert_eq!(mine["templates"][0]["inside"].as_array().unwrap().len(), 2);
+    // A template can't be anchored on a companion the caster doesn't have.
+    let view = board(&service, room);
+    let refused = service.execute(
+        PLAYER,
+        &command(
+            room,
+            Initiative(FightEdit {
+                encounter_id: serde_json::from_value(view["id"].clone()).unwrap(),
+                expected_revision: view["revision"].as_u64().unwrap(),
+                edit: serde_json::from_value(json!({"kind":"place_template","template":{"id":Uuid::new_v4(),"spell":"Protector aura","shape":"emanation","size":10,"lasts":"removed","anchor":9}})).unwrap(),
+            }),
+        ),
+    );
+    assert!(refused.is_err());
 }

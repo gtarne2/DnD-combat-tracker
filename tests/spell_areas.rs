@@ -146,3 +146,11 @@ fn saves_and_damage_types_from_descriptions() {
         "dexterity half"
     );
 }
+
+#[test]
+fn teleports_show_their_reach_around_the_caster() {
+    let misty = "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space that you can see.";
+    assert_eq!(spell_area(Some("Self"), misty), area(Emanation, 30, None));
+    let door = "You teleport yourself from your current location to any other spot within range.";
+    assert_eq!(spell_area(Some("500 feet"), door), None);
+}

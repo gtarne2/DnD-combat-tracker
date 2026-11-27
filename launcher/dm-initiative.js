@@ -8,6 +8,15 @@ function setupDmInitiative(request, refresh) {
   const send = initiativeWriter(request);
   let room, editing, busy = false, signature, damageSignature, currentEnemy;
   const selected = () => room?.combat?.rows.find(row => row.id === order.value);
+  // Enemies go by the alias players know them by. The monster type follows in small text when
+  // the alias doesn't already say it.
+  const shownName = row => row.enemy?.alias || row.name;
+  const typeName = row => {
+    const enemy = row.enemy;
+    if (!enemy) return "";
+    const type = enemy.template?.monster?.name || String(enemy.name || "").replace(/\s+\d{1,3}$/, "");
+    return type && !shownName(row).toLowerCase().startsWith(type.toLowerCase()) ? type : "";
+  };
   const make = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text != null) node.textContent = text;
@@ -60,12 +69,13 @@ function setupDmInitiative(request, refresh) {
       const score = make("span", row.score == null ? "—" : String(row.score), "dm-turn-score");
       const body = make("span", null, "dm-turn-body");
       const title = make("span", null, "dm-turn-name");
-      title.append(make("span", row.name));
+      title.append(make("span", shownName(row)));
+      if (typeName(row)) title.append(make("small", typeName(row), "dm-turn-type"));
       if (enemy) title.append(icon(enemy.revealed ? "eyeball" : "invisible"));
       body.append(title);
       const sub = [];
       if (board.running && row.id === board.current) sub.push("Current turn");
-      if (enemy) sub.push(enemy.revealed ? "Shown as " + enemy.alias : "Hidden from players");
+      if (enemy) sub.push(enemy.revealed ? "Revealed" : "Hidden from players");
       if (enemy?.template?.pack.edition) sub.push(enemy.template.pack.edition);
       if (row.shared?.length) sub.push("with " + row.shared.join(", "));
       if (enemy?.conditions) sub.push(enemy.conditions);
@@ -125,21 +135,30 @@ function setupDmInitiative(request, refresh) {
     }));
     if (focused) waitingList.querySelector(`input[data-seat="${CSS.escape(focused)}"]`)?.focus({preventScroll:true});
   }
+  let cardKey;
   function renderEnemyCard(row) {
     const card = el("dm-enemy-detail");
     const enemy = row?.enemy;
+    const member = row && !enemy && row.damage_recipient && room.members?.find(m => m.member_id === row.damage_recipient);
+    cardKey = JSON.stringify([row, member?.inspection, room?.combat?.running, room?.combat?.current]);
     el("dm-focus-empty").hidden = Boolean(row);
     card.hidden = !row;
+    // Keep folded detail sections the DM opened across refreshes.
+    const open = new Set([...card.querySelectorAll("details[open] > summary")].map(s => s.textContent.replace(/ \(\d+\)$/, "")));
     card.replaceChildren();
+    queueMicrotask(() => {
+      for (const fold of card.querySelectorAll("details > summary")) if (open.has(fold.textContent.replace(/ \(\d+\)$/, ""))) fold.parentElement.open = true;
+    });
     if (!row) return;
     const head = make("div", null, "dm-enemy-head");
-    const title = make("h3", row.name);
+    const title = make("h3", shownName(row));
+    if (typeName(row)) title.append(make("small", typeName(row), "dm-turn-type"));
     head.append(title);
     const board = room.combat;
     if (board.running && row.id === board.current) head.append(make("span", "Current turn", "dm-badge dm-badge-current"));
     if (enemy) {
       const badge = make("span", null, "dm-badge " + (enemy.revealed ? "dm-badge-shown" : "dm-badge-hidden"));
-      badge.append(icon(enemy.revealed ? "eyeball" : "invisible"), make("span", enemy.revealed ? "Revealed as " + enemy.alias : "Hidden from players"));
+      badge.append(icon(enemy.revealed ? "eyeball" : "invisible"), make("span", enemy.revealed ? "Revealed to players" : "Hidden from players"));
       head.append(badge);
     }
     card.append(head);
@@ -164,7 +183,14 @@ function setupDmInitiative(request, refresh) {
         if (vitals.concentration) tags.append(make("span", "Concentrating · " + vitals.concentration, "dm-tag dm-concentration"));
         if (tags.childElementCount) card.append(tags);
       }
-      card.append(make("p", "Players run their own turns from their sheet. Select an enemy to use its stat block and actions.", "dm-muted"));
+      const details = member?.inspection?.details;
+      if (details) {
+        const sheet = make("div", null, "dm-sheet-details");
+        sheet.append(...dmCharacterSections(null, details, {folded:true, withVitals:false}));
+        card.append(sheet);
+      } else {
+        card.append(make("p", member?.inspection ? "This player shares only HP and AC with the DM." : "Players run their own turns from their sheet.", "dm-muted"));
+      }
       return;
     }
     const stats = make("div", null, "dm-enemy-stats");
@@ -177,13 +203,46 @@ function setupDmInitiative(request, refresh) {
     const init = make("span", null, "dm-stat");
     init.append(icon("dice-twenty-faces-twenty"), make("span", "Init", "dm-stat-label"), make("strong", String(row.score)));
     stats.append(hp, armor, init);
-    card.append(stats);
+    card.append(stats, quickHp(row));
     if (enemy.conditions) {
       const tags = make("div", null, "dm-tags");
       for (const condition of enemy.conditions.split(/\s*,\s*/).filter(Boolean)) tags.append(make("span", condition, "dm-tag dm-condition"));
       card.append(tags);
     }
     if (enemy.notes) card.append(make("p", enemy.notes, "dm-enemy-notes"));
+  }
+  // Quick damage and healing for the selected enemy, without opening Edit enemy. The typed
+  // amount survives the dashboard's refresh.
+  let quickAmount = "", quickFocus = false;
+  function quickHp(row) {
+    const enemy = row.enemy;
+    const box = make("form", null, "dm-quick-hp");
+    const amount = Object.assign(document.createElement("input"), {type:"number", min:1, max:100000, value:quickAmount, placeholder:"Amount"});
+    amount.setAttribute("aria-label", "HP change for " + row.name);
+    amount.oninput = () => { quickAmount = amount.value; };
+    amount.onfocus = () => { quickFocus = true; };
+    amount.onblur = () => { quickFocus = false; };
+    const apply = async sign => {
+      const value = amount.valueAsNumber;
+      if (!Number.isInteger(value) || value < 1 || enemy.hp == null) {
+        status.textContent = enemy.hp == null ? "Set this enemy's HP in Edit enemy first." : "Type a whole number first.";
+        return;
+      }
+      const hp = sign < 0 ? Math.max(0, enemy.hp - value) : Math.min(enemy.max_hp ?? Number.MAX_SAFE_INTEGER, enemy.hp + value);
+      const next = {revealed:enemy.revealed, hp, max_hp:enemy.max_hp, ac:enemy.ac};
+      for (const name of ["name","alias","conditions","notes"]) next[name] = enemy[name] ?? "";
+      if (await change({kind:"enemy", id:row.id, score:row.score, enemy:next})) {
+        quickAmount = "";
+        status.textContent = (sign < 0 ? "Damaged " : "Healed ") + row.name + " by " + value + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
+      }
+    };
+    const damage = Object.assign(make("button", "Damage"), {type:"submit", disabled:busy});
+    const heal = Object.assign(make("button", "Heal"), {type:"button", disabled:busy});
+    heal.onclick = () => apply(1);
+    box.onsubmit = event => { event.preventDefault(); apply(-1); };
+    box.append(amount, damage, heal);
+    if (quickFocus) queueMicrotask(() => amount.focus({preventScroll:true}));
+    return box;
   }
   const renderActions = setupMonsterActions(el, change, id => { order.value = id; controls(); });
 
@@ -403,6 +462,8 @@ function setupDmInitiative(request, refresh) {
     if (outcome === "succeeded") amount = area.save?.on_success === "half" ? Math.floor(amount / 2) : 0;
     return Math.floor(amount * defense(row, area.damage_type).factor);
   }
+  const rollNow = new Set();
+  document.addEventListener("dm-settings-change", () => { areasKey = null; if (room?.combat) renderAreas(); });
   function renderAreas() {
     const board = room.combat;
     const pending = (board.areas || []).filter(area => !area.results);
@@ -444,7 +505,7 @@ function setupDmInitiative(request, refresh) {
         const id = area.id + "/" + target;
         const companion = !row.enemy && !row.damage_recipient;
         const bonus = area.save ? saveBonus(row, area.save.ability) : null;
-        if (area.save && bonus !== null && !areaRolls[id]) {
+        if (area.save && bonus !== null && !areaRolls[id] && (dmSettings.get("autoSaves") || rollNow.has(area.id))) {
           areaRolls[id] = {d20: monsterAssist.die(20)};
           rolled = true;
         }
@@ -455,7 +516,7 @@ function setupDmInitiative(request, refresh) {
         areaChoices.set(id, choice);
         const tr = make("tr");
         tr.append(make("td", label.get(target) + (row.enemy && !row.enemy.revealed ? " (hidden)" : "")));
-        tr.append(make("td", !area.save ? "—" : total === null ? (companion ? "At the table" : "Unknown bonus") : "d20 " + roll.d20 + (bonus >= 0 ? " + " : " − ") + Math.abs(bonus) + " = " + total));
+        tr.append(make("td", !area.save ? "—" : total === null ? (companion ? "At the table" : bonus !== null ? "Not rolled (" + (bonus >= 0 ? "+" : "−") + Math.abs(bonus) + ")" : "Unknown bonus") : "d20 " + roll.d20 + (bonus >= 0 ? " + " : " − ") + Math.abs(bonus) + " = " + total));
         const outcome = document.createElement("select");
         outcome.setAttribute("aria-label", "Outcome for " + label.get(target));
         if (!choice.outcome) outcome.append(new Option("Choose…", ""));
@@ -496,6 +557,14 @@ function setupDmInitiative(request, refresh) {
       dismiss.type = "button";
       dismiss.disabled = busy;
       dismiss.onclick = () => change({kind: "dismiss_area", id: area.id});
+      // With automatic saves off, Assist rolls only when asked.
+      if (area.save && !dmSettings.get("autoSaves") && inputs.some(({row}) => !areaRolls[area.id + "/" + row])) {
+        const roll = make("button", "Roll saves");
+        roll.type = "button";
+        roll.disabled = busy;
+        roll.onclick = () => { rollNow.add(area.id); areasKey = null; renderAreas(); };
+        actions.append(roll);
+      }
       actions.append(apply, dismiss);
       box.append(actions);
       return box;
@@ -523,6 +592,9 @@ function setupDmInitiative(request, refresh) {
     renderAreas();
     if (signature === next) {
       renderTurns();
+      const row = selected();
+      const member = row && !row.enemy && row.damage_recipient && room.members?.find(m => m.member_id === row.damage_recipient);
+      if (cardKey !== JSON.stringify([row, member?.inspection, board.running, board.current])) renderEnemyCard(row);
       if (damageSignature !== damageNext) renderActions(room, selected(), busy);
       damageSignature = damageNext;
       return;
@@ -531,7 +603,7 @@ function setupDmInitiative(request, refresh) {
     damageSignature = damageNext;
     const prior = order.value, save = el("dm-saves").value;
     order.replaceChildren(...board.rows.map(row => new Option(
-      (board.running && row.id === board.current ? "Current · " : "") + row.score + " · " + row.name
+      (board.running && row.id === board.current ? "Current · " : "") + row.score + " · " + shownName(row) + (typeName(row) ? " (" + typeName(row) + ")" : "")
         + (row.enemy?.template?.pack.edition ? " · " + row.enemy.template.pack.edition : "")
         + (row.shared?.length ? " with " + row.shared.join(", ") : ""),row.id)));
     const activeEnemy = board.running && board.rows.find(row => row.id === board.current && row.enemy);

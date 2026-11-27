@@ -207,6 +207,8 @@ function setupMonsterLibrary(request, addToEncounter) {
     if (score.dataset.template !== selectionId) {
       score.dataset.template = selectionId;
       score.value = selected?.stats.details?.initiative?.score ?? 0;
+      add.elements.alias.value = "";
+      add.elements.alias.placeholder = selected?.name || "Same as name";
     }
     el("monster-export").disabled = !loaded;
     el("monster-new").disabled = !loaded;
@@ -432,8 +434,10 @@ function setupMonsterLibrary(request, addToEncounter) {
     const selected = monster();
     if (!selected) return;
     const template = {schema_version:loaded.pack.schema_version,pack:loaded.pack.info,revision:loaded.revision,monster:selected};
-    const {count,score} = add.elements;
-    if (await addToEncounter({kind:"add_monsters",template,count:count.valueAsNumber,score:score.valueAsNumber})) {
+    const {count,score,alias} = add.elements;
+    const edit = {kind:"add_monsters",template,count:count.valueAsNumber,score:score.valueAsNumber};
+    if (alias.value.trim()) edit.alias = alias.value.trim();
+    if (await addToEncounter(edit)) {
       library.close();
     } else throw new Error(el("dm-initiative-status").textContent || "Encounter unavailable.");
   });

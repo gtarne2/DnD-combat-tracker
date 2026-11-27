@@ -815,6 +815,9 @@ impl CombatSheet {
         let fallback = match time.as_deref() {
             Some(time) => ActionGroup::from_label(time),
             None if kind == OptionKind::Attack => Some(ActionGroup::Action),
+            // Creating an Eldritch Cannon takes an action; its text also mentions the bonus
+            // action that activates it, which would otherwise leave it under Other options.
+            None if crate::companion::is_summon_feature(id) => Some(ActionGroup::Action),
             None => option
                 .moxie
                 .and_then(|usage| usage.timing)
