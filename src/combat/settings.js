@@ -3,7 +3,7 @@
 // listen for "sheet-settings-change".
 const sheetSettings = (() => {
   const KEY = "aurora-sheet-settings-v1";
-  const DEFAULTS = {trackActions: true, autoRollArea: false, concentrationReminder: true};
+  const DEFAULTS = {trackActions: true, trackActionsSolo: false, autoRollArea: false, concentrationReminder: true};
   let values = {...DEFAULTS};
   try { Object.assign(values, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
   const status = document.getElementById("sheet-settings-status");
@@ -21,6 +21,8 @@ const sheetSettings = (() => {
         status.textContent = "Browser storage is unavailable. This applies to this tab.";
       }
       document.dispatchEvent(new Event("sheet-settings-change"));
+      // Option availability depends on turn tracking, so redraw the sheet.
+      document.dispatchEvent(new Event("preview-encounter-change"));
     });
   }
   render();

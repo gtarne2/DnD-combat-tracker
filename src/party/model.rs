@@ -57,6 +57,8 @@ pub(super) struct Presence {
     pub inspection: Option<Publication>,
     pub publication_session: Uuid,
     pub publication_revision: u64,
+    /// The player's map token look, while they are connected.
+    pub token: Option<TokenLook>,
 }
 
 // Indexed by (room, member). Ephemeral even when the SQLite database is durable.
@@ -314,7 +316,7 @@ impl Room {
                 self.ended_grants.insert((id, *grant_id));
                 for offer in self.offers.values_mut().filter(|o| {
                     o.sender == id
-                        && matches!(o.effect, Effect::Grant(g) if g.grant_id == *grant_id)
+                        && o.effect.grant_id() == Some(*grant_id)
                         && matches!(
                             o.status,
                             Status::Pending | Status::Claimed | Status::Accepted
@@ -706,6 +708,7 @@ impl Room {
         effect: Effect,
     ) -> Result<Change, Rejection> {
         if !valid_label(source)
+            || matches!(effect, Effect::Buff(buff) if !buff.valid())
             || recipient == sender
             || (self.mode == HostMode::Dm
                 && self
@@ -724,7 +727,9 @@ impl Room {
             return Err(Rejection::InvalidTransition);
         }
         let offer_id = Uuid::new_v4();
-        let status = if matches!(effect, Effect::Grant(g) if self.ended_grants.contains(&(sender, g.grant_id)))
+        let status = if effect
+            .grant_id()
+            .is_some_and(|grant| self.ended_grants.contains(&(sender, grant)))
         {
             Status::Ended
         } else {
@@ -806,11 +811,11 @@ impl Room {
     fn expire_pending(&mut self, member: Option<Uuid>, change: &mut Change) {
         for o in self.offers.values_mut().filter(|o| {
             (o.status == Status::Pending
-                || (matches!(o.effect, Effect::Grant(_))
+                || (o.effect.grant_id().is_some()
                     && matches!(o.status, Status::Accepted | Status::Claimed)))
                 && member.is_none_or(|id| o.sender == id || o.recipient == id)
         }) {
-            o.status = if matches!(o.effect, Effect::Grant(_)) {
+            o.status = if o.effect.grant_id().is_some() {
                 Status::Ended
             } else {
                 Status::Expired

@@ -4021,5 +4021,49 @@
     "class": "Druid"
    }
   }
+ ],
+ "buffs": [
+  {
+   "name": "Bless",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "attack_die": 4,
+   "save_die": 4,
+   "targets": 3,
+   "per_slot": 1
+  },
+  {
+   "name": "Longstrider",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "speed": 10,
+   "seconds": 3600,
+   "targets": 1,
+   "per_slot": 1
+  },
+  {
+   "name": "Shield of Faith",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "ac": 2,
+   "targets": 1
+  },
+  {
+   "name": "Warding Bond",
+   "sources": [
+    "PHB",
+    "XPHB"
+   ],
+   "ac": 1,
+   "save": 1,
+   "seconds": 3600,
+   "targets": 1
+  }
  ]
 }

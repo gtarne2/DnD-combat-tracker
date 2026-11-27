@@ -303,6 +303,7 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 .option-badges :is(.spell-level, .focus-badge) { white-space: nowrap; }
 .option-badges :is(.focus-badge, .row-quantity) { background: #172c30; border-color: #40665f; color: var(--teal); }
 .option-badges .unavailable-badge, .option-unavailable .row-quantity { background: #3a2c2e; border-color: #765054; color: #f4c1be; }
+.option-badges .unavailable-badge.turn-badge { background: transparent; border-color: transparent; color: var(--muted); font-style: italic; padding-inline: 0; }
 .option-unavailable .option-title { color: var(--muted); }
 .show-unprepared { margin-left: auto; display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; }
 #encounter-resources .resource-name[data-resource-detail] { background: transparent; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
@@ -364,7 +365,7 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 .party-template-targets details { display: grid; gap: 2px; }
 .party-template-targets details > label { padding-left: 4px; }
 .party-template-damage { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-.party-template-damage input { width: 7ch; }
+.party-template-damage input { width: 10ch; }
 #spell-turn-reminder, #attack-sequence { color: var(--teal); margin: 3px 0; }
 #attack-riders button, #attack-outcome button { padding: 2px 5px; }
 #rest-summary, #rest-hp { margin: 6px 0; }
@@ -956,6 +957,14 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .portrait-editor { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 #portrait-preview { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; border: 2px solid #8d6f45; }
 .portrait-hint { color: var(--muted); font-size: 13px; }
+.portrait-crop { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.portrait-stage { width: min(300px, 70vw); aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #0c1119; cursor: grab; touch-action: none; border: 1px solid var(--line, #2b3442); }
+.portrait-stage:active { cursor: grabbing; }
+.portrait-stage:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.portrait-stage canvas { display: block; width: 100%; height: 100%; }
+.portrait-crop .focus-form { flex: 1 1 180px; }
+.portrait-crop input[type="range"] { width: 100%; }
+.portrait-share { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
 
 /* HP quick box: one number, four ways to apply it */
 .hp-quick { display: flex; align-items: stretch; gap: 5px; margin-top: 5px; }
@@ -1016,3 +1025,12 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 #concentration-reminder { width: min(94vw, 440px); }
 /* The concentration reminder floats over the sheet without blocking it. */
 #concentration-reminder[open] { position: fixed; inset: 70px 0 auto; margin: 0 auto; z-index: 50; box-shadow: 0 10px 30px rgba(0, 0, 0, .55); border: 1px solid var(--gold); }
+/* R79: effect stat changes and boosted stats */
+.effect-mod-fields { border: 1px solid var(--line); border-radius: var(--control-round); padding: 4px 8px; }
+.effect-mod-fields[open] { padding-bottom: 8px; }
+.effect-mod-hint { color: var(--muted); font-size: 12px; margin: 4px 0 6px; }
+.effect-mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.effect-mod-grid :is(input, select) { display: block; width: 100%; }
+.effect-mods { color: var(--teal); font-size: 12px; }
+.stat-boosted { color: var(--teal) !important; }
+.stat-boost-note { display: block; color: var(--teal); font-size: 11px; font-weight: 600; margin-top: 2px; }

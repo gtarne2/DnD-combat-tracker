@@ -28,6 +28,26 @@ pub struct Enemy {
     pub timers: Vec<ConditionTimer>,
 }
 
+impl Enemy {
+    /// Condition names for map markers: the free-text list (split on commas, semicolons and
+    /// new lines) and the timers still running, without duplicates, in that order.
+    pub fn marker_conditions(&self) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+        let free = self.conditions.split([',', ';', '\n']).map(str::trim);
+        let timed = self
+            .timers
+            .iter()
+            .filter(|timer| timer.remaining > 0)
+            .map(|timer| timer.name.trim());
+        for name in free.chain(timed) {
+            if !name.is_empty() && !names.iter().any(|n| n.eq_ignore_ascii_case(name)) {
+                names.push(name.to_string());
+            }
+        }
+        names
+    }
+}
+
 /// A condition on an enemy that ends after a number of turn starts or ends, like the
 /// player sheet's turn-start and turn-end effects.
 #[derive(Clone, Serialize, Deserialize)]
@@ -968,6 +988,8 @@ impl Fight {
                         // show hidden items to players.
                         "name": &enemy.alias,
                         "down": enemy.hp == Some(0),
+                        // Markers on the token, for conditions applied during the fight.
+                        "conditions": enemy.marker_conditions(),
                     });
                     // For the DM's own extension only: which art to use and how big the token is.
                     if let Some(template) = &enemy.template {
@@ -975,6 +997,7 @@ impl Fight {
                             "key": format!("{}/{}", template.pack.id, template.monster.id),
                             "name": template.monster.name,
                             "size": template.monster.stats.size,
+                            "type": template.monster.stats.creature_type,
                         });
                     }
                     view
@@ -1645,11 +1668,20 @@ impl Fight {
                 )?;
             }
             Edit::Remove { id } => {
-                let i = rows
+                let row = rows
                     .iter()
-                    .position(|r| r.id == *id && r.member().is_none())
+                    .find(|r| r.id == *id)
                     .ok_or(Rejection::InvalidInput)?;
-                rows.remove(i);
+                match &row.actor {
+                    // The DM takes a player out of this encounter, with their companions. They
+                    // can rejoin by submitting initiative from their sheet.
+                    Participant::Player { member, .. } => {
+                        let member = *member;
+                        rows.retain(|r| r.member() != Some(member));
+                    }
+                    Participant::Enemy(_) => rows.retain(|r| r.id != *id),
+                    Participant::Companion { .. } => return Err(Rejection::InvalidInput),
+                }
             }
             Edit::Reveal { id, revealed } => {
                 let row = rows

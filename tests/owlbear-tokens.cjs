@@ -358,6 +358,71 @@ async function main() {
     assert(hex.reports.length === 0 && /square grids/.test(hex.note), "hex grids are not supported yet");
     sdk.party.gridType = "SQUARE";
 
+    // Art: class icons, player portraits, type defaults and live updates (playtest 4).
+    scene.clear();
+    memory.clear();
+    assert(t.classSlug("Artificer (Battle Smith) / Wizard") === "artificer" && t.classSlug("Blood Hunter") === "blood-hunter" && t.classSlug("") === null, "class from the Aurora class field");
+    const PORTRAIT = "data:image/webp;base64,UklGRg==";
+    const dragon = { key: "pack/DRAGON", name: "Young Red Dragon", size: "Large", type: "Dragon" };
+    let art = [
+      { id: "p1", kind: "player", member_id: "m1", name: "Eggwig", look: { class: "Artificer", portrait: null } },
+      { id: "p2", kind: "player", member_id: "m2", name: "Ash", look: { class: "Wizard", portrait: PORTRAIT } },
+      { id: "d1", kind: "enemy", revealed: true, name: "Red", down: false, template: dragon, conditions: [] },
+    ];
+    await t.addTokens(table(art), ["p1", "p2", "d1"]);
+    assert(tokenFor("p1").image.url.endsWith("/token-class-artificer.png"), "a player without a portrait gets their class icon");
+    assert(tokenFor("p2").image.url === PORTRAIT && tokenFor("p2").image.mime === "image/webp" && tokenFor("p2").grid.dpi === 160, "a shared portrait becomes the token");
+    assert(t.artSearch(art[2]) === "Dragon" && t.artSearch(art[0]) === "artificer", "Owlbear's picker opens on the creature type or class");
+
+    // The DM picks Owlbear art for one dragon: that template and, as the first pick, every dragon.
+    const red = { image: { url: "https://owlbear.test/dragon.png", mime: "image/png", width: 300, height: 300 }, grid: { dpi: 300, offset: { x: 150, y: 150 } }, scale: { x: 1, y: 1 } };
+    t.chooseArt(art[2], red);
+    await t.syncTokens(table(art));
+    assert(tokenFor("d1").image.url === red.image.url && tokenFor("d1").scale.x === 2, "a new pick replaces the art on the map, at the creature's size");
+    const blue = { id: "d2", kind: "enemy", revealed: true, name: "Blue", down: false, template: { ...dragon, key: "pack/BLUE", name: "Young Blue Dragon" }, conditions: [] };
+    art.push(blue);
+    await t.addTokens(table(art), ["d2"]);
+    assert(tokenFor("d2").image.url === red.image.url, "another dragon uses the dragon default");
+
+    // The player changes their portrait; then Owlbear's own Replace image is left alone.
+    art[1] = { ...art[1], look: { ...art[1].look, portrait: "data:image/webp;base64,AAAA" } };
+    await t.syncTokens(table(art));
+    assert(tokenFor("p2").image.url === "data:image/webp;base64,AAAA", "a new portrait reaches the token");
+    const p2 = tokenFor("p2");
+    scene.set(p2.id, { ...p2, image: { ...p2.image, url: "https://owlbear.test/replaced.png" } });
+    art[1] = { ...art[1], look: { ...art[1].look, portrait: PORTRAIT } };
+    await t.syncTokens(table(art));
+    assert(tokenFor("p2").image.url === "https://owlbear.test/replaced.png", "art replaced in Owlbear is not overwritten");
+    // A pick in the popover is applied even then, and to a token the DM placed.
+    t.chooseArt(art[1], red);
+    assert(await t.applyPickedArt(table(art), "p2"), "picked art applied");
+    assert(tokenFor("p2").image.url === red.image.url, "the explicit pick wins");
+
+    // A companion goes in a free cell beside its owner's token, not on top of another token.
+    const ownerSpot = tokenFor("p1").position;
+    scene.set("blocker", { id: "blocker", type: "IMAGE", layer: "CHARACTER", metadata: {}, position: { x: ownerSpot.x + 150, y: ownerSpot.y } });
+    art.push({ id: "c1", kind: "companion", member_id: "m1", local_id: 1, name: "Eldritch Cannon", shared: true });
+    await t.addTokens(table(art), ["c1"]);
+    const cannon = tokenFor("c1").position;
+    assert(cannon.x === ownerSpot.x - 150 && cannon.y === ownerSpot.y, "the cannon goes left of its owner when the right is taken: " + JSON.stringify([ownerSpot, cannon]));
+
+    // Condition markers use Owlbear attachment art the DM picked, and follow the tracker.
+    const poisoned = { image: { url: "https://owlbear.test/poisoned.png", mime: "image/png", width: 300, height: 300 }, grid: { dpi: 300, offset: { x: 150, y: 150 } }, scale: { x: 1, y: 1 } };
+    t.saveConditionArt("Poisoned", poisoned);
+    art[2] = { ...art[2], conditions: ["Poisoned", "Prone"] };
+    await t.syncTokens(table(art));
+    const conditionsOn = (id) => items().filter((i) => String(i.metadata[t.MARKER] || "").startsWith("condition:") && i.attachedTo === tokenFor(id).id);
+    assert(conditionsOn("d1").length === 1 && conditionsOn("d1")[0].image.url === poisoned.image.url && conditionsOn("d1")[0].scale.x === 2 && conditionsOn("d1")[0].layer === "ATTACHMENT", "poisoned marker sized to the large dragon; prone has no art yet");
+    assert(JSON.stringify(t.encounterConditions(table(art))) === JSON.stringify(["Poisoned", "Prone"]), "conditions listed for the popover");
+    await t.syncTokens(table(art));
+    assert(conditionsOn("d1").length === 1, "condition sync is idempotent");
+    art[2] = { ...art[2], conditions: ["poisoned (2 rounds)"] };
+    await t.syncTokens(table(art));
+    assert(conditionsOn("d1").length === 1, "a timer label still matches the condition");
+    art[2] = { ...art[2], conditions: [], revealed: true, down: true };
+    await t.syncTokens(table(art));
+    assert(conditionsOn("d1").length === 0 && items().some((i) => i.metadata[t.MARKER] === t.DOWN), "an ended condition loses its marker, rings stay");
+
     console.log("owlbear-tokens: all checks passed");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

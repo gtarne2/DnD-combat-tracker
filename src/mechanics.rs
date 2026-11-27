@@ -35,6 +35,94 @@ struct OverlayFile {
     summons: Vec<SummonMechanics>,
     #[serde(default)]
     companions: Vec<CompanionMechanics>,
+    #[serde(default)]
+    buffs: Vec<BuffMechanics>,
+}
+
+/// Stat changes a spell puts on its targets, such as Longstrider's +10 feet of speed (R79).
+/// Numbers only; the description still comes from the player's import.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct BuffMechanics {
+    pub name: String,
+    #[serde(default)]
+    pub sources: Vec<String>,
+    #[serde(default)]
+    pub speed: i16,
+    #[serde(default)]
+    pub ac: i16,
+    #[serde(default)]
+    pub attack: i16,
+    /// A die added to attack rolls once, such as 4 for Bless's 1d4.
+    #[serde(default)]
+    pub attack_die: u8,
+    #[serde(default)]
+    pub damage: i16,
+    #[serde(default)]
+    pub save: i16,
+    #[serde(default)]
+    pub save_die: u8,
+    /// How long the spell lasts when it is not concentration.
+    #[serde(default)]
+    pub seconds: Option<u32>,
+    /// Targets at the spell's own level, and how many more each higher slot adds.
+    #[serde(default)]
+    pub targets: Option<u32>,
+    #[serde(default)]
+    pub per_slot: u32,
+}
+
+impl BuffMechanics {
+    /// Compact form for the sheet, such as `speed=10,seconds=3600`.
+    pub fn attribute(&self) -> String {
+        let mut parts = Vec::new();
+        for (key, value) in [
+            ("speed", i32::from(self.speed)),
+            ("ac", i32::from(self.ac)),
+            ("attack", i32::from(self.attack)),
+            ("attackDie", i32::from(self.attack_die)),
+            ("damage", i32::from(self.damage)),
+            ("save", i32::from(self.save)),
+            ("saveDie", i32::from(self.save_die)),
+        ] {
+            if value != 0 {
+                parts.push(format!("{key}={value}"));
+            }
+        }
+        if let Some(seconds) = self.seconds {
+            parts.push(format!("seconds={seconds}"));
+        }
+        parts.join(",")
+    }
+
+    fn valid(&self) -> bool {
+        let dice = |die: u8| matches!(die, 0 | 4 | 6 | 8 | 10 | 12);
+        [self.speed, self.ac, self.attack, self.damage, self.save]
+            .iter()
+            .all(|value| (-100..=100).contains(value))
+            && dice(self.attack_die)
+            && dice(self.save_die)
+            && self
+                .seconds
+                .is_none_or(|seconds| (1..=864_000).contains(&seconds))
+            && self.targets.is_none_or(|count| (1..=20).contains(&count))
+            && self.per_slot <= 5
+    }
+
+    /// Targets for each slot level 1 to 9, given the spell's own level.
+    pub fn target_counts(&self, level: u8) -> Vec<u32> {
+        let Some(base) = self.targets else {
+            return Vec::new();
+        };
+        (1..=9u8)
+            .map(|slot| {
+                if slot < level {
+                    0
+                } else {
+                    base + self.per_slot * u32::from(slot - level)
+                }
+            })
+            .collect()
+    }
 }
 
 /// When a class feature, feat or trait is used, for features whose imported content does not
@@ -198,6 +286,7 @@ pub struct Overlay {
     features: Vec<FeatureMechanics>,
     summons: Vec<SummonMechanics>,
     companions: Vec<CompanionMechanics>,
+    buffs: Vec<BuffMechanics>,
 }
 
 /// An entry with this name from the import's book, or the first when the import names none.
@@ -292,6 +381,11 @@ impl Overlay {
             features: file.features,
             summons: file.summons,
             companions: file.companions,
+            buffs: file
+                .buffs
+                .into_iter()
+                .filter(BuffMechanics::valid)
+                .collect(),
         })
     }
 
@@ -390,6 +484,13 @@ impl Overlay {
     /// A companion whose hit points the overlay can work out.
     pub fn companion(&self, name: &str, source: Option<&str>) -> Option<&CompanionMechanics> {
         by_book(self, &self.companions, name, source, |entry| {
+            (entry.name.as_str(), entry.sources.as_slice())
+        })
+    }
+
+    /// The stat changes a buff spell makes, if the overlay knows it for the import's book.
+    pub fn buff(&self, name: &str, source: Option<&str>) -> Option<&BuffMechanics> {
+        by_book(self, &self.buffs, name, source, |entry| {
             (entry.name.as_str(), entry.sources.as_slice())
         })
     }

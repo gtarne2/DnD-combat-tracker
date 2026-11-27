@@ -278,16 +278,14 @@ async function main() {
 
     const castPage = await newProfile();
     await castPage.goto(generate(fixture("infusion-attacks.dnd5e"), fixture("infusion-attacks.xml")));
-    await castPage.locator("#action-economy-open").click();
-    await castPage.locator("#economy-enabled").check();
-    await castPage.locator("#action-economy").getByRole("button", {name: "Close"}).click();
+    await castPage.locator(".settings-trigger").click();
+    await castPage.getByLabel("Also track them in solo encounters").check();
+    await castPage.locator("#sheet-settings").getByRole("button", {name: "Close"}).click();
     const ray = row(castPage, "Lens Ray").locator("[data-cast-spell]");
     await ray.press("Enter");
     await ray.waitFor();
     await castPage.waitForFunction(() => document.querySelector('[data-cast-spell][aria-label="Cast Lens Ray"]').disabled);
-    await castPage.locator("#action-economy-open").click();
-    await castPage.getByRole("button", {name: "Override Action", exact: true}).click();
-    await castPage.locator("#action-economy").getByRole("button", {name: "Close"}).click();
+    await castPage.locator('#economy-chips [data-economy-chip="action"]').click();
     await ray.click();
     await castPage.getByRole("button", {name: "Activity", exact: true}).click();
     assert.equal(await castPage.locator("#encounter-log").getByText("Cast Lens Ray · cantrip").count(), 2);
@@ -380,9 +378,9 @@ async function main() {
 
     const tactics = await newProfile();
     await tactics.goto(generate(fixture("combat-options.dnd5e"), fixture("combat-options.xml")));
-    await tactics.locator("#action-economy-open").click();
-    await tactics.locator("#economy-enabled").check();
-    await tactics.locator("#action-economy").getByRole("button", {name: "Close"}).click();
+    await tactics.locator(".settings-trigger").click();
+    await tactics.getByLabel("Also track them in solo encounters").check();
+    await tactics.locator("#sheet-settings").getByRole("button", {name: "Close"}).click();
     const blade = row(tactics, "Practice Blade").locator("[data-record-attack]");
     const bow = row(tactics, "Practice Bow").locator("[data-record-attack]");
     await blade.click();

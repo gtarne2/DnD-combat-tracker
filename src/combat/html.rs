@@ -23,6 +23,11 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("character-sheet.css"));
     html.push_str("</style></head><body data-profile=\"");
     escape(&mut html, profile_key);
+    // The class names the player's default map token.
+    html.push_str("\" data-class=\"");
+    if let Some(class) = sheet.profile.fields.iter().find(|f| f.label == "Class") {
+        escape(&mut html, &class.value);
+    }
     html.push_str("\" data-session-page=\"combat\"><header class=\"command-bar\"><a class=\"brand\" href=\"#character-dialog\" data-session-nav=\"character\" aria-label=\"Aurora Combat Tracker, go to character overview\"><span class=\"brand-mark\" aria-hidden=\"true\">A</span><span><strong>Aurora</strong><small>Combat Tracker</small></span></a>\
         <nav class=\"command-nav\" aria-label=\"Tracker\"><a href=\"#combat\" id=\"combat-nav\" data-session-nav=\"combat\" aria-current=\"page\">Combat</a><button type=\"button\" id=\"character-nav\" data-session-nav=\"character\">Character</button><button type=\"button\" data-session-nav=\"features\">Features &amp; Traits</button><button type=\"button\" id=\"companions-nav\" data-session-nav=\"companions\">Companions</button><button type=\"button\" data-session-nav=\"inventory\">Inventory</button><button type=\"button\" data-session-nav=\"journal\">Journal</button></nav>\
         <p id=\"encounter-status\" class=\"focus-feedback\" role=\"status\"></p><div class=\"command-tools\" role=\"group\" aria-label=\"Sheet tools\"><button type=\"button\" id=\"review-consumables\" hidden>Review consumables</button><button type=\"button\" id=\"sheet-find\" aria-haspopup=\"dialog\" aria-keyshortcuts=\"Control+K Meta+K /\">Find on sheet <kbd>/</kbd></button><button type=\"button\" id=\"party-chip\" class=\"party-chip\" data-dialog=\"session-files\" hidden><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#gi-tabletop-players\"/></svg><span class=\"party-chip-text\">Party</span><span class=\"party-chip-count\" hidden></span></button><button type=\"button\" data-dialog=\"session-files\">Session</button><button type=\"button\" class=\"settings-trigger\" data-dialog=\"sheet-settings\" aria-label=\"Settings\" title=\"Settings\">⚙</button><button type=\"button\" class=\"layout-trigger\" data-dialog=\"layout-dialog\">Layout</button></div></header><main class=\"dashboard\">");
@@ -247,10 +252,13 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     render_layout(&mut html, sheet);
     html.push_str("<p><label><input type=\"checkbox\" id=\"guidance-without-concentration\"> Guidance does not require concentration at my table</label></p><button type=\"button\" data-dialog=\"encounter-settings\">Optional initiative settings</button> <button type=\"button\" data-dialog=\"portrait-dialog\">Character portrait</button>");
     html.push_str("</dialog>");
+    // portrait.html leaves its dialog open for this closing tag. Settings must come after it,
+    // or it nests inside the closed portrait dialog and opens invisibly, blocking the page.
     html.push_str(include_str!("portrait.html"));
+    html.push_str("</dialog>");
     html.push_str(include_str!("settings.html"));
     html.push_str(
-        "</dialog><section class=\"sheet-page\" id=\"character-dialog\" data-view-scroll=\"character\" aria-labelledby=\"character-page-title\" hidden><h2 id=\"character-page-title\">Character</h2>",
+        "<section class=\"sheet-page\" id=\"character-dialog\" data-view-scroll=\"character\" aria-labelledby=\"character-page-title\" hidden><h2 id=\"character-page-title\">Character</h2>",
     );
     render_character_reference(&mut html, &sheet.profile);
     render_full_sheet(&mut html, &sheet.profile);
@@ -289,6 +297,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("quick-actions.js"));
     html.push_str(include_str!("reference-pages.js"));
     html.push_str(include_str!("rolls.js"));
+    html.push_str(include_str!("stat-effects.js"));
     html.push_str(include_str!("sheet-reference.js"));
     html.push_str(include_str!("feature-groups.js"));
     html.push_str(include_str!("dashboard.js"));
@@ -716,6 +725,7 @@ fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGrou
     roll_attribute(html, "data-damage-type", spell.damage_type);
     roll_attribute(html, "data-spell-colour", spell.colour.as_deref());
     roll_attribute(html, "data-spell-look", spell.look.as_deref());
+    roll_attribute(html, "data-spell-buff", spell.buff.as_deref());
     if spell.overlay {
         html.push_str(" data-spell-overlay");
     }

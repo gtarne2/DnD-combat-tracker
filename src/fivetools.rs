@@ -28,10 +28,128 @@ const ABILITIES: [(&str, &str); 6] = [
     ("cha", "Charisma"),
 ];
 
+fn parse(json: &str) -> Result<Value, String> {
+    serde_json::from_str(json.strip_prefix('\u{feff}').unwrap_or(json))
+        .map_err(|err| format!("This file is not valid JSON: {err}"))
+}
+
+/// Book names for the 5etools source codes a DM is most likely to import. Other files fall
+/// back to the file's own `_meta` name, then to the code.
+const BOOKS: [(&str, &str); 24] = [
+    ("MM", "Monster Manual (2014)"),
+    ("XMM", "Monster Manual (2025)"),
+    ("PHB", "Player's Handbook (2014)"),
+    ("XPHB", "Player's Handbook (2024)"),
+    ("DMG", "Dungeon Master's Guide (2014)"),
+    ("XDMG", "Dungeon Master's Guide (2024)"),
+    ("VGM", "Volo's Guide to Monsters"),
+    ("MTF", "Mordenkainen's Tome of Foes"),
+    ("MPMM", "Mordenkainen Presents: Monsters of the Multiverse"),
+    ("TCE", "Tasha's Cauldron of Everything"),
+    ("XGE", "Xanathar's Guide to Everything"),
+    ("FTD", "Fizban's Treasury of Dragons"),
+    ("BGG", "Bigby Presents: Glory of the Giants"),
+    ("BMT", "The Book of Many Things"),
+    ("BAM", "Boo's Astral Menagerie"),
+    ("MPP", "Morte's Planar Parade"),
+    ("VRGR", "Van Richten's Guide to Ravenloft"),
+    ("ERLW", "Eberron: Rising from the Last War"),
+    ("EFA", "Eberron: Forge of the Artificer"),
+    ("EGW", "Explorer's Guide to Wildemount"),
+    ("GGR", "Guildmasters' Guide to Ravnica"),
+    ("MOT", "Mythic Odysseys of Theros"),
+    ("CoS", "Curse of Strahd"),
+    ("ToA", "Tomb of Annihilation"),
+];
+const MODERN_BOOKS: [&str; 3] = ["XPHB", "XMM", "XDMG"];
+
+/// Converts a 5etools bestiary file without asking for pack details: the pack ID, book name and
+/// rules edition come from the file. Reimporting the same book gives the same pack ID, so it
+/// replaces the earlier copy.
+pub fn import_fivetools_file(file_name: &str, json: &str) -> Result<FiveToolsImport, String> {
+    let value = parse(json)?;
+    let info = fivetools_pack_info(file_name, &value);
+    import_value(info, &value)
+}
+
+pub fn fivetools_pack_info(file_name: &str, value: &Value) -> PackInfo {
+    let empty = vec![];
+    let records = value
+        .get("monster")
+        .and_then(Value::as_array)
+        .unwrap_or(&empty);
+    let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+    for record in records {
+        if let Some(source) = record.get("source").and_then(Value::as_str) {
+            *counts.entry(source).or_default() += 1;
+        }
+    }
+    let code = counts
+        .iter()
+        .max_by_key(|(code, count)| (**count, std::cmp::Reverse(**code)))
+        .map(|(code, _)| plain(code).trim().to_owned())
+        .filter(|code| !code.is_empty());
+    let stem = file_name
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(file_name)
+        .trim_end_matches(".json")
+        .trim_end_matches(".JSON");
+    let meta_name = value
+        .pointer("/_meta/sources")
+        .and_then(Value::as_array)
+        .and_then(|sources| {
+            sources
+                .iter()
+                .find(|s| {
+                    code.is_some() && s.get("json").and_then(Value::as_str) == code.as_deref()
+                })
+                .or(sources.first())
+        })
+        .and_then(|s| s.get("full"))
+        .and_then(Value::as_str)
+        .map(|name| plain(name).trim().to_owned())
+        .filter(|name| !name.is_empty());
+    let book = code.as_deref().and_then(|code| {
+        BOOKS
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(code))
+            .map(|(_, name)| (*name).to_owned())
+    });
+    let name = book
+        .or(meta_name)
+        .or(code.clone())
+        .unwrap_or_else(|| stem.to_owned());
+    // Later books print 2024 stat blocks; their records carry fields older books never use.
+    let modern = code.as_deref().is_some_and(|code| {
+        MODERN_BOOKS
+            .iter()
+            .any(|key| key.eq_ignore_ascii_case(code))
+    }) || records.iter().any(|record| {
+        ["initiative", "treasure", "srd52", "basicRules2024"]
+            .iter()
+            .any(|key| record.get(key).is_some())
+    });
+    let id_part = code.as_deref().unwrap_or(stem);
+    PackInfo {
+        id: format!("5etools-{}", slug(id_part)),
+        edition: if modern { "2024" } else { "2014" }.into(),
+        source: name.chars().take(100).collect(),
+        attribution: format!(
+            "Imported from the local 5etools file {}.",
+            stem.chars().take(200).collect::<String>()
+        ),
+        source_version: None,
+        license: None,
+    }
+}
+
 pub fn import_fivetools_pack(info: PackInfo, json: &str) -> Result<FiveToolsImport, String> {
-    let value: Value = serde_json::from_str(json.strip_prefix('\u{feff}').unwrap_or(json))
-        .map_err(|err| format!("This file is not valid JSON: {err}"))?;
-    let records = match &value {
+    import_value(info, &parse(json)?)
+}
+
+fn import_value(info: PackInfo, value: &Value) -> Result<FiveToolsImport, String> {
+    let records = match value {
         Value::Object(root) => match root.get("monster") {
             Some(Value::Array(list)) => list.clone(),
             _ if root.contains_key("name") => vec![value.clone()],

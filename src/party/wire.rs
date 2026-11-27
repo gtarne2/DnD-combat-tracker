@@ -92,6 +92,55 @@ pub enum Effect {
     TemporaryHp(NonZeroU32),
     Damage(NonZeroU32),
     Grant(AttackGrant),
+    /// A spell or effect another player puts on this player, such as Longstrider or Bless,
+    /// with the stat changes the recipient's sheet applies while it lasts (R79).
+    Buff(StatBuff),
+}
+
+impl Effect {
+    /// The lasting grant this offer belongs to, which its sender can end later.
+    pub fn grant_id(&self) -> Option<Uuid> {
+        match self {
+            Self::Grant(grant) => Some(grant.grant_id),
+            Self::Buff(buff) => Some(buff.grant_id),
+            _ => None,
+        }
+    }
+}
+
+/// Stat changes a buff makes. Dice are a die size added once, such as 4 for +1d4.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StatBuff {
+    pub grant_id: Uuid,
+    #[serde(default)]
+    pub speed: i16,
+    #[serde(default)]
+    pub ac: i16,
+    #[serde(default)]
+    pub attack: i16,
+    #[serde(default)]
+    pub attack_die: u8,
+    #[serde(default)]
+    pub damage: i16,
+    #[serde(default)]
+    pub save: i16,
+    #[serde(default)]
+    pub save_die: u8,
+    /// Game seconds the buff lasts on its own; none while its source lasts.
+    #[serde(default)]
+    pub seconds: Option<NonZeroU32>,
+}
+
+impl StatBuff {
+    pub fn valid(&self) -> bool {
+        let dice = |die: u8| matches!(die, 0 | 4 | 6 | 8 | 10 | 12);
+        [self.speed, self.ac, self.attack, self.damage, self.save]
+            .iter()
+            .all(|value| (-100..=100).contains(value))
+            && dice(self.attack_die)
+            && dice(self.save_die)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -229,6 +278,43 @@ pub struct CharacterDetails {
     pub features: Vec<RuleEntry>,
     pub inventory: Vec<RuleEntry>,
     pub resources: BTreeMap<String, u32>,
+}
+
+/// How a player's map token looks: their class, for the default icon, and an optional small
+/// portrait the sheet renders for the token. Kept apart from `Publication`, because the token is
+/// shown to the whole table whatever the player shares with the DM.
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct TokenLook {
+    pub class: String,
+    /// A `data:image/webp` or `data:image/png` or `data:image/jpeg` URL, at most
+    /// [`TokenLook::MAX_PORTRAIT`] bytes.
+    pub portrait: Option<String>,
+}
+
+impl TokenLook {
+    pub const MAX_PORTRAIT: usize = 48 * 1024;
+    pub const MAX_CLASS: usize = 40;
+
+    /// True when the look is small enough to relay and the portrait is an inline raster image.
+    pub fn valid(&self) -> bool {
+        self.class.chars().count() <= Self::MAX_CLASS
+            && !self.class.chars().any(char::is_control)
+            && self.portrait.as_ref().is_none_or(|url| {
+                url.len() <= Self::MAX_PORTRAIT
+                    && [
+                        "data:image/webp;base64,",
+                        "data:image/png;base64,",
+                        "data:image/jpeg;base64,",
+                    ]
+                    .iter()
+                    .any(|prefix| url.starts_with(prefix))
+                    && url.split_once(',').is_some_and(|(_, data)| {
+                        data.bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b))
+                    })
+            })
+    }
 }
 
 /// Each publication replaces the whole previous value, including on downgrade.

@@ -13,13 +13,13 @@ const actionEconomy = (() => {
     return card?.turn === "owner" ? "owner" : actor;
   }
 
-  // In the DM's shared initiative, tracking is on unless the player switched it off for this
-  // participant or in Settings. Solo play keeps it opt-in, since nothing advances turns there.
+  // Settings decide: on in the DM's shared initiative, and in solo encounters only when the
+  // player asks for it. A companion can still be switched off from its card.
   function tracking(state, actor) {
-    if (!state.progress) return false;
-    const chosen = state.progress.economyEnabled?.[actor];
-    if (chosen !== undefined) return Boolean(chosen);
-    return sheetSettings.get("trackActions") && Boolean(state.progress.partyClock);
+    if (!sheetSettings.get("trackActions")) return false;
+    const chosen = state.progress?.economyEnabled?.[actor];
+    if (actor !== "owner" && chosen === false) return false;
+    return Boolean(state.progress?.partyClock) || sheetSettings.get("trackActionsSolo");
   }
 
   function override(state, actor, kind) {
@@ -40,7 +40,7 @@ const actionEconomy = (() => {
       document.getElementById("encounter-status").textContent = unavailable;
       return false;
     }
-    const progress = force ? (state.progress ||= previewEncounter.emptyProgress()) : state.progress;
+    const progress = force || tracking(state, actor) ? (state.progress ||= previewEncounter.emptyProgress()) : state.progress;
     if (override(state, actor, kind)) {
       delete progress.economyOverrides[actor][kind];
       previewEncounter.log(state, "override", `Table override used · ${names[kind]}`);
@@ -63,9 +63,6 @@ const actionEconomy = (() => {
   function render() {
     const state = previewEncounter.current();
     const progress = state.progress;
-    const opener = document.getElementById("action-economy-open");
-    const used = Object.keys(progress?.economyUsed?.owner || {}).length;
-    opener.textContent = tracking(state, "owner") ? `Turn actions · ${used}/3 used` : "Turn actions";
     renderChips(state);
     if (!dialog.open) return;
     const selected = select.value;
@@ -157,7 +154,6 @@ const actionEconomy = (() => {
     select.value = actor;
     render();
   }
-  document.getElementById("action-economy-open").onclick = () => open("owner");
   select.onchange = render;
   enabled.onchange = () => {
     const actor = select.value;

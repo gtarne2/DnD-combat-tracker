@@ -17,6 +17,11 @@
       <label><input type="checkbox" data-dm-setting="assistDefault"> Start monster actions in Assist mode</label>
     </fieldset>
     <fieldset class="dm-settings-group">
+      <legend>Players</legend>
+      <label><input type="checkbox" data-dm-setting="autoSeat"> Add connected players to the encounter automatically</label>
+      <p class="dm-waiting-hint">Each player is seated with a d20 plus their shared initiative bonus. They can replace it with their own roll from their sheet. A player you remove stays out of that encounter.</p>
+    </fieldset>
+    <fieldset class="dm-settings-group">
       <legend>Layout</legend>
       <label><input type="checkbox" data-dm-setting="openMore"> Keep "More options" sections open</label>
     </fieldset>
@@ -70,7 +75,7 @@
         <div class="dm-toolbar" role="group" aria-label="More enemy options">
           <button data-edit="duplicate"><svg class="icon" aria-hidden="true"><use href="#gi-files"/></svg><span>Duplicate</span></button>
           <button data-edit="group"><svg class="icon" aria-hidden="true"><use href="#gi-tabletop-players"/></svg><span>Group initiative by name</span></button>
-          <button data-edit="remove" class="dm-danger-quiet"><svg class="icon" aria-hidden="true"><use href="#gi-skull-crossed-bones"/></svg><span>Remove enemy</span></button>
+          <button data-edit="remove" class="dm-danger-quiet"><svg class="icon" aria-hidden="true"><use href="#gi-skull-crossed-bones"/></svg><span class="dm-label">Remove enemy</span></button>
         </div>
         <div class="dm-toolbar dm-fixes" role="group" aria-label="Turn fixes">
           <span class="dm-group-label">Fix order</span>
@@ -186,7 +191,10 @@
           <button type="button" id="monster-export">Export pack JSON</button>
           <label class="dm-file">Import pack JSON <input id="monster-import" type="file" accept=".json,application/json"></label>
           <button type="button" id="monster-aurora">Import Aurora folder</button>
-          <button type="button" id="monster-fivetools">Import 5etools JSON</button>
+          <button type="button" id="monster-fivetools" title="Choose one or more 5etools bestiary JSON files">Import 5etools files</button>
+          <button type="button" id="monster-fivetools-folder" title="Choose a 5etools data or bestiary folder">Import 5etools folder</button>
+          <input id="monster-fivetools-files" type="file" accept=".json,application/json" multiple hidden>
+          <input id="monster-fivetools-dir" type="file" webkitdirectory multiple hidden>
           <button type="button" id="monster-new-pack">Create pack</button>
         </div>
         <details id="monster-pack-credits" hidden>
@@ -229,7 +237,6 @@
       <label>License <input name="license" maxlength="120"></label>
       <label>License URL <input name="license_url" type="url" maxlength="2048"></label>
       <label id="monster-xml-label" hidden>Local XML folder <input name="folder" type="file" webkitdirectory multiple></label>
-      <label id="monster-fivetools-label" hidden>5etools bestiary JSON <input name="bestiary" type="file" accept=".json,application/json"></label>
     </div>
     <div class="dm-dialog-actions"><button class="dm-primary">Continue</button><button type="button" data-close>Cancel</button></div>
     <p role="status"></p>

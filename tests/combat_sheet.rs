@@ -491,3 +491,13 @@ fn exposes_concentration_from_a_spell_and_a_generated_scroll() {
     assert!(html.contains("data-focus-spell=\"Shield Flash\""));
     assert!(html.contains("id=\"replace-concentration\""));
 }
+
+#[test]
+fn settings_dialog_is_not_nested_in_the_portrait_dialog() {
+    // A dialog nested in another closed dialog opens invisibly and blocks the page.
+    let html = render_html(&sheet());
+    let portrait = html.find("id=\"portrait-dialog\"").unwrap();
+    let settings = html.find("id=\"sheet-settings\"").unwrap();
+    let portrait_end = portrait + html[portrait..].find("</dialog>").unwrap();
+    assert!(portrait_end < settings);
+}

@@ -152,7 +152,19 @@ const partyInitiative = (() => {
       if (hadBoard && !board()) { order = ""; document.dispatchEvent(new Event("preview-encounter-change")); }
       if (!state?.room_id || !state.self_id || state.role === "host") return;
       const key = state.room_id + "/" + state.self_id;
-      if (!state.combat && previewEncounter.current().progress?.partyClock?.key !== key && !state.ended) return;
+      // A clock left over from another room or session would otherwise keep claiming "Your
+      // turn" in a room whose DM has no encounter running.
+      const leftover = clock => clock && (clock.key !== key || !state.combat || state.ended
+        || !state.combat.running || !state.combat.joined || clock.encounter !== state.combat.id);
+      const dropLeftover = async () => {
+        if (!leftover(previewEncounter.current().progress?.partyClock)) return;
+        await previewEncounter.transact(draft => leftover(draft.progress?.partyClock) && release(draft.progress) && "leaving a finished party encounter", {undo:false});
+        document.dispatchEvent(new Event("preview-encounter-change"));
+      };
+      if (!state.combat && previewEncounter.current().progress?.partyClock?.key !== key && !state.ended) {
+        await dropLeftover();
+        return;
+      }
       const saved = previewEncounter.delivery().clocks?.[key] || 0;
       // A restored portable snapshot contains the solo pointer. Read the last
       // consumed position as well, so resuming never repeats its mechanics.
@@ -169,6 +181,8 @@ const partyInitiative = (() => {
         }
         if (events.length < 128) break;
       }
+      // Only when this poll brought no clock events, so the room view and the clock agree.
+      if (after === (align ? saved - 1 : saved)) await dropLeftover();
       if (panel.hidden) return;
       await syncTemplates(state);
       const mine = state.combat.rows.find(row => row.key === "owner");
