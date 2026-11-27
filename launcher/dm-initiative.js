@@ -8,6 +8,15 @@ function setupDmInitiative(request, refresh) {
   const send = initiativeWriter(request);
   let room, editing, busy = false, signature, damageSignature, currentEnemy;
   const selected = () => room?.combat?.rows.find(row => row.id === order.value);
+  // Enemies go by the alias players know them by. The monster type follows in small text when
+  // the alias doesn't already say it.
+  const shownName = row => row.enemy?.alias || row.name;
+  const typeName = row => {
+    const enemy = row.enemy;
+    if (!enemy) return "";
+    const type = enemy.template?.monster?.name || String(enemy.name || "").replace(/\s+\d{1,3}$/, "");
+    return type && !shownName(row).toLowerCase().startsWith(type.toLowerCase()) ? type : "";
+  };
   const make = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text != null) node.textContent = text;
@@ -60,12 +69,13 @@ function setupDmInitiative(request, refresh) {
       const score = make("span", row.score == null ? "—" : String(row.score), "dm-turn-score");
       const body = make("span", null, "dm-turn-body");
       const title = make("span", null, "dm-turn-name");
-      title.append(make("span", row.name));
+      title.append(make("span", shownName(row)));
+      if (typeName(row)) title.append(make("small", typeName(row), "dm-turn-type"));
       if (enemy) title.append(icon(enemy.revealed ? "eyeball" : "invisible"));
       body.append(title);
       const sub = [];
       if (board.running && row.id === board.current) sub.push("Current turn");
-      if (enemy) sub.push(enemy.revealed ? "Shown as " + enemy.alias : "Hidden from players");
+      if (enemy) sub.push(enemy.revealed ? "Revealed" : "Hidden from players");
       if (enemy?.template?.pack.edition) sub.push(enemy.template.pack.edition);
       if (row.shared?.length) sub.push("with " + row.shared.join(", "));
       if (enemy?.conditions) sub.push(enemy.conditions);
@@ -125,21 +135,30 @@ function setupDmInitiative(request, refresh) {
     }));
     if (focused) waitingList.querySelector(`input[data-seat="${CSS.escape(focused)}"]`)?.focus({preventScroll:true});
   }
+  let cardKey;
   function renderEnemyCard(row) {
     const card = el("dm-enemy-detail");
     const enemy = row?.enemy;
+    const member = row && !enemy && row.damage_recipient && room.members?.find(m => m.member_id === row.damage_recipient);
+    cardKey = JSON.stringify([row, member?.inspection, room?.combat?.running, room?.combat?.current]);
     el("dm-focus-empty").hidden = Boolean(row);
     card.hidden = !row;
+    // Keep folded detail sections the DM opened across refreshes.
+    const open = new Set([...card.querySelectorAll("details[open] > summary")].map(s => s.textContent.replace(/ \(\d+\)$/, "")));
     card.replaceChildren();
+    queueMicrotask(() => {
+      for (const fold of card.querySelectorAll("details > summary")) if (open.has(fold.textContent.replace(/ \(\d+\)$/, ""))) fold.parentElement.open = true;
+    });
     if (!row) return;
     const head = make("div", null, "dm-enemy-head");
-    const title = make("h3", row.name);
+    const title = make("h3", shownName(row));
+    if (typeName(row)) title.append(make("small", typeName(row), "dm-turn-type"));
     head.append(title);
     const board = room.combat;
     if (board.running && row.id === board.current) head.append(make("span", "Current turn", "dm-badge dm-badge-current"));
     if (enemy) {
       const badge = make("span", null, "dm-badge " + (enemy.revealed ? "dm-badge-shown" : "dm-badge-hidden"));
-      badge.append(icon(enemy.revealed ? "eyeball" : "invisible"), make("span", enemy.revealed ? "Revealed as " + enemy.alias : "Hidden from players"));
+      badge.append(icon(enemy.revealed ? "eyeball" : "invisible"), make("span", enemy.revealed ? "Revealed to players" : "Hidden from players"));
       head.append(badge);
     }
     card.append(head);
@@ -164,7 +183,14 @@ function setupDmInitiative(request, refresh) {
         if (vitals.concentration) tags.append(make("span", "Concentrating · " + vitals.concentration, "dm-tag dm-concentration"));
         if (tags.childElementCount) card.append(tags);
       }
-      card.append(make("p", "Players run their own turns from their sheet. Select an enemy to use its stat block and actions.", "dm-muted"));
+      const details = member?.inspection?.details;
+      if (details) {
+        const sheet = make("div", null, "dm-sheet-details");
+        sheet.append(...dmCharacterSections(null, details, {folded:true, withVitals:false}));
+        card.append(sheet);
+      } else {
+        card.append(make("p", member?.inspection ? "This player shares only HP and AC with the DM." : "Players run their own turns from their sheet.", "dm-muted"));
+      }
       return;
     }
     const stats = make("div", null, "dm-enemy-stats");
@@ -566,6 +592,9 @@ function setupDmInitiative(request, refresh) {
     renderAreas();
     if (signature === next) {
       renderTurns();
+      const row = selected();
+      const member = row && !row.enemy && row.damage_recipient && room.members?.find(m => m.member_id === row.damage_recipient);
+      if (cardKey !== JSON.stringify([row, member?.inspection, board.running, board.current])) renderEnemyCard(row);
       if (damageSignature !== damageNext) renderActions(room, selected(), busy);
       damageSignature = damageNext;
       return;
@@ -574,7 +603,7 @@ function setupDmInitiative(request, refresh) {
     damageSignature = damageNext;
     const prior = order.value, save = el("dm-saves").value;
     order.replaceChildren(...board.rows.map(row => new Option(
-      (board.running && row.id === board.current ? "Current · " : "") + row.score + " · " + row.name
+      (board.running && row.id === board.current ? "Current · " : "") + row.score + " · " + shownName(row) + (typeName(row) ? " (" + typeName(row) + ")" : "")
         + (row.enemy?.template?.pack.edition ? " · " + row.enemy.template.pack.edition : "")
         + (row.shared?.length ? " with " + row.shared.join(", ") : ""),row.id)));
     const activeEnemy = board.running && board.rows.find(row => row.id === board.current && row.enemy);

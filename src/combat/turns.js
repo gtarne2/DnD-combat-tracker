@@ -41,9 +41,12 @@ const encounterTracker = (() => {
   function hpAdjustment(adjust, available = true) {
     const form = html("form");
     form.className = "companion-damage";
-    const label = html("label", "HP adjustment");
+    // One compact row: "HP [amount] Damage Heal".
+    const label = html("label", "HP");
+    label.className = "hp-adjust-label";
     const amount = html("input");
-    Object.assign(amount, {type: "number", min: "1", max: "4294967295", required: true, name: "amount"});
+    Object.assign(amount, {type: "number", min: "1", max: "4294967295", required: true, name: "amount", placeholder: "0"});
+    amount.setAttribute("aria-label", "HP adjustment");
     label.append(amount);
     const damage = html("button", "Damage");
     const heal = html("button", "Heal");

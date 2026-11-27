@@ -300,16 +300,24 @@ const concentrationControls = (() => {
     byId("cast-map-width").hidden = shape !== "line";
     byId("cast-map-aim").hidden = !["cone", "line", "cube"].includes(shape);
     form.mapSize.required = form.mapPlace.checked;
+    // A required size hidden in a closed section would block Confirm without saying why.
+    if (form.mapPlace.checked && !form.mapSize.value) castForm.querySelector("#cast-map-field details").open = true;
   }
+  castForm.addEventListener("invalid", (event) => {
+    const fold = event.target.closest("details");
+    if (fold) fold.open = true;
+  }, true);
   castForm.elements.mapPlace.onchange = renderMap;
   castForm.elements.mapShape.onchange = renderMap;
 
   function openMap(tools, focus) {
     const field = byId("cast-map-field");
-    field.hidden = !partyInitiative.templates.available();
+    const [shape, size, width] = (tools.dataset.spellArea || "").split(" ");
+    // Only spells with an area (or a teleport's reach) offer a template.
+    field.hidden = !partyInitiative.templates.available() || !shape;
+    castForm.elements.mapPlace.checked = false;
     if (field.hidden) return;
     const form = castForm.elements;
-    const [shape, size, width] = (tools.dataset.spellArea || "").split(" ");
     form.mapPlace.checked = Boolean(shape);
     form.mapShape.value = shape || "sphere";
     form.mapSize.value = size || "";
@@ -319,7 +327,7 @@ const concentrationControls = (() => {
     const lasts = form.mapLasts;
     lasts.querySelector("[value=concentration]").disabled = !focus;
     lasts.value = focus ? "concentration" : "turn";
-    byId("cast-map-note").textContent = shape ? "" : "This spell names no area. Choose a shape to place one.";
+    byId("cast-map-note").textContent = "";
     renderMap();
   }
 

@@ -45,7 +45,7 @@ module.exports = async function reviewActions({host, hostPage, guest, guestPage,
   const form = hostPage.locator("#protector-form");
   await form.locator("[value='1']").check();
   for (const id of [guestId, thirdId]) await form.locator("input[value='" + remote(id) + "']").check();
-  await form.getByLabel("Rolled temporary HP").fill("7");
+  await form.getByLabel("Temporary HP", {exact:true}).fill("7");
   await form.getByRole("button", {name:"Activate and apply HP"}).click();
   await offer(guestPage,"Protector").getByRole("button",{name:"Accept"}).click();
   await offer(guestPage,"Protector").getByText(/Accepted$/).waitFor();

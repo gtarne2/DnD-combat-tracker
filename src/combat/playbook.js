@@ -393,19 +393,45 @@ const playbook = (() => {
     pendingProtector = action;
     protectorForm.reset();
     protectorFeedback.textContent = "";
-    byId("protector-description").textContent = action.detail || "";
+    // Just the effect line here; the cannon's full rules stay on its card and under Rules.
+    const [effect, ...rest] = String(action.detail || "").split(/\n+/);
+    byId("protector-description").textContent = effect || "";
+    const rules = byId("protector-rules");
+    rules.hidden = !rest.length;
+    rules.querySelector("p").textContent = rest.join("\n");
+    renderProtectorTargets(true);
+    protector.showModal();
+  }
+  // Recipients. When the cannon's aura is on the Owlbear map, the allies inside it (and the
+  // cannon) start checked, and follow the map until the player changes a box.
+  let protectorEdited = false, protectorAura = "";
+  function renderProtectorTargets(fresh = false) {
+    if (!pendingProtector) return;
     const targets = byId("protector-targets");
+    const checked = new Set([...targets.querySelectorAll("input:checked")].map(input => input.value));
+    const inside = partyInitiative.templates.auraTargets?.(pendingProtector.companion) || null;
+    const key = JSON.stringify(inside && [...inside].sort());
+    if (!fresh && (protectorEdited || key === protectorAura)) return;
+    if (fresh) protectorEdited = false;
+    protectorAura = key;
     targets.querySelectorAll("label, p").forEach(node => node.remove());
     for (const [id, {name, hp}] of partyActions.targets(previewEncounter.current())) {
       const label = make("label");
       const checkbox = make("input");
-      Object.assign(checkbox, {type: "checkbox", name: "recipient", value: id});
+      Object.assign(checkbox, {type: "checkbox", name: "recipient", value: id,
+        checked: inside ? inside.has(id) : !fresh && checked.has(id)});
+      checkbox.onchange = () => { protectorEdited = true; };
       label.append(checkbox, hp ? ` ${name} · ${hp.temporary || 0} temp HP` : ` ${name}`);
       targets.append(label);
     }
     if (!targets.querySelector("input")) targets.append(make("p", "Set current HP to make a recipient available."));
-    protector.showModal();
+    byId("protector-aura-note").textContent = inside ? "Checked from the cannon's 10-foot aura on the map." : "";
   }
+  document.addEventListener("preview-encounter-change", () => { if (protector.open) renderProtectorTargets(); });
+  byId("protector-roll").onclick = () => {
+    const modifier = Number(cannonRolls?.modifier);
+    protectorForm.elements.amount.value = Math.floor(Math.random() * 8) + 1 + (Number.isFinite(modifier) ? Math.max(1, modifier) : 1);
+  };
 
   protectorForm.addEventListener("submit", event => {
     event.preventDefault();

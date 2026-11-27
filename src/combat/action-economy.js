@@ -115,19 +115,27 @@ const actionEconomy = (() => {
     const host = document.getElementById("economy-chips");
     if (!host) return;
     const progress = state.progress;
+    // A gold outline and flag on Combat options while it is this character's turn.
+    const myTurn = Boolean(progress && progress.active !== false && progress.current && turnKey(state, progress.current) === "owner");
+    document.getElementById("combat")?.classList.toggle("is-my-turn", myTurn);
+    const flag = document.getElementById("turn-flag");
+    if (flag) flag.hidden = !myTurn;
     host.hidden = !tracking(state, "owner") || progress?.active === false;
     if (host.hidden) return;
     const focus = document.activeElement?.dataset?.economyChip;
     host.replaceChildren(...Object.entries(names).map(([kind, label]) => {
       const used = Boolean(progress?.economyUsed?.owner?.[kind]);
+      const waiting = !used && kind !== "reaction" && !myTurn;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "economy-chip";
       chip.dataset.economyChip = kind;
-      chip.dataset.state = used ? "spent" : "ready";
+      chip.dataset.state = used ? "spent" : waiting ? "waiting" : "ready";
       chip.setAttribute("aria-pressed", String(used));
-      chip.textContent = label + (used ? " spent" : " ready");
-      chip.title = used ? `Mark ${label} ready again (table override)` : `Record ${label}`;
+      chip.textContent = label;
+      chip.setAttribute("aria-label", label + (used ? " used" : waiting ? " available on your turn" : " ready"));
+      chip.title = used ? `${label} used. Click to mark it ready again (table override)` : waiting ? `${label} is available on your turn` : `${label} ready. Click to record it`;
+      chip.disabled = waiting;
       chip.onclick = () => encounterTracker.update((_, draft) => {
         if (used) {
           delete draft.progress.economyUsed.owner[kind];

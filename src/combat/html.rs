@@ -67,7 +67,7 @@ pub fn render_html_with_profile(sheet: &CombatSheet, profile_key: &str) -> Strin
     html.push_str(include_str!("concentration.html"));
     render_abilities(&mut html, &sheet.profile.stats);
     html.push_str("<section class=\"resource-strip\" aria-labelledby=\"resource-heading\"><h2 id=\"resource-heading\">Resources</h2><ul id=\"encounter-resources\"></ul><button type=\"button\" id=\"show-all-resources\" class=\"quiet-button\" data-dialog=\"all-resources\">All pools</button><button type=\"button\" class=\"quiet-button\" data-dialog=\"resource-settings\">Manage resources</button><button type=\"button\" data-configure-moxie id=\"configure-moxie\" hidden></button></section></section>");
-    html.push_str("<section class=\"combat-workspace\" id=\"combat\" aria-labelledby=\"options-heading\"><div class=\"workspace-heading\"><h2 id=\"options-heading\">Combat options</h2>\
+    html.push_str("<section class=\"combat-workspace\" id=\"combat\" aria-labelledby=\"options-heading\"><div class=\"workspace-heading\"><div class=\"workspace-title\"><h2 id=\"options-heading\">Combat options</h2><span id=\"turn-flag\" class=\"turn-flag\" hidden>Your turn</span><span id=\"economy-chips\" class=\"economy-chips\" role=\"group\" aria-label=\"This turn's actions\" hidden></span></div>\
         <div class=\"workspace-tools\"><button type=\"button\" id=\"open-companion-sidebar\" class=\"quiet-button\" aria-controls=\"companion-roster-content\">Add companion</button><label class=\"option-search\"><span class=\"visually-hidden\">Search combat options</span><input type=\"search\" id=\"option-search\" placeholder=\"Search options\"></label><button type=\"button\" id=\"toggle-skills-dock\" aria-controls=\"skills-dock\" aria-pressed=\"false\">Skills</button><button type=\"button\" id=\"toggle-inspector\" aria-controls=\"option-inspector\" aria-expanded=\"true\">Hide details</button></div></div>");
     html.push_str(include_str!("quick-actions.html"));
     html.push_str(
@@ -897,6 +897,11 @@ fn render_rolls(html: &mut String, sheet: &CombatSheet) {
         }
         if let Some(dc) = casting.save_dc {
             write!(html, " data-dc=\"{dc}\"").unwrap();
+            // The casting ability modifier, for the Protector's 1d8 + modifier roll.
+            if let Some(proficiency) = sheet.profile.rolls.proficiency_bonus {
+                let modifier = i32::from(dc) - 8 - i32::from(proficiency);
+                write!(html, " data-modifier=\"{modifier}\"").unwrap();
+            }
         }
         html.push_str("></span>");
     }

@@ -87,43 +87,8 @@ const renderDmParty = (() => {
     document.getElementById("dm-inspector-presence").textContent = presence(member);
     content.replaceChildren();
 
-    function facts(title, values) {
-      if (!Object.keys(values).length) return;
-      const list = node("dl");
-      for (const [label, value] of Object.entries(values)) {
-        const item = node("div");
-        item.append(node("dt", label), node("dd", shown(value)));
-        list.append(item);
-      }
-      const section = node("section");
-      section.append(node("h3", title), list);
-      content.append(section);
-    }
-
     const {vitals, details} = member.inspection;
-    facts("Vitals", {
-      HP: hp(vitals), "Temp HP": vitals.temporary_hp, AC: vitals.effective_ac,
-      Initiative: vitals.initiative, Conditions: vitals.conditions.join(", ") || "None",
-      Concentration: vitals.concentration ?? "None",
-    });
-    if (!details) return;
-    facts("Ability scores", details.ability_scores);
-    facts("Saving throws", details.saves);
-    facts("Skills", details.skills);
-    facts("Resources remaining", details.resources);
-
-    for (const [key, title] of [["attacks", "Attacks"], ["spells", "Spells"], ["features", "Features"], ["inventory", "Inventory"]]) {
-      if (!details[key].length) continue;
-      const section = node("section");
-      section.append(node("h3", title));
-      for (const {name, rules} of details[key]) {
-        const rule = node("article");
-        rule.append(node("h4", name));
-        if (rules) rule.append(node("p", rules));
-        section.append(rule);
-      }
-      content.append(section);
-    }
+    content.append(...dmCharacterSections(vitals, details));
   }
 
   function render(state) {
@@ -209,6 +174,58 @@ const renderDmParty = (() => {
   };
   return render;
 })();
+
+// Shared character details, as sections. Used by the inspector and by the turn order card when
+// the DM selects a player. Long lists (attacks, spells, features, inventory) fold away when
+// `folded` is set, so the turn card stays short.
+function dmCharacterSections(vitals, details, {folded = false, withVitals = true} = {}) {
+  const node = (tag, value, className) => {
+    const element = document.createElement(tag);
+    if (value != null) element.textContent = value;
+    if (className) element.className = className;
+    return element;
+  };
+  const shown = value => value ?? "—";
+  const sections = [];
+  function facts(title, values) {
+    if (!values || !Object.keys(values).length) return;
+    const list = node("dl");
+    for (const [label, value] of Object.entries(values)) {
+      const item = node("div");
+      item.append(node("dt", label), node("dd", shown(value)));
+      list.append(item);
+    }
+    const section = node("section");
+    section.append(node("h3", title), list);
+    sections.push(section);
+  }
+  if (withVitals && vitals) facts("Vitals", {
+    HP: vitals ? shown(vitals.current_hp) + " / " + shown(vitals.max_hp) : "—", "Temp HP": vitals.temporary_hp, AC: vitals.effective_ac,
+    Initiative: vitals.initiative, Conditions: (vitals.conditions || []).join(", ") || "None",
+    Concentration: vitals.concentration ?? "None",
+  });
+  if (!details) return sections;
+  facts("Ability scores", details.ability_scores);
+  facts("Saving throws", details.saves);
+  facts("Skills", details.skills);
+  facts("Resources remaining", details.resources);
+  for (const [key, title] of [["attacks", "Attacks"], ["spells", "Spells"], ["features", "Features"], ["inventory", "Inventory"]]) {
+    if (!details[key]?.length) continue;
+    const section = node(folded ? "details" : "section");
+    if (folded) {
+      section.className = "dm-fold";
+      section.append(node("summary", title + " (" + details[key].length + ")"));
+    } else section.append(node("h3", title));
+    for (const {name, rules} of details[key]) {
+      const rule = node("article");
+      rule.append(node("h4", name));
+      if (rules) rule.append(node("p", rules));
+      section.append(rule);
+    }
+    sections.push(section);
+  }
+  return sections;
+}
 
 // Owlbear Rodeo link (stage O1): show the pairing code and whether an extension is connected.
 ;(() => {

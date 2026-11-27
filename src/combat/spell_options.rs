@@ -138,7 +138,25 @@ pub fn area(range: Option<&str>, description: &str) -> Option<SpellArea> {
         }
     }
     let lower = description.to_ascii_lowercase();
-    scan(&super::words(&lower), false)
+    let words = super::words(&lower);
+    scan(&words, false).or_else(|| teleport(&words))
+}
+
+/// Teleports such as Misty Step have no area, but their reach is worth showing on the map:
+/// "teleport up to 30 feet" becomes a 30-foot radius around the caster.
+fn teleport(words: &[&str]) -> Option<SpellArea> {
+    let start = words.iter().position(|word| word.starts_with("teleport"))?;
+    let rest = &words[start..words.len().min(start + 8)];
+    rest.windows(4).find_map(|window| {
+        (window[0] == "up" && window[1] == "to" && matches!(window[3], "foot" | "feet" | "ft"))
+            .then(|| feet(window[2]))
+            .flatten()
+            .map(|size| SpellArea {
+                shape: AreaShape::Emanation,
+                size,
+                width: None,
+            })
+    })
 }
 
 fn scan(words: &[&str], from_self: bool) -> Option<SpellArea> {

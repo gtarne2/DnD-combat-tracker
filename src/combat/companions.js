@@ -90,16 +90,59 @@ const companionControls = (() => {
     });
   }
 
-  function createCannon(id) {
-    const template = cannonTemplates.get(id);
+  // Summoning: an action that creates one of a feature's companion variants. The Eldritch
+  // Cannon uses it; a feature with other variants can join by listing them in `summons`.
+  function summon(id) {
+    const template = templates.get(id);
     if (!template) return;
     update((roster, state) => {
       if (!actionEconomy.spend(state, "owner", "action")) return false;
-      roster.cards.push({ ...template, templateId: id, zeroHp: "vanish", id: ++roster.sequence });
+      const card = { ...template, templateId: id, id: ++roster.sequence };
+      if (cannonTemplates.has(id)) card.zeroHp = "vanish";
+      roster.cards.push(card);
       previewEncounter.log(state, "action", `Created ${template.name}`);
+      document.dispatchEvent(new CustomEvent("companion-summoned", {detail: {card}}));
       return "creating " + template.name;
     });
   }
+  const createCannon = summon;
+  const variantName = (name) => name.replace(/^Eldritch Cannon\s*[-—:]?\s*/i, "");
+  const summons = [];
+  if (cannonTemplates.size) {
+    const row = document.querySelector('.option-row[data-pin$="_ARTILLERIST_ELDRITCH_CANNON"]');
+    if (row) summons.push({row, variants: [...cannonTemplates.keys()], label: "Create cannon"});
+  }
+  for (const {row, variants, label} of summons) {
+    const tools = row.querySelector(".option-execute");
+    const pick = document.createElement("select");
+    pick.dataset.summonVariant = "";
+    pick.setAttribute("aria-label", "Variant to create");
+    for (const id of variants) pick.add(new Option(variantName(templates.get(id).name), id));
+    const create = document.createElement("button");
+    create.type = "button";
+    create.dataset.summonCreate = "";
+    create.textContent = label;
+    tools.prepend(pick, create);
+  }
+  // The inspector shows a copy of the row's controls, so the click is handled here for both.
+  document.addEventListener("click", (event) => {
+    const create = event.target.closest("[data-summon-create]");
+    if (!create || create.disabled) return;
+    const pick = create.parentElement.querySelector("[data-summon-variant]");
+    if (pick?.getClientRects().length) {
+      summon(pick.value);
+      return;
+    }
+    // The action list row is too narrow for the variant list: open the option beside it so
+    // the player can choose there.
+    create.closest(".option-row")?.querySelector("[data-inspect]")?.click();
+    const shown = [...document.querySelectorAll("#option-inspector [data-summon-variant]")].find((node) => node.getClientRects().length);
+    if (shown) shown.focus();
+    else if (pick) {
+      pick.closest(".option-execute").classList.add("show-variants");
+      pick.focus();
+    }
+  });
 
   function setCollapsed(value = layoutPreferences.companionsCollapsed()) {
     const hide = inSidebar && value;
@@ -246,9 +289,11 @@ const companionControls = (() => {
     panel.append(summary, controls, hpControls(card));
 
     if (command) {
-      const commandControl = playbook.followupButton(command, state);
-      panel.append(commandControl);
-      if (command.roll) panel.append(node("p", command.roll));
+      const row = node("div");
+      row.className = "companion-command";
+      row.append(playbook.followupButton(command, state));
+      if (command.roll) row.append(node("small", command.roll));
+      panel.append(row);
     }
 
     const details = node("dl");
@@ -507,5 +552,5 @@ const companionControls = (() => {
       previewEncounter.transact(syncSeeds, { undo: false });
     }
   }
-  return { cannonTemplates, createCannon, place, showCard, start, available, advance };
+  return { cannonTemplates, createCannon, summon, place, showCard, start, available, advance };
 })();

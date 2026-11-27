@@ -60,6 +60,17 @@ pub struct AreaTemplate {
     pub damage_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub save: Option<AreaSave>,
+    /// The caster's companion the template is centred on, by its sheet ID, such as a
+    /// Protector cannon's aura. None centres it on the caster.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<u32>,
+}
+
+/// A stable map ID for a companion that acts on its owner's turn and so has no row of its
+/// own. Owlbear tokens and inside reports use it like a row ID.
+pub fn companion_map_id(owner_row: Uuid, local_id: u32) -> Uuid {
+    let salt = (u128::from(local_id) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15_f39c_c060_5ced_c835);
+    Uuid::from_u128(owner_row.as_u128() ^ salt)
 }
 
 /// The saving throw an area spell asks for.
@@ -566,8 +577,19 @@ impl Row {
                 name, companions, ..
             } => {
                 row["name"] = json!(name);
+                row["member_id"] = json!(self.player());
                 if self.member() == Some(viewer) {
                     row["companions"] = json!(companions);
+                    row["companion_rows"] = json!(
+                        companions
+                            .iter()
+                            .filter(|c| c.initiative.is_none())
+                            .map(|c| (
+                                c.local_id.to_string(),
+                                companion_map_id(self.id, c.local_id)
+                            ))
+                            .collect::<BTreeMap<_, _>>()
+                    );
                 }
                 if dm {
                     row["damage_recipient"] = json!(self.player());
@@ -887,20 +909,34 @@ impl Fight {
                     "local_id": local_id, "name": name,
                 }),
             })
+            .chain(
+                self.shared_companions()
+                    .map(|(id, member, local_id, name)| {
+                        json!({
+                            "id": id, "kind": "companion", "member_id": member,
+                            "local_id": local_id, "name": name, "shared": true,
+                        })
+                    }),
+            )
             .collect();
         // Templates name their caster's row so the extension can place them at its token.
         let templates: Vec<Value> = self
             .templates
             .iter()
             .filter_map(|t| {
-                let caster = self
-                    .position
-                    .rows
-                    .iter()
-                    .find(|r| r.player() == Some(t.member))?;
                 let template = &t.template;
+                let caster = match template.anchor {
+                    Some(local) => self.companion_spot(t.member, local)?,
+                    None => {
+                        self.position
+                            .rows
+                            .iter()
+                            .find(|r| r.player() == Some(t.member))?
+                            .id
+                    }
+                };
                 Some(json!({
-                    "id": template.id, "caster": caster.id, "member_id": t.member,
+                    "id": template.id, "caster": caster, "member_id": t.member,
                     "spell": template.spell, "shape": template.shape, "size": template.size,
                     "width": template.width, "lasts": template.lasts, "aim": template.aim,
                 }))
@@ -1090,11 +1126,52 @@ impl Fight {
     pub(super) fn shown_to_players(&self, id: Uuid) -> bool {
         self.position.rows.iter().any(|row| {
             row.id == id && !matches!(&row.actor, Participant::Enemy(enemy) if !enemy.revealed)
-        })
+        }) || self.shared_companions().any(|(map_id, ..)| map_id == id)
     }
 
     pub(super) fn has_row(&self, id: Uuid) -> bool {
         self.position.rows.iter().any(|row| row.id == id)
+            || self.shared_companions().any(|(map_id, ..)| map_id == id)
+    }
+
+    /// Companions that act on their owner's turn: (map ID, owner member, local ID, name).
+    fn shared_companions(&self) -> impl Iterator<Item = (Uuid, Uuid, u32, &str)> {
+        self.position.rows.iter().flat_map(|row| {
+            let (member, companions) = match &row.actor {
+                Participant::Player {
+                    member, companions, ..
+                } => (Some(*member), companions.as_slice()),
+                _ => (None, &[][..]),
+            };
+            companions
+                .iter()
+                .filter(|c| c.initiative.is_none())
+                .filter_map(move |c| {
+                    Some((
+                        companion_map_id(row.id, c.local_id),
+                        member?,
+                        c.local_id,
+                        c.name.as_str(),
+                    ))
+                })
+        })
+    }
+
+    /// The row or map ID a companion is drawn at.
+    fn companion_spot(&self, member: Uuid, local: u32) -> Option<Uuid> {
+        self.position
+            .rows
+            .iter()
+            .find(|r| {
+                matches!(&r.actor, Participant::Companion { member: m, local_id, .. }
+                    if *m == member && *local_id == local)
+            })
+            .map(|r| r.id)
+            .or_else(|| {
+                self.shared_companions()
+                    .find(|(_, m, l, _)| *m == member && *l == local)
+                    .map(|(id, ..)| id)
+            })
     }
 
     pub fn edit(
@@ -1194,7 +1271,16 @@ impl Fight {
                 }
             }
             Edit::PlaceTemplate { template } => {
+                let anchored = template.anchor.is_none_or(|local| {
+                    rows.iter().any(|r| match &r.actor {
+                        Participant::Player {
+                            member, companions, ..
+                        } => *member == actor && companions.iter().any(|c| c.local_id == local),
+                        _ => false,
+                    })
+                });
                 if !valid_template(template)
+                    || !anchored
                     || !rows.iter().any(|r| r.player() == Some(actor))
                     || template
                         .aim
