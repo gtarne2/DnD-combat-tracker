@@ -112,6 +112,7 @@ const partyInitiative = (() => {
     function railError(message) {
       const note = document.getElementById("party-encounter-note");
       note.textContent = message;
+      note.hidden = false;
       note.dataset.error = "true";
       setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
     }
@@ -361,6 +362,7 @@ const partyInitiative = (() => {
     const note = document.getElementById("party-encounter-note");
     if (!note) return;
     note.textContent = message;
+    note.hidden = false;
     note.dataset.error = "true";
     setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
   }

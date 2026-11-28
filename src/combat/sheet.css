@@ -352,7 +352,8 @@ body:is(.has-companions, .show-empty-roster) #open-companion-sidebar { display: 
 #cast-map-field .cast-map-options[hidden] { display: none; }
 #cast-map-field input[type=number] { width: 5.5em; }
 #cast-map-note:empty { display: none; }
-.party-templates { display: grid; gap: 6px; margin: 4px 0; }
+.party-templates { display: grid; gap: 6px; margin: 0 0 8px; }
+.party-templates[hidden] { display: none; }
 .party-template { border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: 8px; padding: 6px 8px; display: grid; gap: 4px; }
 .party-template p { margin: 0; }
 .party-template-head { display: flex; align-items: flex-start; gap: 6px; }
@@ -1045,7 +1046,7 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .stat-boosted { color: var(--teal) !important; }
 .stat-boost-note { display: block; color: var(--teal); font-size: 11px; font-weight: 600; margin-top: 2px; }
 /* Reaction calls and the fight recap on the combat rail (R82, R86). */
-.party-calls { display: grid; gap: 6px; margin: 4px 0; }
+.party-calls { display: grid; gap: 6px; margin: 0 0 8px; }
 .party-calls[hidden], .party-recap[hidden] { display: none; }
 .party-call { border-left-color: var(--accent, #d8b45a); }
 .party-call small { flex: 1 1 100%; opacity: .8; }
