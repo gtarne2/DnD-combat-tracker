@@ -32,6 +32,14 @@ fn preview_path(output: Output) -> PathBuf {
     PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }
 
+fn without_definition_report(html: &str) -> (&str, &str) {
+    let (before, report) = html
+        .split_once("<script type=\"application/json\" id=\"import-definitions\">")
+        .unwrap();
+    let (_, after) = report.split_once("</script>").unwrap();
+    (before, after)
+}
+
 #[test]
 fn preview_refresh_keeps_the_same_url_and_preserves_the_previous_sheet_on_failure() {
     let id = SystemTime::now()
@@ -59,7 +67,10 @@ fn preview_refresh_keeps_the_same_url_and_preserves_the_previous_sheet_on_failur
     fs::copy(&first_content, nested.join("lantern.XML")).unwrap();
     fs::write(library.join("ignored.txt"), "not XML").unwrap();
     assert_eq!(preview_path(run_preview(&previews, &save, &library)), sheet);
-    assert_eq!(fs::read_to_string(&sheet).unwrap(), original);
+    let from_folder = fs::read_to_string(&sheet).unwrap();
+    assert!(from_folder.contains("lantern.XML"));
+    assert!(original.contains("sample-content.xml"));
+    assert!(without_definition_report(&from_folder) == without_definition_report(&original));
 
     let other_save = scratch.0.join("alternate.dnd5e");
     fs::copy(&save, &other_save).unwrap();
@@ -84,6 +95,6 @@ fn preview_refresh_keeps_the_same_url_and_preserves_the_previous_sheet_on_failur
     assert!(!failure.status.success());
     assert!(failure.stdout.is_empty());
     assert!(String::from_utf8_lossy(&failure.stderr).contains("broken.xml"));
-    assert_eq!(fs::read_to_string(&sheet).unwrap(), updated);
+    assert!(fs::read_to_string(&sheet).unwrap() == updated);
     assert_eq!(previews.read_dir().unwrap().count(), 2);
 }

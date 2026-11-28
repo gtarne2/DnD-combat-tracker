@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element type="Class" id="ID_TEST_CLASS_MONK" name="Monk">
+    <rules><grant type="Class Feature" id="ID_TEST_FEATURE_KI" level="2"/></rules>
+  </element>
+  <element type="Class" id="ID_TEST_CLASS_BARD" name="Bard">
+    <rules>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_SURGE" level="2"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_INSPIRATION" level="1"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_UNKNOWN" level="1"/>
+      <select type="Archetype" supports="School of Resonance" level="3"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_RESERVE" level="2"/>
+    </rules>
+  </element>
+  <element type="Class" id="ID_TEST_CLASS_PALADIN" name="Paladin">
+    <rules>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_HEALING_POOL" level="1"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_DIVINITY" level="1"/>
+    </rules>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_KI" name="Ki">
+    <description><p>Spent Ki returns when you finish a short or long rest.</p></description>
+    <sheet><description>{{ki:points}} Ki points. Save DC {{ki:dc}}.</description></sheet>
+    <rules>
+      <stat name="ki:points" value="level:monk"/>
+      <stat name="ki:dc" value="8"/>
+      <stat name="ki:dc" value="proficiency"/>
+      <stat name="ki:dc" value="wisdom:modifier"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_STEP"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_PRESS"/>
+    </rules>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_STEP" name="Gust Step">
+    <description><p>You can spend 1 ki point to dash as a bonus action.</p></description>
+    <sheet action="Bonus Action" usage="Ki"/>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_PRESS" name="Forceful Press">
+    <description><p>Spend two ki points. A target makes a Constitution saving throw.</p></description>
+    <sheet action="Action" usage="Ki"/>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_SURGE" name="Rally Surge">
+    <sheet action="Action" usage="1/Short Rest">
+      <description>Rally once.</description>
+      <description level="6" usage="2/Short Rest">Rally up to twice.</description>
+    </sheet>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_INSPIRATION" name="Rallying Note">
+    <sheet action="Bonus Action" usage="{{voice:uses}}/Long Rest">
+      <description>Give an ally a d{{voice:die}}.</description>
+    </sheet>
+    <rules>
+      <stat name="voice:uses" value="1" bonus="minimum"/>
+      <stat name="voice:uses" value="charisma:modifier" bonus="minimum"/>
+      <stat name="voice:die" value="4" bonus="size"/>
+      <stat name="voice:die" value="8" bonus="size" level="5"/>
+    </rules>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_UNKNOWN" name="Conditional Feature">
+    <sheet action="Action" usage="{{unknown:uses}}/Long Rest"/>
+    <rules><stat name="unknown:uses" value="7" condition="when awakened"/></rules>
+  </element>
+  <element type="Archetype" id="ID_TEST_ARCHETYPE_RESONANCE" name="School of Resonance">
+    <supports>School of Resonance</supports>
+    <rules><grant type="Archetype Feature" id="ID_TEST_FEATURE_UPGRADE"/></rules>
+  </element>
+  <element type="Archetype Feature" id="ID_TEST_FEATURE_UPGRADE" name="Resonance">
+    <rules><stat name="voice:die" value="6" bonus="size" level="3"/></rules>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_RESERVE" name="Harmonic Reserve">
+    <description><p>Restore your sorcery points after a long rest.</p></description>
+    <rules><stat name="sorcery-points" value="level:bard"/><grant type="Class Feature" id="ID_TEST_FEATURE_VARIATION"/></rules>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_VARIATION" name="Vary Tone">
+    <description><p>Spend two sorcery points to change the tone of a spell.</p></description>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_DIVINITY" name="Shared Light">
+    <description><p>Uses return on a short or long rest.</p></description>
+    <sheet usage="{{channel divinity:count}}/Short Rest"/>
+    <rules>
+      <stat name="channel divinity:count" value="1" bonus="maximum"/>
+      <stat name="channel divinity:count" value="2" bonus="maximum" level="6"/>
+      <grant type="Class Feature" id="ID_TEST_FEATURE_RADIANCE"/>
+    </rules>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_RADIANCE" name="Radiant Resolve">
+    <sheet action="Action" usage="Channel Divinity"/>
+  </element>
+  <element type="Class Feature" id="ID_TEST_FEATURE_HEALING_POOL" name="Restoring Touch">
+    <sheet action="Action" usage="{{lay on hands:hp pool}}/Long Rest"/>
+    <rules>
+      <stat name="touch:base" value="level:paladin"/>
+      <stat name="lay on hands:hp pool" value="touch:base"/>
+      <stat name="lay on hands:hp pool" value="touch:base"/>
+      <stat name="lay on hands:hp pool" value="touch:base"/>
+    </rules>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_ARC" name="Static Arc">
+    <description><p>Make a spell attack. A hit deals 1d8 lightning damage.</p><p>The spell’s damage increases by 1d8 when you reach 5th level (2d8), 11th level (3d8), and 17th level (4d8).</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_BEAMS" name="Cobalt Rays">
+    <description><p>Make a spell attack. A hit deals 1d10 cold damage.</p><p>It creates two beams at 5th level, three beams at 11th level, and four beams at 17th level. Make a separate attack roll for each beam.</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_CONDITIONAL" name="Metal Mark">
+    <description><p>The weapon may deal damage later. At 5th level add 1d4, at 11th add 2d4, and at 17th add 3d4.</p></description>
+    <setters><set name="level">0</set><set name="time">1 action</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_BURST" name="Lantern Burst">
+    <description><p>The target makes a saving throw or takes 6d6 radiant damage.</p><p><b>At Higher Levels.</b> The damage increases by 1d6 for each slot level above 3rd.</p></description>
+    <setters><set name="level">3</set><set name="time">1 action</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_HEAL" name="Mend Wounds">
+    <description><p>The target regains hit points equal to 2d4 + your spellcasting ability modifier.</p><p><b>At Higher Levels.</b> The healing increases by 2d4 for each slot level above 1st.</p></description>
+    <setters><set name="level">1</set><set name="time">1 action</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_DARTS" name="Numerous Darts">
+    <description><p>Send out three luminous darts. Each deals 1d4 + 1 force damage.</p><p><b>At Higher Levels.</b> Create one more dart for each slot level above 1st.</p></description>
+    <setters><set name="level">1</set><set name="time">1 action</set></setters>
+  </element>
+</elements>

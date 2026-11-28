@@ -9,8 +9,10 @@ function setupFeatureGroups() {
     .sort((a, b) => a.name.localeCompare(b.name)).map((entry) => [entry.id, entry]));
   const getFact = (entry, label) => entry.facts?.filter((fact) => fact.querySelector("dt").textContent === label)
     .map((fact) => fact.querySelector("dd").textContent) || [];
+  const isAbilityScoreImprovement = (entry) => /^ability score (?:improvement|increase)\b/i.test(entry.name)
+    || /(?:^|_)ABILITY_?SCORE_?IMPROVEMENT(?:_|$)/i.test(entry.pin || "");
   const recommended = [
-    ["all", "All features", () => true],
+    ["all", "All features", (entry) => !isAbilityScoreImprovement(entry)],
     ["moxie", "Moxie", (entry) => entry.moxiePool || entry.moxieAction],
     ["hit", "After a hit", (entry) => getFact(entry, "Trigger").includes("After dealing unarmed damage") || /^when you (?:hit|deal damage)/i.test(entry.summary || "")],
     ["rest", "Rest recovery", (entry) => entry.moxiePool || getFact(entry, "Uses").some((use) => /rest/i.test(use))],
@@ -24,7 +26,7 @@ function setupFeatureGroups() {
   };
   moxieGroup?.entries.sort((left, right) => moxieOrder(left) - moxieOrder(right));
   const previous = sessionView.get("featureGroups");
-  let custom = Array.isArray(previous) ? previous.filter((group) => typeof group.id === "string" && typeof group.name === "string" && Array.isArray(group.entries)) : [];
+  let custom = Array.isArray(previous) ? previous.filter((group) => typeof group?.id === "string" && typeof group.name === "string" && Array.isArray(group.entries)) : [];
   let selected = sessionView.get("selectedFeatureGroup") || "all";
   let draft;
 
@@ -91,14 +93,15 @@ function setupFeatureGroups() {
       const entry = features.get(row.dataset.featureEntry);
       const use = playbook.featureUse(entry.pin, state);
       const control = row.querySelector("[data-feature-use]");
+      const turnLimit = use && use.label !== "Deactivate" && actionEconomy.reason(state, "owner", playbook.optionTiming(entry.pin));
       control.hidden = !use;
-      control.disabled = Boolean(use?.reason);
+      control.disabled = Boolean(use?.reason || turnLimit);
       control.textContent = use?.label || "Use feature";
       control.setAttribute("aria-label", `${control.textContent} · ${entry.name}`);
       row.querySelector("[data-feature-pool-setup]").hidden = !entry.moxiePool || Boolean(moxie);
       const status = row.querySelector(".feature-availability");
       status.textContent = entry.moxiePool && moxie ? `${Math.max(0, moxie.capacity - (state.progress?.used[moxie.key] || 0))} / ${moxie.capacity} Moxie`
-        : use?.reason || use?.summary || "";
+        : turnLimit || use?.reason || use?.summary || "";
     }
   }
 
@@ -173,8 +176,30 @@ function setupFeatureGroups() {
     groupSearch.value = "";
     byId("feature-group-feedback").textContent = "";
     byId("remove-feature-group").hidden = !group;
+    groupMoveControls();
     renderDraft();
   }
+  const groupMoves = [[byId("move-feature-group-up"), -1], [byId("move-feature-group-down"), 1]];
+  function groupMoveControls() {
+    const index = custom.findIndex((group) => group.id === draft.id);
+    for (const [control, step] of groupMoves) control.disabled = index < 0 || index + step < 0 || index + step >= custom.length;
+  }
+  function groupChoices(id) {
+    choices.replaceChildren(new Option("New group", ""), ...custom.map((group) => new Option(group.name, group.id)));
+    choices.value = id;
+  }
+  for (const [control, step] of groupMoves) control.onclick = () => {
+    const index = custom.findIndex((group) => group.id === draft.id);
+    const next = index + step;
+    const reordered = [...custom];
+    [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
+    custom = reordered;
+    sessionView.set("featureGroups", custom);
+    groupChoices(draft.id);
+    groupMoveControls();
+    if (control.disabled) choices.focus();
+    render();
+  };
   function persist() {
     sessionView.set("featureGroups", custom);
     sessionView.set("selectedFeatureGroup", selected);
@@ -182,8 +207,7 @@ function setupFeatureGroups() {
     render();
   }
   byId("manage-feature-groups").onclick = () => {
-    choices.replaceChildren(new Option("New group", ""), ...custom.map((group) => new Option(group.name, group.id)));
-    choices.value = custom.some((group) => group.id === selected) ? selected : "";
+    groupChoices(custom.some((group) => group.id === selected) ? selected : "");
     openDraft(choices.value);
     editor.showModal();
     form.elements.name.focus();

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aurora Combat Tracker</title>
+<link rel="stylesheet" href="popover.css">
+</head>
+<body>
+<header>
+  <h1>Aurora Combat Tracker</h1>
+  <p id="summary" role="status">Connecting to Owlbear…</p>
+</header>
+
+<section id="player-view" hidden>
+  <p>Your DM links this room to the Aurora Combat Tracker. There is nothing to set up on your side yet.</p>
+</section>
+
+<section id="gm-view" hidden>
+  <ol class="steps">
+    <li id="step-bridge">
+      <h2>Open the bridge window</h2>
+      <p class="hint">Start the DM session from the Aurora launcher first. The bridge is a small window that stays open while you play. You can minimize it.</p>
+      <button id="open-bridge" type="button" class="primary">Open bridge window</button>
+      <details>
+        <summary>Different port</summary>
+        <p class="hint">Only needed if the DM dashboard shows a port other than 47831.</p>
+        <label>Port <input id="port" type="number" min="1" max="65535" inputmode="numeric"></label>
+      </details>
+    </li>
+    <li id="step-pair">
+      <h2>Enter the pairing code</h2>
+      <p class="hint">The DM dashboard shows it under <strong>Owlbear Rodeo</strong>. Each code works once.</p>
+      <form id="pair-form">
+        <input id="code" name="code" autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABC123" aria-label="Pairing code" required>
+        <button type="submit" class="primary">Pair</button>
+      </form>
+    </li>
+  </ol>
+  <section id="linked" hidden>
+    <div class="bar">
+      <h2 id="encounter-title">Encounter</h2>
+      <button id="add-all" type="button" class="small">Add all to map</button>
+    </div>
+    <ol id="rows" class="rows"></ol>
+    <p id="rows-empty" class="hint" hidden>No one is in the initiative order yet.</p>
+    <p id="map-error" class="error" hidden></p>
+    <details id="condition-art" class="art-list">
+      <summary>Condition markers</summary>
+      <p class="hint">Pick each condition's look once from Owlbear's own Attachments. Enemy tokens then show it while they have that condition.</p>
+      <ol id="conditions" class="rows"></ol>
+    </details>
+    <h2 class="gap">Players</h2>
+    <p class="hint">Which tracker character each Owlbear player controls. Kept in this browser only.</p>
+    <ol id="players" class="rows"></ol>
+    <button id="forget" type="button" class="quiet">Unpair this room</button>
+  </section>
+  <p id="error" class="error" role="alert" hidden></p>
+</section>
+<script type="module" src="popover.js"></script>
+</body>
+</html>

@@ -3,6 +3,8 @@
   <article id="effect-concentration" hidden><span class="status-chip" data-status-kind="concentration">Concentration</span><h3 id="effect-concentration-name"></h3><p id="effect-concentration-duration"></p><button type="button" id="effect-end-concentration">End concentration</button></article>
   <div class="focus-form effect-tools">
     <details class="effect-time-controls" data-view-disclosure="effect-clock"><summary>Advance game time</summary>
+    <p id="game-time-elapsed"></p>
+    <button type="button" data-dialog="dawn-dialog">Advance to dawn</button>
     <form id="effect-clock" class="focus-form">
       <label>Elapsed game time <input name="elapsed" type="number" min="1" max="4294967295" value="1" required></label>
       <label for="effect-clock-unit">Game time unit</label>
@@ -21,6 +23,8 @@
 <dialog id="effect-editor" aria-labelledby="effect-heading">
   <form id="effect-form">
     <h2 id="effect-heading">Ongoing effect</h2>
+    <div class="focus-form"><label>Effect preset <select name="preset"></select></label><button type="button" id="save-effect-preset">Save as preset</button><button type="button" id="delete-effect-preset">Delete preset</button></div>
+    <p id="effect-preset-feedback" role="status"></p>
     <div class="companion-fields">
       <label>Effect name <input name="name" maxlength="120" placeholder="Berserk" required></label>
       <label>Type <select name="category"><option value="effect">Effect</option><option value="condition">Condition</option></select></label>
@@ -33,11 +37,23 @@
         <select id="effect-duration-unit" name="unit"><option value="1">Seconds</option><option value="60">Minutes</option><option value="3600">Hours</option></select>
       </div>
       <div id="effect-anchor"><label for="effect-turn">Whose turn</label><select id="effect-turn" name="anchor"></select></div>
+      <details id="effect-mod-fields" class="companion-wide effect-mod-fields"><summary>Stat changes</summary><p class="effect-mod-hint">Applied to the target's sheet while the effect lasts. Leave blank for none.</p><div class="effect-mod-grid"><label>Speed (ft.) <input name="mod-speed" type="number" min="-100" max="100" step="1" inputmode="numeric" placeholder="+10"></label><label>AC <input name="mod-ac" type="number" min="-100" max="100" step="1" inputmode="numeric" placeholder="+2"></label><label>Attack rolls <input name="mod-attack" type="number" min="-100" max="100" step="1" inputmode="numeric" placeholder="+1"></label><label>Attack die <select name="mod-attackDie"><option value="0">None</option><option value="4">+1d4</option><option value="6">+1d6</option><option value="8">+1d8</option></select></label><label>Weapon damage <input name="mod-damage" type="number" min="-100" max="100" step="1" inputmode="numeric" placeholder="+1"></label><label>Saving throws <input name="mod-save" type="number" min="-100" max="100" step="1" inputmode="numeric" placeholder="+1"></label><label>Save die <select name="mod-saveDie"><option value="0">None</option><option value="4">+1d4</option><option value="6">+1d6</option><option value="8">+1d8</option></select></label></div></details>
       <label class="companion-wide">Condition, modifier, or notes <textarea name="notes" rows="3" maxlength="2000"></textarea></label>
     </div>
     <div class="focus-form companion-edit-actions">
       <button type="button" id="effect-cancel">Cancel</button>
       <button>Save effect</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="remove-participant" aria-labelledby="remove-participant-heading">
+  <form id="remove-participant-form">
+    <h2 id="remove-participant-heading">Remove participant</h2>
+    <p>Effects on this participant will end. Choose what happens to effects that follow their turn.</p>
+    <div id="removed-turn-effects" class="focus-form"></div>
+    <div class="focus-form companion-edit-actions">
+      <button type="button" id="cancel-participant-removal">Cancel</button>
+      <button class="danger-outline">Remove participant</button>
     </div>
   </form>
 </dialog>

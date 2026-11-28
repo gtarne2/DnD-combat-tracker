@@ -1,0 +1,126 @@
+{
+  "version": 2,
+  "room_id": "00000000-0000-4000-8000-0000000000c8",
+  "exchanges": [
+    {
+      "as": "host", "command_id": "00000000-0000-4000-8000-0000000003e8",
+      "command": {"kind":"create","payload":{"mode":"dm","name":"Warden"}},
+      "receipt": {"kind":"membership","member_id":"00000000-0000-4000-8000-000000000001"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003e9",
+      "command": {"kind":"join","payload":{"name":"Lark"}},
+      "receipt": {"kind":"membership","member_id":"00000000-0000-4000-8000-000000000002"}
+    },
+    {
+      "as": "second", "command_id": "00000000-0000-4000-8000-0000000003ea",
+      "command": {"kind":"join","payload":{"name":"Lark"}},
+      "receipt": {"kind":"membership","member_id":"00000000-0000-4000-8000-000000000003"}
+    },
+    {
+      "as": "host", "command_id": "00000000-0000-4000-8000-0000000003eb",
+      "command": {"kind":"set_round","payload":{"encounter_id":"00000000-0000-4000-8000-000000000004","expected_revision":0,"round":1}},
+      "receipt": {"kind":"encounter","encounter":{"encounter_id":"00000000-0000-4000-8000-000000000004","revision":1,"round":1}}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003ec",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-00000000006e","recipient":"00000000-0000-4000-8000-000000000003","source":"Lantern balm","effect":{"kind":"healing","amount":8}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000a","status":"pending"}
+    },
+    {
+      "as": "second", "command_id": "00000000-0000-4000-8000-0000000003ed",
+      "command": {"kind":"claim","payload":{"offer_id":"00000000-0000-4000-8000-00000000000a"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000a","status":"claimed"}
+    },
+    {
+      "as": "second", "command_id": "00000000-0000-4000-8000-0000000003ee",
+      "command": {"kind":"accept","payload":{"offer_id":"00000000-0000-4000-8000-00000000000a"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000a","status":"accepted"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003ef",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-00000000006f","recipient":"00000000-0000-4000-8000-000000000003","source":"Glass ward","effect":{"kind":"temporary_hp","amount":6}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000b","status":"pending"}
+    },
+    {
+      "as": "second", "command_id": "00000000-0000-4000-8000-0000000003f0",
+      "command": {"kind":"decline","payload":{"offer_id":"00000000-0000-4000-8000-00000000000b"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000b","status":"declined"}
+    },
+    {
+      "as": "host", "command_id": "00000000-0000-4000-8000-0000000003f1",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-000000000070","recipient":"00000000-0000-4000-8000-000000000002","source":"Glass moth","effect":{"kind":"damage","amount":3}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000c","status":"pending"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f2",
+      "command": {"kind":"claim","payload":{"offer_id":"00000000-0000-4000-8000-00000000000c"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000c","status":"claimed"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f3",
+      "command": {"kind":"decline","payload":{"offer_id":"00000000-0000-4000-8000-00000000000c"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000c","status":"declined"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f4",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-000000000071","recipient":"00000000-0000-4000-8000-000000000003","source":"Moss poultice","effect":{"kind":"healing","amount":2}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000d","status":"pending"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f5",
+      "command": {"kind":"withdraw","payload":{"offer_id":"00000000-0000-4000-8000-00000000000d"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000d","status":"withdrawn"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f6",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-000000000072","recipient":"00000000-0000-4000-8000-000000000003","source":"Briar ward","effect":{"kind":"temporary_hp","amount":2}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000e","status":"pending"}
+    },
+    {
+      "as": "host", "command_id": "00000000-0000-4000-8000-0000000003f7",
+      "command": {"kind":"expire","payload":{"offer_id":"00000000-0000-4000-8000-00000000000e"}},
+      "receipt": {"kind":"done"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f8",
+      "command": {"kind":"disconnect"},
+      "receipt": {"kind":"done"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003f9",
+      "command": {"kind":"resume"},
+      "receipt": {"kind":"membership","member_id":"00000000-0000-4000-8000-000000000002"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003fa",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-000000000073","recipient":"00000000-0000-4000-8000-000000000003","source":"Moonberry","effect":{"kind":"healing","amount":3}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000f","status":"pending"}
+    },
+    {
+      "as": "second", "command_id": "00000000-0000-4000-8000-0000000003fb",
+      "command": {"kind":"claim","payload":{"offer_id":"00000000-0000-4000-8000-00000000000f"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000f","status":"claimed"}
+    },
+    {
+      "as": "first", "command_id": "00000000-0000-4000-8000-0000000003fc",
+      "command": {"kind":"leave"},
+      "receipt": {"kind":"done"}
+    },
+    {
+      "as": "host", "command_id": "00000000-0000-4000-8000-0000000003fd",
+      "command": {"kind":"send","payload":{"action_id":"00000000-0000-4000-8000-000000000074","recipient":"00000000-0000-4000-8000-000000000003","source":"Glass moth","effect":{"kind":"damage","amount":1}}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-000000000010","status":"pending"}
+    },
+    {
+      "as": "host", "command_id": "00000000-0000-4000-8000-0000000003fe",
+      "command": {"kind":"close"},
+      "receipt": {"kind":"done"}
+    },
+    {
+      "as": "second", "command_id": "00000000-0000-4000-8000-0000000003ff",
+      "command": {"kind":"accept","payload":{"offer_id":"00000000-0000-4000-8000-00000000000f"}},
+      "receipt": {"kind":"offer","offer_id":"00000000-0000-4000-8000-00000000000f","status":"accepted"}
+    }
+  ]
+}

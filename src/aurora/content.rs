@@ -174,7 +174,7 @@ fn collect_references(element: &ContentElement, references: &mut BTreeSet<String
         && element.attributes.get("name").is_some_and(|name| {
             matches!(
                 name.as_str(),
-                "actions" | "reactions" | "traits" | "bonusActions"
+                "actions" | "reactions" | "traits" | "bonusActions" | "legendaryActions"
             )
         })
     {

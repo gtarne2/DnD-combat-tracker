@@ -120,6 +120,160 @@ pub fn companion_templates(character: &ImportedCharacter) -> Vec<CompanionTempla
 
 const CANNON: &str = "ID_WOTC_ERLW_ARCHETYPE_FEATURE_ARTILLERIST_ELDRITCH_CANNON";
 
+/// Features whose action creates one of several companion variants (the sheet offers a Create
+/// button and lets the player choose the variant).
+pub fn is_summon_feature(id: &str) -> bool {
+    id == CANNON
+}
+
+/// A summon feature by its Aurora ID, or by name and book in the tracker's mechanics overlay,
+/// so other books' Eldritch Cannon content works too.
+pub fn is_summon(id: &str, definition: Option<&ContentDefinition>) -> bool {
+    is_summon_feature(id) || summon_mechanics(definition).is_some()
+}
+
+fn summon_mechanics(
+    definition: Option<&ContentDefinition>,
+) -> Option<&'static crate::mechanics::SummonMechanics> {
+    let definition = definition?;
+    if !definition
+        .kind
+        .as_deref()
+        .is_some_and(crate::aurora::is_feature_kind)
+    {
+        return None;
+    }
+    crate::mechanics::overlay().summon(definition.name.as_deref()?, definition.source.as_deref())
+}
+
+/// The character's cannon feature: the known Aurora ID, or a feature the overlay recognizes.
+fn cannon_feature(character: &ImportedCharacter) -> Option<(&str, &ContentDefinition)> {
+    if let Some(cannon) = definition(character, CANNON) {
+        return Some((CANNON, cannon));
+    }
+    character.features().find_map(|entry| {
+        let definition = entry.definition.as_ref()?;
+        summon_mechanics(Some(definition)).map(|_| (entry.content_id.as_str(), definition))
+    })
+}
+
+/// The owner's level in a class, by the class's name, such as "Ranger".
+fn class_level(character: &ImportedCharacter, class: &str) -> Option<u32> {
+    let from_ids: u32 = character
+        .class_levels
+        .iter()
+        .filter(|(id, _)| {
+            definition(character, id)
+                .and_then(|definition| definition.name.as_deref())
+                .is_some_and(|name| name.eq_ignore_ascii_case(class))
+                || id
+                    .to_ascii_uppercase()
+                    .ends_with(&format!("_CLASS_{}", class.to_ascii_uppercase()))
+        })
+        .map(|(_, level)| *level)
+        .sum();
+    if from_ids > 0 {
+        return Some(from_ids);
+    }
+    profile_class_level(character, class)
+}
+
+fn ability_modifier(character: &ImportedCharacter, ability: &str) -> Option<i32> {
+    let index = [
+        "strength",
+        "dexterity",
+        "constitution",
+        "intelligence",
+        "wisdom",
+        "charisma",
+    ]
+    .iter()
+    .position(|name| name.eq_ignore_ascii_case(ability))?;
+    character.profile.stats.modifiers[index]
+}
+
+fn formula_hp(character: &ImportedCharacter, formula: &crate::mechanics::HpFormula) -> Option<u32> {
+    let level = class_level(character, &formula.class)?;
+    let modifier = match &formula.ability {
+        Some(ability) => Some(ability_modifier(character, ability)?),
+        None => None,
+    };
+    formula.hit_points(level, modifier)
+}
+
+/// Fills what the import left out from the overlay: hit points worked out from the owner,
+/// and, for a summon feature, its shared statistics and any variant the import lacks.
+fn apply_overlay(
+    character: &ImportedCharacter,
+    templates: &mut BTreeMap<String, CompanionDetails>,
+) {
+    let overlay = crate::mechanics::overlay();
+    for (id, details) in templates.iter_mut() {
+        if details.max_hp.is_some() {
+            continue;
+        }
+        let source = definition(character, id).and_then(|definition| definition.source.as_deref());
+        let base_name = details.name.clone();
+        let lookup = overlay.companion(&base_name, source).or_else(|| {
+            let original = definition(character, id)?.name.as_deref()?;
+            overlay.companion(original, source)
+        });
+        if let Some(companion) = lookup {
+            details.max_hp = formula_hp(character, &companion.hp);
+        }
+    }
+    let Some((feature_id, feature)) = cannon_feature(character) else {
+        return;
+    };
+    let Some(summon) = summon_mechanics(Some(feature)) else {
+        return;
+    };
+    let hp = summon
+        .hp
+        .as_ref()
+        .and_then(|formula| formula_hp(character, formula));
+    let fill = |value: &mut String, from: &str| {
+        if value.trim().is_empty() {
+            *value = from.to_owned();
+        }
+    };
+    for variant in &summon.variants {
+        let name = format!("{} — {}", summon.name, variant.name);
+        let existing = templates.iter_mut().find(|(id, details)| {
+            id.starts_with(feature_id)
+                && details
+                    .name
+                    .to_ascii_lowercase()
+                    .ends_with(&variant.name.to_ascii_lowercase())
+        });
+        let details = match existing {
+            Some((_, details)) => details,
+            None => {
+                let key = format!(
+                    "{feature_id}_{}",
+                    variant.name.to_ascii_uppercase().replace(' ', "_")
+                );
+                let details = templates.entry(key).or_default();
+                details.name = name;
+                if variant.attack {
+                    details.attacks = variant.summary.clone();
+                } else {
+                    details.abilities = variant.summary.clone();
+                }
+                details
+            }
+        };
+        fill(&mut details.kind, &summon.kind);
+        fill(&mut details.armor_class, &summon.armor_class);
+        fill(&mut details.speed, &summon.speed);
+        fill(&mut details.command, &summon.command);
+        fill(&mut details.duration, &summon.duration);
+        if details.max_hp.is_none() {
+            details.max_hp = hp;
+        }
+    }
+}
+
 fn templates(character: &ImportedCharacter) -> BTreeMap<String, CompanionDetails> {
     let mut templates: BTreeMap<_, _> = character
         .companion_definitions
@@ -164,13 +318,13 @@ fn templates(character: &ImportedCharacter) -> BTreeMap<String, CompanionDetails
             details.command = command_sources[0].clone();
         }
     }
-    if let Some(cannon) = definition(character, CANNON) {
+    if let Some((cannon_id, cannon)) = cannon_feature(character) {
         let shared = description(cannon);
         for grant in cannon.rules().filter(|rule| rule.tag == "grant") {
             let Some(id) = grant
                 .attributes
                 .get("id")
-                .filter(|id| id.starts_with(CANNON))
+                .filter(|id| id.starts_with(cannon_id))
             else {
                 continue;
             };
@@ -243,6 +397,7 @@ fn templates(character: &ImportedCharacter) -> BTreeMap<String, CompanionDetails
             templates.insert(id.clone(), details);
         }
     }
+    apply_overlay(character, &mut templates);
     templates
 }
 
@@ -322,14 +477,14 @@ fn read_template(
     details
 }
 
-fn hp_number(value: &str) -> Option<u32> {
+pub(crate) fn hp_number(value: &str) -> Option<u32> {
     if let Ok(number) = value.parse() {
         return Some(number);
     }
     value.split_once(" (")?.0.parse().ok()
 }
 
-fn setter(source: &ContentDefinition, name: &str) -> Option<String> {
+pub(crate) fn setter(source: &ContentDefinition, name: &str) -> Option<String> {
     source
         .element
         .children_named("setters")
@@ -351,7 +506,7 @@ fn cannon_setter(
     setter(variant, name).or_else(|| setter(parent, name))
 }
 
-fn description(source: &ContentDefinition) -> String {
+pub(crate) fn description(source: &ContentDefinition) -> String {
     let full: Vec<_> = source
         .element
         .children_named("description")
@@ -421,16 +576,22 @@ fn command_sentence(source: &str) -> Option<String> {
 }
 
 fn artificer_level(character: &ImportedCharacter) -> Option<u32> {
+    profile_class_level(character, "Artificer")
+}
+
+fn profile_class_level(character: &ImportedCharacter, class: &str) -> Option<u32> {
     let classes = &character
         .profile
         .fields
         .iter()
         .find(|field| field.label == "Class")?
         .value;
-    let artificer = classes
-        .split('/')
-        .map(str::trim)
-        .find(|entry| entry.split_whitespace().next() == Some("Artificer"))?;
+    let artificer = classes.split('/').map(str::trim).find(|entry| {
+        entry
+            .split_whitespace()
+            .next()
+            .is_some_and(|name| name.eq_ignore_ascii_case(class))
+    })?;
     if let Some((_, level)) = artificer.split_once('(') {
         return level.trim_end_matches(')').trim().parse().ok();
     }

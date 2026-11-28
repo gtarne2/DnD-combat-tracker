@@ -1,0 +1,24 @@
+<dialog id="portrait-dialog" aria-labelledby="portrait-dialog-title">
+  <div class="dialog-heading"><h2 id="portrait-dialog-title">Character portrait</h2><form method="dialog"><button>Close</button></form></div>
+  <div class="portrait-editor" id="portrait-current">
+    <img id="portrait-preview" alt="Current portrait" hidden>
+    <div class="focus-form">
+      <label>Choose an image <input type="file" id="portrait-file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+      <button type="button" id="portrait-adjust" hidden>Adjust crop</button>
+      <button type="button" id="portrait-remove" hidden>Remove portrait</button>
+    </div>
+  </div>
+  <div class="portrait-crop" id="portrait-crop" hidden>
+    <div class="portrait-stage" id="portrait-stage" tabindex="0" aria-label="Crop area. Drag or use the arrow keys to move the picture, and the slider or mouse wheel to zoom.">
+      <canvas id="portrait-canvas" width="480" height="480"></canvas>
+    </div>
+    <div class="focus-form">
+      <label>Zoom <input type="range" id="portrait-zoom" min="1" max="4" step="0.01" value="1"></label>
+      <p class="portrait-hint">Drag the picture to place it. The circle is what shows on your map token.</p>
+      <div class="portrait-crop-actions"><button type="button" id="portrait-save" class="primary">Save portrait</button> <button type="button" id="portrait-cancel">Cancel</button></div>
+    </div>
+  </div>
+  <label class="portrait-share"><input type="checkbox" id="portrait-token"> Use this portrait as my map token in Owlbear</label>
+  <p class="portrait-hint">The image is kept in this browser for this character. When you join a DM's party, a small round copy goes to the DM's tracker so your Owlbear token shows it to the whole table. Without a portrait, your token shows your class icon.</p>
+  <p id="portrait-status" class="focus-feedback" role="status"></p>
+</dialog>

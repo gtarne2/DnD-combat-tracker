@@ -27,7 +27,9 @@
       <label>Armor Class <input name="armor" maxlength="120"></label>
       <label>Speed <input name="speed" maxlength="120"></label>
       <label>Duration <input name="duration" maxlength="160"></label>
-      <label>Remaining rounds <input name="rounds" type="number" min="0" max="4294967295"></label>
+      <label>Remaining duration <input name="remaining" type="number" min="0" max="4294967295"></label>
+      <label>Duration unit <select name="timerUnit"><option value="rounds">Rounds</option><option value="seconds">Seconds</option></select></label>
+      <label>At 0 HP <select name="zeroHp"><option value="keep">Keep available</option><option value="vanish">Vanish</option></select></label>
       <div><label for="companion-turn-mode">Turn</label>
         <select id="companion-turn-mode" name="turn"><option value="owner">With owner</option><option value="separate">Separate initiative</option></select></div>
       <label>Companion initiative <input name="initiative" type="number" min="-2147483648" max="2147483647" disabled></label>

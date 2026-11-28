@@ -4,13 +4,26 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Security.Principal;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+// Version details for the file's Properties page. An unsigned exe with blank details looks more
+// like throwaway malware to antivirus heuristics, so the launcher says what it is.
+[assembly: AssemblyTitle("Aurora Combat Tracker")]
+[assembly: AssemblyDescription("Launcher for the Aurora Combat Tracker D&D 5e combat sheet and LAN party room")]
+[assembly: AssemblyProduct("Aurora Combat Tracker")]
+[assembly: AssemblyCompany("Aurora Combat Tracker")]
+[assembly: AssemblyCopyright("Personal project")]
+[assembly: AssemblyVersion("0.1.0.0")]
+[assembly: AssemblyFileVersion("0.1.0.0")]
+
 internal sealed class TrackerLauncher : Form
 {
-    private readonly string tracker = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "combat-sheet.exe");
+    private static readonly string tracker = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "combat-sheet.exe");
     private readonly string appData = Path.Combine(
         Environment.GetEnvironmentVariable("LOCALAPPDATA") ??
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aurora Combat Tracker");
@@ -21,28 +34,66 @@ internal sealed class TrackerLauncher : Form
         HorizontalScrollbar = true,
         IntegralHeight = false
     };
+    // 5etools bestiary files and folders a DM room loads into its monster library on start.
+    private readonly ListBox bestiary = new ListBox
+    {
+        FormattingEnabled = true,
+        HorizontalScrollbar = true,
+        IntegralHeight = false
+    };
+    private readonly Button bestiaryRemove = new Button { Text = "Remove" };
     private readonly Button remove = new Button { Text = "Remove" };
     private readonly Button up = new Button { Text = "Move up" };
     private readonly Button down = new Button { Text = "Move down" };
     private readonly Button open = new Button { Text = "Open Combat Sheet" };
     private readonly Label status = new Label();
-    private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 290 };
+    private readonly Panel selection = new Panel { Dock = DockStyle.Top, Height = 414 };
     private string characterPath;
+    private RefreshBridge bridge;
+    private PartySession party;
+    // A DM room kept running while this PC also opens a player sheet, for testing both sides
+    // on one machine. Its dashboard bridge stays with it.
+    private PartySession hostedParty;
+    private RefreshBridge hostedBridge;
+    private readonly Stopwatch lifecycleTick = Stopwatch.StartNew();
+    private readonly Stopwatch hostProbe = new Stopwatch();
+    private bool checkingHost;
+    private readonly NotifyIcon tray = new NotifyIcon { Text = "Aurora Combat Tracker", Icon = SystemIcons.Application };
     private string SettingsPath { get { return Path.Combine(appData, "last-import.txt"); } }
+    private string BestiaryPath { get { return Path.Combine(appData, "bestiary-sources.txt"); } }
 
     [STAThread]
     private static void Main()
     {
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-        using (var launcher = new TrackerLauncher())
-            Application.Run(launcher);
+        string name;
+        using (var user = WindowsIdentity.GetCurrent())
+            name = @"Local\AuroraCombatTracker-" + user.User.Value;
+        using (var activate = new EventWaitHandle(false, EventResetMode.AutoReset, name + "-activate"))
+        using (var instance = new Mutex(false, name))
+        {
+            bool ownsInstance;
+            try { ownsInstance = instance.WaitOne(0); }
+            catch (AbandonedMutexException) { ownsInstance = true; }
+            if (!ownsInstance)
+            {
+                activate.Set();
+                return;
+            }
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                using (var launcher = new TrackerLauncher(activate))
+                    Application.Run(launcher);
+            }
+            finally { instance.ReleaseMutex(); }
+        }
     }
 
-    private TrackerLauncher()
+    private TrackerLauncher(EventWaitHandle activate)
     {
         Text = "Aurora Combat Tracker";
-        ClientSize = new Size(640, 367);
+        ClientSize = new Size(640, 491);
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96, 96);
         StartPosition = FormStartPosition.CenterScreen;
@@ -63,11 +114,67 @@ internal sealed class TrackerLauncher : Form
         Place(selection, remove, 536, 167, 88, 26);
         Place(selection, up, 536, 198, 88, 26);
         Place(selection, down, 536, 229, 88, 26);
-        Place(this, status, 16, 295, 608, 22);
-        Place(this, open, 452, 321, 172, 30);
+        var bestiaryFiles = new Button { Text = "Add files..." };
+        var bestiaryFolder = new Button { Text = "Add folder..." };
+        Place(selection, new Label { Text = "5etools bestiary JSON (optional). Loaded into the monster library when you host as DM." }, 16, 293, 608, 22);
+        Place(selection, bestiary, 16, 318, 510, 88);
+        Place(selection, bestiaryFiles, 536, 318, 88, 26);
+        Place(selection, bestiaryFolder, 536, 349, 88, 26);
+        Place(selection, bestiaryRemove, 536, 380, 88, 26);
+        Place(this, status, 16, 419, 608, 22);
+        Place(this, open, 452, 445, 172, 30);
+        var partyButton = new Button { Text = "Party..." };
+        Place(selection, partyButton, 536, 259, 88, 26);
+        var partyMenu = new ContextMenuStrip();
+        foreach (var entry in new[] { new[] { "Host Party", "host" }, new[] { "Host as DM", "dm" },
+            new[] { "Join", "join" }, new[] { "Resume party", "resume" }, new[] { "Resume DM room", "resume-dm" } })
+        {
+            string mode = entry[1];
+            partyMenu.Items.Add(entry[0], null, async delegate { await OpenParty(mode); });
+        }
+        partyButton.Click += delegate { partyMenu.Show(partyButton, 0, partyButton.Height); };
         AcceptButton = open;
+        var trayMenu = new ContextMenuStrip();
+        trayMenu.Items.Add("Open launcher", null, delegate { ShowLauncher(); });
+        trayMenu.Items.Add("Reopen current session", null, delegate {
+            if (bridge == null) return;
+            try { OpenBrowser(bridge.PreviewPath); bridge.KeepAlive(); }
+            catch (Exception error) {
+                MessageBox.Show(error.Message, "Could not reopen session", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        });
+        trayMenu.Items.Add("Reopen DM dashboard", null, delegate {
+            if (hostedBridge == null) return;
+            try { OpenBrowser(hostedBridge.PreviewPath); hostedBridge.KeepAlive(); }
+            catch (Exception error) {
+                MessageBox.Show(error.Message, "Could not reopen the DM dashboard", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        });
+        trayMenu.Items.Add("Exit refresh service", null, delegate { Close(); });
+        tray.ContextMenuStrip = trayMenu;
+        tray.DoubleClick += delegate { ShowLauncher(); };
+        var lifecycle = new System.Windows.Forms.Timer { Interval = 1000 };
+        lifecycle.Tick += async delegate { await CheckLifecycle(activate); };
+        lifecycle.Start();
+        FormClosed += delegate {
+            lifecycle.Dispose();
+            if (bridge != null) bridge.Dispose();
+            if (party != null) party.Dispose();
+            DisposeHosted();
+            partyMenu.Dispose();
+            tray.Dispose();
+            trayMenu.Dispose();
+        };
 
         browse.Click += delegate { ChooseCharacter(); };
+        bestiaryFiles.Click += delegate { AddBestiaryFiles(); };
+        bestiaryFolder.Click += delegate { AddBestiaryFolder(); };
+        bestiary.Format += delegate(object sender, ListControlConvertEventArgs args)
+        {
+            args.Value = DisplayPath((string)args.ListItem);
+        };
+        bestiary.SelectedIndexChanged += delegate { UpdateButtons(); };
+        bestiaryRemove.Click += delegate { RemoveBestiary(); };
         add.Click += delegate { AddContent(); };
         folder.Click += delegate { AddContentFolder(); };
         content.Format += delegate(object sender, ListControlConvertEventArgs args)
@@ -86,7 +193,111 @@ internal sealed class TrackerLauncher : Form
         down.Click += delegate { MoveContent(1); };
         open.Click += async delegate { await OpenSheet(); };
         RestoreSelections();
+        RestoreBestiary();
         UpdateButtons();
+    }
+
+    private void AddBestiaryFiles()
+    {
+        string directory = bestiary.SelectedItem as string;
+        if (directory != null && !Directory.Exists(directory)) directory = Path.GetDirectoryName(directory);
+        var existing = new HashSet<string>(bestiary.Items.Cast<string>(), StringComparer.OrdinalIgnoreCase);
+        foreach (string path in ChooseFiles("Select 5etools bestiary JSON", "5etools bestiary (*.json)|*.json", directory, true))
+            if (existing.Add(path))
+                bestiary.SelectedIndex = bestiary.Items.Add(path);
+        SaveBestiary();
+    }
+
+    private void AddBestiaryFolder()
+    {
+        using (var dialog = new FolderBrowserDialog
+        {
+            Description = "Select a folder of 5etools bestiary JSON, such as data\\bestiary. Subfolders are included.",
+            SelectedPath = bestiary.SelectedItem as string ?? "",
+            ShowNewFolderButton = false
+        })
+        {
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+            int index = bestiary.Items.Cast<string>().ToList().FindIndex(
+                path => StringComparer.OrdinalIgnoreCase.Equals(path, dialog.SelectedPath));
+            bestiary.SelectedIndex = index >= 0 ? index : bestiary.Items.Add(dialog.SelectedPath);
+        }
+        SaveBestiary();
+    }
+
+    private void RemoveBestiary()
+    {
+        int index = bestiary.SelectedIndex;
+        if (index < 0) return;
+        bestiary.Items.RemoveAt(index);
+        bestiary.SelectedIndex = Math.Min(index, bestiary.Items.Count - 1);
+        SaveBestiary();
+    }
+
+    private void SaveBestiary()
+    {
+        try
+        {
+            Directory.CreateDirectory(appData);
+            File.WriteAllLines(BestiaryPath, bestiary.Items.Cast<string>());
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private void RestoreBestiary()
+    {
+        string[] paths;
+        try { paths = File.ReadAllLines(BestiaryPath); }
+        catch (IOException) { return; }
+        catch (UnauthorizedAccessException) { return; }
+        foreach (string path in paths.Where(path => path.Length > 0))
+            bestiary.Items.Add(path);
+    }
+
+    private void ShowLauncher()
+    {
+        Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+    }
+
+    private async Task CheckLifecycle(EventWaitHandle activate)
+    {
+        // After sleep, let browsers renew their lease before evaluating idle shutdown.
+        if (lifecycleTick.Elapsed >= TimeSpan.FromSeconds(30) && bridge != null) bridge.KeepAlive();
+        if (lifecycleTick.Elapsed >= TimeSpan.FromSeconds(30) && hostedBridge != null) hostedBridge.KeepAlive();
+        lifecycleTick.Restart();
+        if (activate.WaitOne(0)) ShowLauncher();
+        if (Visible || !selection.Enabled || bridge == null || !bridge.IsIdle || checkingHost) return;
+
+        var currentBridge = bridge;
+        var currentParty = party;
+        var currentHosted = hostedParty;
+        if (currentHosted != null)
+        {
+            if (hostProbe.IsRunning && hostProbe.Elapsed < TimeSpan.FromSeconds(15)) return;
+            hostProbe.Restart();
+            checkingHost = true;
+            try { if (await currentHosted.HasActiveRoom()) return; }
+            finally { checkingHost = false; }
+        }
+        if (currentParty != null && currentParty.IsHosting)
+        {
+            if (hostProbe.IsRunning && hostProbe.Elapsed < TimeSpan.FromSeconds(15)) return;
+            hostProbe.Restart();
+            checkingHost = true;
+            try { if (await currentParty.HasActiveRoom()) return; }
+            finally { checkingHost = false; }
+        }
+        if (!IsDisposed && !Visible && selection.Enabled && currentBridge == bridge &&
+            currentParty == party && currentBridge.IsIdle) Close();
+    }
+
+    private static void OpenBrowser(string path)
+    {
+        using (Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })) { }
     }
 
     private static void Place(Control parent, Control control, int x, int y, int width, int height)
@@ -183,6 +394,7 @@ internal sealed class TrackerLauncher : Form
     {
         open.Enabled = selection.Enabled && characterPath != null;
         remove.Enabled = content.SelectedIndex >= 0;
+        bestiaryRemove.Enabled = bestiary.SelectedIndex >= 0;
         up.Enabled = content.SelectedIndex > 0;
         down.Enabled = remove.Enabled && content.SelectedIndex < content.Items.Count - 1;
     }
@@ -212,32 +424,122 @@ internal sealed class TrackerLauncher : Form
             content.Items.Add(path);
     }
 
-    private async Task OpenSheet()
+    private async Task OpenParty(string mode)
+    {
+        PartySession candidate = null;
+        RefreshBridge lobbyBridge = null;
+        try {
+            var options = PartySession.Choose(this, mode, characterPath, bestiary.Items.Cast<string>().ToArray());
+            if (options == null) return;
+            // Resuming a host reuses its LAN port and creates a fresh sheet capability.
+            if (mode.StartsWith("resume") && party != null) {
+                party.Dispose();
+                party = null;
+            }
+            if (mode == "dm" || mode == "resume-dm") DisposeHosted();
+            selection.Enabled = false;
+            UpdateButtons();
+            status.Text = "Connecting party...";
+            candidate = await PartySession.Start(options);
+            if (IsDisposed) return;
+            if (candidate.Role == "dm") {
+                var previews = Path.Combine(appData, "Previews");
+                lobbyBridge = new RefreshBridge(previews, null);
+                var lobby = candidate.WriteLobby(previews, lobbyBridge.Url);
+                lobbyBridge.TrackLobby(lobby);
+                OpenBrowser(lobby);
+                if (bridge != null) bridge.Dispose();
+                bridge = lobbyBridge;
+                lobbyBridge = null;
+                tray.Visible = true;
+                Hide();
+            } else {
+                // Joining as a player keeps a DM room on this PC running beside the sheet.
+                if (party != null && party.Role == "dm") {
+                    DisposeHosted();
+                    hostedParty = party;
+                    hostedBridge = bridge;
+                    party = null;
+                    bridge = null;
+                }
+                if (!await OpenSheet(candidate)) return;
+            }
+            if (party != null) party.Dispose();
+            party = candidate;
+            candidate = null;
+        } catch (Exception error) {
+            if (!IsDisposed) MessageBox.Show(this, error.Message, "Could not open party", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        } finally {
+            if (lobbyBridge != null) lobbyBridge.Dispose();
+            if (candidate != null) candidate.Dispose();
+            if (!IsDisposed) {
+                selection.Enabled = true;
+                UpdateButtons();
+                status.Text = "";
+            }
+        }
+    }
+
+    private void DisposeHosted()
+    {
+        if (hostedBridge != null) hostedBridge.Dispose();
+        if (hostedParty != null) hostedParty.Dispose();
+        hostedBridge = null;
+        hostedParty = null;
+    }
+
+    private async Task<bool> OpenSheet(PartySession attached = null)
     {
         selection.Enabled = false;
         UpdateButtons();
         status.Text = "Importing character...";
         string[] sources = new[] { characterPath }.Concat(content.Items.Cast<string>()).ToArray();
+        RefreshBridge candidate = null;
         try
         {
-            string preview = await GeneratePreview(sources);
+            candidate = new RefreshBridge(Path.Combine(appData, "Previews"), directory => GeneratePreview(sources, directory), attached == null ? null : attached.Url);
+            string preview = await candidate.Open();
             if (IsDisposed)
-                return;
-            Process.Start(new ProcessStartInfo(preview) { UseShellExecute = true });
-            status.Text = "Combat sheet opened in your browser.";
-            try { File.WriteAllLines(SettingsPath, sources); }
-            catch (IOException) { status.Text = "Combat sheet opened. Could not remember these selections."; }
-            catch (UnauthorizedAccessException) { status.Text = "Combat sheet opened. Could not remember these selections."; }
+                return false;
+            OpenBrowser(preview);
+            // A solo sheet on the DM's PC leaves the DM room running.
+            if (attached == null && party != null && party.Role == "dm") {
+                DisposeHosted();
+                hostedParty = party;
+                hostedBridge = bridge;
+                party = null;
+                bridge = null;
+            }
+            if (bridge != null) bridge.Dispose();
+            bridge = candidate;
+            candidate = null;
+            bool remembered = false;
+            try { File.WriteAllLines(SettingsPath, sources); remembered = true; }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            if (!remembered)
+                MessageBox.Show(this, "The combat sheet opened, but the launcher could not remember these selections.",
+                    "Selections not saved", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            status.Text = "";
+            tray.Visible = true;
+            Hide();
+            if (attached == null && party != null) {
+                party.Dispose();
+                party = null;
+            }
+            return true;
         }
         catch (Exception error)
         {
             if (IsDisposed)
-                return;
+                return false;
             status.Text = "Check the selected files and try again.";
             MessageBox.Show(this, error.Message, "Could not open combat sheet", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
         }
         finally
         {
+            if (candidate != null) candidate.Dispose();
             if (!IsDisposed)
             {
                 selection.Enabled = true;
@@ -246,11 +548,10 @@ internal sealed class TrackerLauncher : Form
         }
     }
 
-    private async Task<string> GeneratePreview(string[] sources)
+    internal static async Task<string> GeneratePreview(string[] sources, string previewDirectory)
     {
         if (!File.Exists(tracker))
             throw new FileNotFoundException("Extract combat-sheet.exe into the same folder as the launcher.");
-        string previewDirectory = Path.Combine(appData, "Previews");
         // Double trailing separators so they cannot escape the closing quote.
         string arguments = string.Join(" ", new[] { previewDirectory }.Concat(sources).Select(
             path => "\"" + path + new string('\\', path.Length - path.TrimEnd('\\').Length) + "\""));

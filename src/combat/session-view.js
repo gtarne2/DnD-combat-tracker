@@ -9,10 +9,11 @@ const sessionView = (() => {
   const positions = new Map(Object.entries(stored?.positions || {}));
   const disclosures = new Map(Object.entries(stored?.disclosures || {}));
   let pending;
+  let suspended = false;
 
   function save() {
     clearTimeout(pending);
-    if (!storageKey) return;
+    if (!storageKey || suspended) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify({
         values: Object.fromEntries(values),
@@ -70,6 +71,8 @@ const sessionView = (() => {
   window.addEventListener("pagehide", save);
 
   return {
+    save,
+    suspend: () => { suspended = true; },
     get: (key) => values.get(key),
     set,
     setPosition,

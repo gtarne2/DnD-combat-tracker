@@ -1,0 +1,682 @@
+const partyInitiative = (() => {
+  let view, left = null;
+  let sendEdit = null, refreshView = null;
+  const clearing = new Set();
+  function rows(state) {
+    const clock = state.progress.partyClock;
+    if (view?.combat?.id === clock.encounter && view.combat.rows.length)
+      return view.combat.rows.map(row => ({...row, rank: 3}));
+    return [{key:state.progress.current, name:state.progress.current === "owner" ? "Your turn" : "Party turn", rank:3}];
+  }
+
+  function release(progress) {
+    if (!progress?.partyClock) return false;
+    Object.assign(progress, progress.partyClock.solo);
+    delete progress.partyClock;
+    return true;
+  }
+  // Keep only fields the clock changed. The owner can repair a mistaken
+  // boundary after the DM corrects the pointer, including expired focus.
+  function outcomeFields(state) {
+    const fields = new Map();
+    const progress = state.progress || {};
+    const add = (id, object, key) => fields.set(id, {object,key});
+    for (const key of ["elapsedSeconds","economyUsed","economyOverrides","spellTurnReminder","turnSequence"])
+      add(key, progress, key);
+    for (const key of ["active","pending"]) add("focus/" + key, state.focus, key);
+    for (const effect of progress.effects || [])
+      for (const key of ["remaining","clockLimit","ended","endedByConcentration","targetRemoved","anchorRemoved"])
+        add("effect/" + effect.id + "/" + key,effect,key);
+    for (const card of state.companions?.cards || [])
+      for (const key of ["remaining","timerUnit","rounds"]) add("companion/" + card.id + "/" + key,card,key);
+    return fields;
+  }
+
+  function remember(before, after) {
+    const old = outcomeFields(before);
+    const changes = [];
+    for (const [id, {object,key}] of outcomeFields(after)) {
+      const previous = old.get(id);
+      if (!previous) continue;
+      const prior = previous.object[previous.key], value = object[key];
+      if (JSON.stringify(prior) !== JSON.stringify(value)) changes.push({id,prior,value});
+    }
+    if (changes.length) after.progress.partyClock.repair = {id:crypto.randomUUID(),changes};
+  }
+
+  function repair(state, id) {
+    const clock = state.progress?.partyClock;
+    if (!clock?.repair || clock.repair.id !== id) return false;
+    const fields = outcomeFields(state);
+    for (const change of clock.repair.changes) {
+      const slot = fields.get(change.id);
+      if (!slot || JSON.stringify(slot.object[slot.key]) !== JSON.stringify(change.value)) continue;
+      if (change.prior === undefined) delete slot.object[slot.key];
+      else slot.object[slot.key] = structuredClone(change.prior);
+    }
+    delete clock.repair;
+    previewEncounter.log(state, "override", "Corrected my last DM clock update");
+    return "correcting my clock outcomes";
+  }
+
+  function apply(state, key, tick) {
+    const progress = state.progress ||= previewEncounter.emptyProgress();
+    if (tick.phase === "exit") return progress.partyClock?.key === key && release(progress);
+    if (progress.partyClock?.key !== key) release(progress);
+    progress.partyClock ||= {key, solo:{current:progress.current, round:progress.round, active:progress.active !== false}};
+    Object.assign(progress.partyClock, {encounter:tick.encounter_id, separate:tick.separate});
+    progress.active = true;
+    progress.round = tick.wrap ? tick.round - 1 : tick.round;
+    if (tick.phase === "step" || tick.phase === "enter")
+      encounterTracker.enterTurn(state, tick.phase === "step" ? tick.from : null, tick.to, tick.wrap);
+    if (tick.phase === "time") {
+      if (tick.rounds) effectControls.advanceRounds(state, tick.rounds);
+      else effectControls.advanceTime(state, tick.seconds);
+    }
+    progress.current = tick.to;
+    progress.round = tick.round;
+    return true;
+  }
+
+  function setup(request, refresh) {
+    const panel = document.getElementById("party-initiative");
+    const form = panel.querySelector("form");
+    const leave = panel.querySelector(".party-leave");
+    const status = panel.querySelector("[role=status]");
+    const correct = panel.querySelector(".clock-repair");
+    correct.onclick = async () => {
+      const id = previewEncounter.current().progress?.partyClock?.repair?.id;
+      if (!id) return;
+      await previewEncounter.transact(draft => repair(draft,id));
+      await refresh();
+    };
+    const send = initiativeWriter(request);
+    sendEdit = send;
+    refreshView = refresh;
+    const epoch = previewEncounter.restoreEpoch();
+    let busy = false;
+    let choices = "";
+    let order = "";
+    let companionSync = "";
+    async function change(edit) {
+      if (busy || !view?.combat) return;
+      busy = true;
+      try {
+        await send(view, edit);
+        // Leaving returns this sheet to solo turns for this encounter; submitting again rejoins.
+        left = edit.kind === "leave" ? view.room_id + "/" + view.combat.id : null;
+        status.textContent = edit.kind === "leave" ? "Left the shared encounter." : "Initiative submitted.";
+      } catch (error) { status.textContent = error.message; railError(error.message); }
+      finally { busy = false; await refresh(); }
+    }
+    function railError(message) {
+      const note = document.getElementById("party-encounter-note");
+      note.textContent = message;
+      note.hidden = false;
+      note.dataset.error = "true";
+      setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
+    }
+    const submit = score => {
+      const companions = [...form.querySelectorAll("[data-companion]")].map(input => ({
+        name:input.dataset.name, local_id:Number(input.dataset.companion), initiative:input.value === "" ? null : input.valueAsNumber
+      }));
+      return change({kind:"submit", score, companions});
+    };
+    form.onsubmit = event => {
+      event.preventDefault();
+      submit(form.elements.score.valueAsNumber);
+    };
+    leave.onclick = () => change({kind:"leave"});
+    // Combat rail: join with a roll, and end the turn when the current row is mine.
+    const join = document.getElementById("party-join-form");
+    join.onsubmit = event => {
+      event.preventDefault();
+      submit(join.elements.score.valueAsNumber);
+    };
+    const endTurn = document.getElementById("end-my-turn");
+    endTurn.onclick = async () => {
+      const id = endTurn.dataset.row;
+      if (!id || busy || !view?.combat) return;
+      busy = true;
+      endTurn.disabled = true;
+      try {
+        await send(view, {kind:"end_turn", id});
+        status.textContent = "";
+      } catch (error) {
+        railError(error.message);
+      } finally { busy = false; endTurn.disabled = false; await refresh(); }
+    };
+    return async state => {
+      const hadBoard = Boolean(board());
+      view = state;
+      panel.hidden = !state?.combat || state.ended;
+      if (hadBoard && !board()) { order = ""; document.dispatchEvent(new Event("preview-encounter-change")); }
+      if (!state?.room_id || !state.self_id || state.role === "host") return;
+      const key = state.room_id + "/" + state.self_id;
+      // A clock left over from another room or session would otherwise keep claiming "Your
+      // turn" in a room whose DM has no encounter running.
+      const leftover = clock => clock && (clock.key !== key || !state.combat || state.ended
+        || !state.combat.running || !state.combat.joined || clock.encounter !== state.combat.id);
+      const dropLeftover = async () => {
+        if (!leftover(previewEncounter.current().progress?.partyClock)) return;
+        await previewEncounter.transact(draft => leftover(draft.progress?.partyClock) && release(draft.progress) && "leaving a finished party encounter", {undo:false});
+        document.dispatchEvent(new Event("preview-encounter-change"));
+      };
+      if (!state.combat && previewEncounter.current().progress?.partyClock?.key !== key && !state.ended) {
+        await dropLeftover();
+        return;
+      }
+      const saved = previewEncounter.delivery().clocks?.[key] || 0;
+      // A restored portable snapshot contains the solo pointer. Read the last
+      // consumed position as well, so resuming never repeats its mechanics.
+      const align = saved > 0 && state.combat?.joined && state.combat.running && !previewEncounter.current().progress?.partyClock;
+      let after = align ? saved - 1 : saved;
+      for (;;) {
+        const events = await request("clock", after);
+        for (const {cursor, event} of events) {
+          const positionOnly = align && cursor === saved && event.tick.phase !== "exit";
+          const mechanical = !positionOnly && ["step","enter","time"].includes(event.tick.phase);
+          await previewEncounter.applyClock({key, cursor, epoch, align:positionOnly, mechanical},
+            draft => apply(draft, key, positionOnly ? {...event.tick,phase:"position"} : event.tick));
+          after = cursor;
+        }
+        if (events.length < 128) break;
+      }
+      // Only when this poll brought no clock events, so the room view and the clock agree.
+      if (after === (align ? saved - 1 : saved)) await dropLeftover();
+      if (panel.hidden) return;
+      renderCalls(state);
+      renderRecap(state);
+      await syncTemplates(state);
+      const mine = state.combat.rows.find(row => row.key === "owner");
+      const sheet = previewEncounter.current();
+      const cards = (sheet.companions?.cards || []).filter(companionControls.available);
+      const next = JSON.stringify([cards.map(c => [c.id,c.name,c.turn,c.initiative]),mine]);
+      if (next !== choices) {
+        choices = next;
+        form.elements.score.value = mine?.score ?? sheet.companions?.owner ?? "";
+        const target = form.querySelector(".party-companions");
+        target.replaceChildren();
+        for (const card of cards) {
+          const label = document.createElement("label");
+          label.textContent = card.name + " initiative (blank to act with you) ";
+          const input = document.createElement("input");
+          const prior = mine?.companions?.find(c => c.local_id === card.id);
+          Object.assign(input, {type:"number",value:prior ? prior.initiative ?? "" : card.turn === "separate" ? card.initiative ?? "" : ""});
+          Object.assign(input.dataset, {companion:card.id,name:card.name});
+          label.append(input); target.append(label);
+        }
+      }
+      // A companion summoned, destroyed or dismissed mid-fight joins or leaves this sheet's
+      // entry in the shared encounter, so the DM sees it. New ones act on this turn unless the
+      // sheet gives them their own initiative.
+      if (state.combat.joined && mine && !busy) {
+        const want = cards.map(c => c.id).sort((a, b) => a - b).join();
+        const have = (mine.companions || []).map(c => c.local_id).sort((a, b) => a - b).join();
+        if (want !== have && companionSync !== want + "/" + have) {
+          companionSync = want + "/" + have;
+          submit(mine.score);
+        }
+      }
+      syncAuras(state, mine, cards);
+      leave.hidden = !state.combat.joined;
+      correct.hidden = !sheet.progress?.partyClock?.repair;
+      const signature = JSON.stringify([state.combat.rows, state.combat.running, state.combat.current, state.combat.round, state.combat.joined, companionsAtTable()]);
+      if (signature !== order) {
+        order = signature;
+        document.dispatchEvent(new Event("preview-encounter-change"));
+      }
+    };
+  }
+  // Reaction calls from the DM (R82): a creature is leaving reach, casting a spell or attacking.
+  // The player answers React or Pass; an opportunity attack spends the reaction here, and a
+  // reaction spell is cast from the sheet as usual.
+  const CALL_PHRASES = {leaves_reach: "is leaving your reach", casts_spell: "is casting a spell", attacks: "is attacking", other: "is doing something"};
+  const OPPORTUNITY = "Opportunity attack";
+  const callChoices = new Map();
+  let callsKey, callBusy = false;
+  const OTHER = "Another reaction";
+  function reactionOptions() {
+    const names = [OPPORTUNITY];
+    for (const tools of document.querySelectorAll('.option-execute[data-turn-cost="reaction"]')) {
+      const row = tools.closest("article");
+      const title = row?.querySelector(".option-title") || row?.querySelector("h3");
+      const name = title?.textContent.trim();
+      if (name && !names.includes(name)) names.push(name);
+    }
+    names.push(OTHER);
+    return names;
+  }
+  function defaultReaction(trigger, options) {
+    const find = pattern => options.find(name => pattern.test(name));
+    return (trigger === "casts_spell" ? find(/counterspell|silvery barbs/i)
+      : trigger === "attacks" ? find(/^shield\b|protection|parry|uncanny dodge|silvery barbs/i)
+      : trigger === "leaves_reach" ? OPPORTUNITY : null) || OTHER;
+  }
+  // A player who can't react is never prompted: the sheet passes for them and tells the DM
+  // why (their reaction is spent, or nothing on the sheet answers this kind of call). A spell
+  // call needs a Counterspell-like reaction, an attack call a Shield-like one; anyone can make
+  // an opportunity attack. Names are matched across every option and feature on the sheet,
+  // because some reactions (such as the Protection fighting style) aren't tagged as reactions.
+  const ANSWERS = {
+    casts_spell: /counterspell|silvery barbs|^shield\b|absorb elements|spell ?breaker/i,
+    attacks: /^shield\b|protection|interception|parry|uncanny dodge|defensive duelist|deflect|silvery barbs|warding flare|cutting words|riposte|sentinel|hellish rebuke|tactical shift|bulwark/i,
+  };
+  function sheetNames() {
+    const names = new Set(reactionOptions());
+    for (const title of document.querySelectorAll("#action-groups .option-title")) {
+      const name = title.textContent.trim();
+      if (name) names.add(name);
+    }
+    return [...names];
+  }
+  function unable(call, used) {
+    if (used) return "used";
+    const pattern = ANSWERS[call.trigger];
+    return pattern && !sheetNames().some(name => pattern.test(name)) ? "no_reaction" : null;
+  }
+  const autoPassed = new Set();
+  async function autoPass(call, reason) {
+    if (autoPassed.has(call.id)) return;
+    autoPassed.add(call.id);
+    try { await templateEdit({kind: "answer_call", id: call.id, answer: {reacted: false, note: "", unable: reason}}); }
+    catch (error) { autoPassed.delete(call.id); railError(error.message); }
+  }
+  function renderCalls(state) {
+    const host = document.getElementById("party-calls");
+    if (!host) return;
+    const encounter = previewEncounter.current();
+    const used = actionEconomy.tracking(encounter, "owner") ? actionEconomy.reason(encounter, "owner", "reaction", true) : "";
+    const all = board() ? state.combat.calls || [] : [];
+    for (const call of all) if (!call.answer) { const reason = unable(call, used); if (reason) autoPass(call, reason); }
+    const calls = all.filter(call => !(call.answer ? call.answer.unable : autoPassed.has(call.id)));
+    const options = reactionOptions();
+    const key = JSON.stringify([calls, options, used, callBusy]);
+    if (key === callsKey) return;
+    callsKey = key;
+    for (const id of callChoices.keys()) if (!calls.some(call => call.id === id)) callChoices.delete(id);
+    for (const id of autoPassed) if (!all.some(call => call.id === id)) autoPassed.delete(id);
+    host.hidden = !calls.length;
+    host.replaceChildren(...calls.map(call => {
+      const card = document.createElement("form");
+      card.className = "focus-form party-card party-call";
+      const heading = document.createElement("strong");
+      heading.textContent = call.source + " " + (CALL_PHRASES[call.trigger] || CALL_PHRASES.other) + (call.detail ? ": " + call.detail : "") + ".";
+      card.append(heading);
+      if (call.answer) {
+        card.append(" " + (call.answer.reacted ? "You react" + (call.answer.note ? " with " + call.answer.note : "") + ". The DM has your answer." : "You pass."));
+        return card;
+      }
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Reaction to use");
+      for (const name of options) select.add(new Option(name, name));
+      select.value = callChoices.get(call.id) || defaultReaction(call.trigger, options);
+      select.onchange = () => callChoices.set(call.id, select.value);
+      const react = document.createElement("button");
+      react.textContent = "React";
+      const pass = document.createElement("button");
+      pass.type = "button";
+      pass.textContent = "Pass";
+      react.disabled = pass.disabled = callBusy;
+      const note = document.createElement("small");
+      note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual.";
+      select.addEventListener("change", () => { note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual."; });
+      const answer = async reacted => {
+        if (callBusy) return;
+        callBusy = true;
+        callsKey = null;
+        try {
+          await templateEdit({kind: "answer_call", id: call.id, answer: {reacted, note: reacted && select.value !== OTHER ? select.value : ""}});
+          if (reacted && select.value === OPPORTUNITY)
+            await previewEncounter.transact(draft => actionEconomy.spend(draft, "owner", "reaction", true) && "an opportunity attack");
+        } catch (error) { railError(error.message); }
+        finally { callBusy = false; callsKey = null; renderCalls(view); }
+      };
+      card.onsubmit = event => { event.preventDefault(); answer(true); };
+      pass.onclick = () => answer(false);
+      const label = document.createElement("label");
+      label.append("Use ", select);
+      card.append(label, react, pass, note);
+      return card;
+    }));
+  }
+  // End-of-fight recap (R86): once the DM ends the encounter, the room's log summed up, with
+  // a button to keep it in the Journal.
+  let recapKey;
+  function renderRecap(state) {
+    const host = document.getElementById("party-recap");
+    if (!host) return;
+    const recap = board() && !state.combat.running ? fightRecap(state.combat.log) : null;
+    const key = JSON.stringify([recap?.text]);
+    if (key === recapKey) return;
+    recapKey = key;
+    host.hidden = !recap;
+    document.getElementById("party-recap-body").replaceChildren(...(recap?.lines || []).map(text => {
+      const line = document.createElement("p");
+      line.textContent = text;
+      return line;
+    }));
+    document.getElementById("party-recap-journal").onclick = () => recap && journalControls.draft("Fight recap", recap.text);
+  }
+  function railError(message) {
+    const note = document.getElementById("party-encounter-note");
+    if (!note) return;
+    note.textContent = message;
+    note.hidden = false;
+    note.dataset.error = "true";
+    setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
+  }
+  // A Protector cannon shows its 10-foot healing range on the map for as long as it is
+  // around, as a template centred on the cannon's token. Its inside list picks the allies a
+  // Protector activation reaches.
+  const AURA = "Protector aura";
+  const auraPending = new Set();
+  const isProtector = card => /ELDRITCH_CANNON_PROTECTOR$/i.test(card.templateId || "") || /^Eldritch Cannon\b.*Protector\b/i.test(card.name || "");
+  function syncAuras(state, mine, cards) {
+    if (!state.combat.joined || !mine) return;
+    const submitted = new Set((mine.companions || []).map(c => c.local_id));
+    const wanted = cards.filter(card => isProtector(card) && submitted.has(card.id));
+    const auras = (state.combat.templates || []).filter(t => t.anchor != null && t.spell === AURA);
+    for (const card of wanted) {
+      if (auras.some(t => t.anchor === card.id) || auraPending.has(card.id)) continue;
+      auraPending.add(card.id);
+      templateEdit({kind:"place_template", template:{id:crypto.randomUUID(), spell:AURA, shape:"emanation", size:10, lasts:"removed", anchor:card.id}})
+        .catch(() => {}).finally(() => setTimeout(() => auraPending.delete(card.id), 5000));
+    }
+    for (const aura of auras) {
+      if (wanted.some(card => card.id === aura.anchor) || clearing.has(aura.id)) continue;
+      clearing.add(aura.id);
+      templateEdit({kind:"clear_template", id:aura.id}).catch(() => clearing.delete(aura.id));
+    }
+  }
+  // Sheet target IDs (see partyActions.targets) inside a cannon's aura, the cannon included,
+  // or null while the map has not reported.
+  function auraTargets(cardId) {
+    const combat = board();
+    const aura = (combat?.templates || []).find(t => t.anchor === cardId && t.spell === AURA);
+    if (!aura || !Array.isArray(aura.inside)) return null;
+    const byRow = new Map();
+    for (const row of combat.rows) {
+      if (row.key === "owner") {
+        byRow.set(row.id, "owner");
+        for (const [local, id] of Object.entries(row.companion_rows || {})) byRow.set(id, String(local));
+      } else if (row.key?.startsWith("companion:")) byRow.set(row.id, row.key.slice(10));
+      else if (row.member_id) byRow.set(row.id, "party:" + view.room_id + ":" + row.member_id);
+    }
+    const result = new Set([String(cardId)]);
+    for (const id of aura.inside) if (byRow.has(id)) result.add(byRow.get(id));
+    return result;
+  }
+  // Owlbear spell templates. The room keeps them; the DM's Owlbear extension draws them.
+  const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"aura around you"};
+  const LASTS = {turn:"This turn", concentration:"While you concentrate", removed:"Until you remove it"};
+  async function templateEdit(edit) {
+    if (!sendEdit || !board()?.joined) throw new Error("Join the party encounter to place templates.");
+    for (let attempt = 1; ; attempt++) {
+      try { await sendEdit(view, edit); break; }
+      catch (error) {
+        // Another edit landed first. A joined sheet's view of the room can lag by a couple of
+        // seconds, so wait for a newer revision and try again.
+        if (attempt === 4 || !/revision|updated order/i.test(error.message)) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        await refreshView();
+      }
+    }
+    await refreshView();
+  }
+  async function syncTemplates(state) {
+    const host = document.getElementById("party-templates");
+    const templates = state.combat?.templates || [];
+    const focus = previewEncounter.current().focus?.active?.id ?? null;
+    // Concentration templates go when this sheet's concentration ends or changes.
+    for (const template of templates) {
+      if (template.lasts !== "concentration" || template.focus === focus || clearing.has(template.id)) continue;
+      clearing.add(template.id);
+      // Keep the ID after success: this sheet's view can show the template for a moment longer.
+      templateEdit({kind:"clear_template", id:template.id}).catch(() => clearing.delete(template.id));
+    }
+    if (!host) return;
+    lastTemplates = templates;
+    lastAreas = state.combat?.areas || [];
+    renderTemplates();
+  }
+  // Who is inside each template (O4): the DM's map suggests rows, and the caster confirms or
+  // edits the list. Choices stay on this sheet until confirmed.
+  let lastTemplates = [], lastAreas = [];
+  // Area damage (O5): roll the template's dice on this sheet. The DM applies saves and defenses.
+  function rollDice(text) {
+    const terms = String(text || "").replace(/\s+/g, "").match(/[+-]?(\d+d\d+|\d+)/gi) || [];
+    let total = 0, dice = false;
+    for (const term of terms) {
+      const sign = term.startsWith("-") ? -1 : 1;
+      const body = term.replace(/^[+-]/, "");
+      const [count, sides] = body.toLowerCase().split("d").map(Number);
+      if (sides) {
+        if (count > 100 || sides > 1000) return null;
+        dice = true;
+        for (let i = 0; i < count; i++) total += sign * (Math.floor(Math.random() * sides) + 1);
+      } else total += sign * count;
+    }
+    return dice ? Math.max(0, total) : null;
+  }
+  const ABILITY = {strength:"STR", dexterity:"DEX", constitution:"CON", intelligence:"INT", wisdom:"WIS", charisma:"CHA"};
+  const picks = new Map();
+  function rowName(row) { return row.key === "owner" ? "You" : row.name; }
+  function pickFor(template) {
+    const suggested = template.inside || [];
+    const key = JSON.stringify(suggested);
+    let pick = picks.get(template.id);
+    if (!pick) pick = {key, chosen:new Set(template.confirmed || suggested), edited:Boolean(template.confirmed)};
+    if (pick.key !== key && !pick.edited) Object.assign(pick, {key, chosen:new Set(suggested)});
+    picks.set(template.id, pick);
+    return pick;
+  }
+  function renderTemplates() {
+    const host = document.getElementById("party-templates");
+    // Companion auras live on the map; the Protector dialog uses them.
+    const templates = lastTemplates.filter(t => t.anchor == null);
+    // Visible rows only; the server already leaves unrevealed enemies out of the suggestions.
+    const rows = (board()?.rows || []).filter(row => row.score !== null || row.key === "owner");
+    for (const id of picks.keys()) if (!templates.some(t => t.id === id)) picks.delete(id);
+    const signature = JSON.stringify([templates, lastAreas, rows.map(r => [r.id, rowName(r)]),
+      [...picks].map(([id, p]) => [id, p.key, p.edited, [...p.chosen], p.rolled])]);
+    if (host.dataset.signature === signature) return;
+    host.dataset.signature = signature;
+    // Keep focus in the damage box or a checkbox across the rebuild, so typing is not lost.
+    const focusLabel = host.contains(document.activeElement) ? document.activeElement.getAttribute("aria-label") : null;
+    queueMicrotask(() => {
+      if (!focusLabel) return;
+      const again = [...host.querySelectorAll("[aria-label]")].find(node => node.getAttribute("aria-label") === focusLabel);
+      again?.focus();
+    });
+    // Save spells sent from the cast dialog have no template. Show the latest three.
+    const NIL = "00000000-0000-0000-0000-000000000000";
+    const direct = lastAreas.filter(area => area.template === NIL).slice(-3);
+    const names = new Map(rows.map(row => [row.id, rowName(row)]));
+    host.hidden = !templates.length && !direct.length;
+    const sends = direct.map(area => {
+      const card = document.createElement("div");
+      card.className = "party-template";
+      const line = document.createElement("p");
+      line.className = "party-template-note party-template-sent";
+      const head = document.createElement("strong");
+      head.textContent = area.spell;
+      line.append(head, " · " + (area.results
+        ? "Applied by the DM: " + (area.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
+        : "Sent " + area.amount + " damage to the DM. Waiting for saves."));
+      card.append(line);
+      return card;
+    });
+    host.replaceChildren(...sends, ...templates.map(template => {
+      const card = document.createElement("div");
+      card.className = "party-template";
+      const title = document.createElement("p");
+      const name = document.createElement("strong");
+      name.textContent = template.spell;
+      const remove = document.createElement("button");
+      Object.assign(remove, {type:"button", className:"quiet-button", textContent:"✕", title:"Remove this template from Owlbear"});
+      remove.setAttribute("aria-label", "Remove " + template.spell + " template");
+      remove.onclick = async () => {
+        remove.disabled = true;
+        try { await templateEdit({kind:"clear_template", id:template.id}); }
+        catch (error) { remove.disabled = false; remove.title = error.message; }
+      };
+      // The name on its own line with the remove button beside it, and the shape and duration
+      // underneath, so a long name never splits the size across lines.
+      title.className = "party-template-head";
+      const heading = document.createElement("span");
+      const meta = document.createElement("small");
+      meta.textContent = template.size + "-ft " + (SHAPES[template.shape] || template.shape) + (LASTS[template.lasts] ? " · " + LASTS[template.lasts] : "");
+      heading.append(name, meta);
+      title.append(heading, remove);
+      card.append(title);
+      if (template.damage) card.append(ruleLine(template));
+      const pick = pickFor(template);
+      const suggested = new Set(template.inside || []);
+      const note = document.createElement("p");
+      note.className = "party-template-note";
+      note.className = "party-template-label";
+      note.textContent = template.inside === undefined ? "Targets · waiting for the map"
+        : suggested.size ? "Targets · inside on the map" : "Targets · nobody inside on the map";
+      card.append(note);
+      const list = document.createElement("div");
+      list.className = "party-template-targets";
+      const box = row => {
+        const label = document.createElement("label");
+        const input = Object.assign(document.createElement("input"), {type:"checkbox", checked:pick.chosen.has(row.id)});
+        input.onchange = () => {
+          if (input.checked) pick.chosen.add(row.id); else pick.chosen.delete(row.id);
+          pick.edited = true;
+          renderTemplates();
+        };
+        label.append(input, document.createTextNode(rowName(row)));
+        return label;
+      };
+      const listed = rows.filter(row => suggested.has(row.id) || pick.chosen.has(row.id));
+      list.append(...listed.map(box));
+      const others = rows.filter(row => !suggested.has(row.id) && !pick.chosen.has(row.id));
+      if (others.length) {
+        const more = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = "Add a target";
+        more.append(summary, ...others.map(box));
+        list.append(more);
+      }
+      card.append(list);
+      const actions = document.createElement("p");
+      if (pick.edited && pick.key !== JSON.stringify(template.inside || [])) {
+        const reset = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button", textContent:"Use the map's list"});
+        reset.onclick = () => { Object.assign(pick, {key:JSON.stringify(template.inside || []), chosen:new Set(template.inside || []), edited:false}); renderTemplates(); };
+        actions.append(reset);
+      }
+      const chosen = rows.filter(row => pick.chosen.has(row.id)).map(row => row.id);
+      if (template.damage) {
+        card.append(...areaControls(template, pick, chosen, rows));
+        card.append(actions);
+        return card;
+      }
+      const same = JSON.stringify(template.confirmed || null) === JSON.stringify(chosen);
+      const confirm = Object.assign(document.createElement("button"), {type:"button", textContent: same ? "Targets confirmed" : "Confirm targets", disabled: same});
+      confirm.onclick = async () => {
+        confirm.disabled = true;
+        try {
+          await templateEdit({kind:"confirm_template", id:template.id, targets:chosen});
+          pick.edited = true;
+        } catch (error) { confirm.disabled = false; confirm.title = error.message; }
+      };
+      actions.append(confirm);
+      card.append(actions);
+      return card;
+    }));
+  }
+  // "3d8 radiant · WIS save DC 15, half" under the template's name.
+  function ruleLine(template) {
+    const rule = document.createElement("p");
+    rule.className = "party-template-rule";
+    const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
+      + (template.save.on_success === "half" ? ", half" : ", none") + " on a success" : "";
+    rule.textContent = template.damage + " " + (template.damage_type || "") + save;
+    return rule;
+  }
+  // The damage line, the send button and the outcome of the latest application.
+  function areaControls(template, pick, chosen, rows) {
+    const nodes = [];
+    let send = null;
+    const sent = lastAreas.filter(area => area.template === template.id);
+    const latest = sent[sent.length - 1];
+    // The damage box starts empty unless the player asked the sheet to roll for them. It keeps
+    // its number after sending; a zone spell clears it once the DM applies the last send.
+    const auto = sheetSettings.get("autoRollArea");
+    if (pick.rolled === undefined) pick.rolled = auto ? rollDice(template.damage) : null;
+    if (latest?.results && pick.resetFor !== latest.id) {
+      if (pick.resetFor !== undefined || pick.sentRoll !== undefined) pick.rolled = auto ? rollDice(template.damage) : null;
+      pick.resetFor = latest.id;
+      pick.sentRoll = undefined;
+    }
+    const line = document.createElement("p");
+    line.className = "party-template-damage";
+    const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? "", placeholder:"Total"});
+    amount.setAttribute("aria-label", template.spell + " damage");
+    amount.oninput = () => {
+      pick.rolled = amount.value === "" ? null : amount.valueAsNumber;
+      send.disabled = blocked();
+    };
+    const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button",
+      textContent: pick.rolled == null ? "Roll" : "Reroll", title:"Roll " + template.damage});
+    reroll.onclick = () => { pick.rolled = rollDice(template.damage); renderTemplates(); };
+    line.append(amount, reroll);
+    const names = new Map(rows.map(row => [row.id, rowName(row)]));
+    if (latest) {
+      const outcome = document.createElement("p");
+      outcome.className = "party-template-status";
+      outcome.dataset.state = latest.results ? "applied" : "waiting";
+      outcome.textContent = latest.results
+        ? "DM applied: " + (latest.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
+        : "Sent " + latest.amount + ". Waiting for the DM.";
+      nodes.push(outcome);
+    }
+    // Instant spells are sent once. Zone spells can be sent again on later turns.
+    const repeat = template.lasts === "concentration";
+    const pending = latest && !latest.results;
+    const blocked = () => !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled);
+    send = Object.assign(document.createElement("button"), {type:"button",
+      className:"party-template-send", textContent: latest && repeat ? "Send again" : "Send to DM", disabled: blocked()});
+    send.title = "Send the damage and targets to the DM, who rolls saves and applies it";
+    send.onclick = async () => {
+      send.disabled = true;
+      try {
+        await templateEdit({kind:"send_area", request:{id:crypto.randomUUID(), template:template.id, amount:pick.rolled, targets:chosen}});
+        pick.edited = true;
+        pick.sentRoll = pick.rolled;
+      } catch (error) { send.disabled = false; send.title = error.message; }
+    };
+    line.append(send);
+    nodes.push(line);
+    return nodes;
+  }
+  const templates = {
+    available: () => Boolean(board()?.joined),
+    // Rows a cone or line can point at. Hidden enemies are left out.
+    targets: () => (board()?.rows || []).filter(row => row.key !== "owner" && row.score !== null).map(row => ({id:row.id, name:row.name})),
+    place: template => templateEdit({kind:"place_template", template}),
+    // A save spell aimed from the cast dialog without a template (R76).
+    sendSpell: request => templateEdit({kind:"send_spell", request}),
+    // Tells the fight log about a cast (R86). Only while the shared encounter is running.
+    logCast: spell => board()?.joined && board().running ? templateEdit({kind:"cast", spell}) : Promise.resolve(),
+    rollDice,
+    auraTargets,
+  };
+  // The shared encounter as this player sees it, whether or not they have joined it yet.
+  function board() {
+    if (!view?.combat || view.ended || !view.self_id || view.role === "host") return null;
+    if (!view.combat.joined && left === view.room_id + "/" + view.combat.id) return null;
+    return view.combat;
+  }
+  // Other players in the room, for the combat rail. The DM is left out.
+  function companionsAtTable() {
+    if (!board()) return [];
+    return (view.members || []).filter(member => member.member_id !== view.self_id && member.member_id !== view.dm_id)
+      .map(member => member.name);
+  }
+  return {rows, setup, release, remember, board, players: companionsAtTable, templates};
+})();

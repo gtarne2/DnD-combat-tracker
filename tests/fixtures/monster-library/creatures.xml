@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <info><update version="synthetic-1.3" /></info>
+  <element id="ID_TEST_COPPER_KITE" type="Companion" name="Copper Kite" source="Synthetic Bestiary">
+    <setters>
+      <set name="type">Construct</set><set name="size">Tiny</set><set name="cr">1/4</set>
+      <set name="ac">13 (copper plating)</set><set name="hp">9 (2d4 + 4)</set>
+      <set name="speed">10 ft., fly 30 ft.</set><set name="strength">3</set>
+      <set name="constitution">owner:constitution</set><set name="alignment">Unaligned</set>
+      <set name="saves">Dexterity +0</set><set name="skills">Perception +2</set>
+      <set name="conditionImmunities">poisoned</set>
+      <set name="actions">ID_TEST_KITE_NEEDLE</set>
+    </setters>
+    <description><p>The kite circles an imaginary workshop.</p></description>
+    <rules>
+      <grant type="Companion Reaction" id="ID_TEST_KITE_GLIDE" />
+      <grant type="Companion Trait" id="ID_TEST_KITE_MISSING" />
+    </rules>
+  </element>
+  <element id="ID_TEST_UNLOCK" type="Companion" name="Unlock only">
+    <description><p>This is a build selection.</p></description>
+  </element>
+</elements>

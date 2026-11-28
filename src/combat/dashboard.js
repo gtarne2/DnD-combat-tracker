@@ -21,7 +21,7 @@
   const pages = new Map([
     ["combat", workspace], ["character", byId("character-dialog")], ["companions", byId("companion-roster-dialog")],
     ["features", byId("features-page")],
-    ["inventory", byId("inventory-page")], ["journal", byId("journal-page")], ["notes", byId("notes-page")],
+    ["inventory", byId("inventory-page")], ["journal", byId("journal-page")],
   ]);
   const navigation = document.querySelector(".command-nav");
   let page;
@@ -139,11 +139,13 @@
 
   function updateAction(card, state) {
     const tools = card.querySelector(".option-execute");
+    attackModifiers.updateOption(card, state);
     const availability = tools.querySelector("[data-option-availability]");
     const badge = card.querySelector("[data-option-badge]");
     const cast = tools.querySelector("[data-cast-spell]");
     const stack = tools.querySelector("[data-consumable]");
     const feature = tools.querySelector("[data-feature-use]");
+    const charges = chargedItems.render(tools, state);
     let reason = "";
     let summary = "";
     let unavailable = false;
@@ -161,23 +163,57 @@
       }
     } else if (stack) {
       const remaining = consumableCards.remaining(state, stack.dataset.consumable);
-      unavailable = remaining == null || remaining === 0;
+      const pending = consumableCards.pending(state, stack.dataset.consumable);
+      unavailable = pending || remaining == null || remaining === 0;
       stack.querySelector("[data-use]").disabled = unavailable;
       stack.querySelector("[data-remaining]").textContent = remaining ?? "Unavailable";
-      if (unavailable) reason = remaining === 0 ? "None remaining." : "Quantity unavailable in the Aurora save.";
+      if (unavailable) reason = pending ? "Review the imported quantity before using this stack."
+        : remaining === 0 ? "None remaining." : "Quantity unavailable in the Aurora save.";
     } else if (feature) {
       const use = playbook.featureUse(card.dataset.pin, state);
       feature.hidden = !use;
       feature.disabled = Boolean(use?.reason);
       if (use) {
         const title = card.querySelector(".option-title").textContent;
-        feature.textContent = use.label;
+        feature.textContent = card.classList.contains("option-row") ? use.shortLabel || use.label : use.label;
         feature.setAttribute("aria-label", use.label + " " + title);
         unavailable = Boolean(use.reason);
         reason = use.reason || use.summary;
         if (unavailable) summary = "No uses";
       }
+      if (tools.hasAttribute("data-feature-level-blocked")) {
+        feature.disabled = true;
+        unavailable = true;
+        reason = "This variant requires the listed class level.";
+        summary = "Level required";
+      }
     }
+    const summon = tools.querySelector("[data-summon-create]");
+    if (summon) {
+      const busy = actionEconomy.reason(state, "owner", "action");
+      summon.disabled = Boolean(busy);
+      summon.title = busy || "";
+    }
+    if (charges) {
+      unavailable = charges.uses === 0 || charges.requiresAttunement;
+      reason = charges.requiresAttunement ? tools.dataset.attunementNote : reason;
+      summary = charges.requiresAttunement ? "Attunement required"
+        : charges.pool ? `${charges.uses} ${charges.uses === 1 ? "use" : "uses"} left` : "No charge pool";
+    }
+    const run = tools.querySelector("[data-record-attack], [data-cast-spell], [data-use], [data-feature-use], [data-charge-key]");
+    const continuingAttack = run?.matches("[data-record-attack]") && combatTools.continuesAttack(state, tools.dataset.turnCost);
+    const turnLimit = run && !run.hidden && !continuingAttack && feature?.textContent !== "Deactivate"
+      ? actionEconomy.reason(state, "owner", tools.dataset.turnCost) : "";
+    if (run?.matches("[data-record-attack]")) run.disabled = false;
+    if (turnLimit && !cast?.hasAttribute("data-ritual-cast")) {
+      run.disabled = true;
+      unavailable = true;
+      reason = turnLimit;
+      // Off-turn rows stay quiet: the button is dimmed and the heading shows whose turn it is.
+      // A spent action gets a small tag naming it.
+      summary = /already used/.test(turnLimit) ? turnLimit.replace(" already used.", " used").replace("Bonus Action", "Bonus") : "";
+    }
+    badge.classList.toggle("turn-badge", Boolean(turnLimit) && !cast?.hasAttribute("data-ritual-cast"));
     card.classList.toggle("option-unavailable", unavailable);
     availability.textContent = reason;
     availability.hidden = !reason;
@@ -227,6 +263,7 @@
     card.classList.add("selected-option");
     updateInspectorVisibility();
     const article = document.createElement("article");
+    article.dataset.sheetEntry = card.dataset.sheetEntry || "";
     if (card.dataset.pin) article.dataset.pin = card.dataset.pin;
     const heading = document.createElement("h3");
     heading.className = "option-title";
@@ -258,7 +295,8 @@
       filter = first.dataset.nav || first.dataset.filter;
     }
     const term = query.value.trim().toLowerCase();
-    const shown = term && !["pinned", "traits"].includes(filter) ? "all" : filter;
+    const filteringSpells = combatTools.filtering();
+    const shown = filteringSpells || term && !["pinned", "traits"].includes(filter) ? "all" : filter;
     const changedView = workspace.dataset.view !== shown;
     if (changedView) sessionView.rememberScroll(optionList);
     workspace.dataset.view = shown;
@@ -281,7 +319,8 @@
         const unprepared = !playbook.isPrepared(card.dataset.pin);
         const kind = kindOf(card);
         const match = (shown !== "traits" || kind === "Feature")
-          && (!unprepared || showUnprepared.checked)
+          && (!unprepared || showUnprepared.checked || filteringSpells)
+          && combatTools.filterSpells(card)
           && (!term || card.textContent.toLowerCase().includes(term));
         card.classList.toggle("search-hidden", !match);
         if (match) {
@@ -300,10 +339,10 @@
         category.querySelector("h3 span").textContent = count;
       }
     }
+    matches += showFollowups(term);
     byId("no-options").textContent = term ? "No matching options." : "No options to display.";
-    byId("no-options").hidden = matches > 0 || (!term && (!byId("no-groups").hidden
+    byId("no-options").hidden = matches > 0 || (!filteringSpells && !term && (!byId("no-groups").hidden
       || shown === "pinned" || active.some((section) => section.querySelector(":scope > .empty"))));
-    showFollowups();
     byId("no-groups").classList.toggle("view-hidden", shown === "pinned");
     const previous = sessionView.get("selection:" + shown);
     const preferred = previous && candidates.find((card) => optionKey(card) === previous);
@@ -318,13 +357,19 @@
     quick.render();
   }
 
-  function showFollowups() {
-    const visible = ["bonus-action", "all"].includes(workspace.dataset.view);
-    const hasFollowups = Boolean(byId("bonus-followup-list").children.length);
-    byId("bonus-followups").hidden = !visible || !hasFollowups;
-    byId("bonus-action").querySelector(":scope > .empty")?.toggleAttribute("hidden", hasFollowups);
+  function showFollowups(term) {
+    const visible = !combatTools.filtering() && ["bonus-action", "all"].includes(workspace.dataset.view) && !byId("bonus-action").hidden;
+    let count = 0;
+    for (const row of byId("bonus-followup-list").children) {
+      const matches = row.textContent.toLowerCase().includes(term);
+      row.hidden = !matches;
+      if (matches) count += 1;
+    }
+    byId("bonus-followups").hidden = !visible || count === 0;
+    byId("bonus-action").querySelector(":scope > .empty")?.toggleAttribute("hidden", count > 0 || Boolean(term));
+    return visible ? count : 0;
   }
-  document.addEventListener("followups-changed", showFollowups);
+  document.addEventListener("followups-changed", showOptions);
   showUnprepared.addEventListener("change", () => {
     sessionView.set("showUnprepared", showUnprepared.checked);
     showOptions();
@@ -359,6 +404,11 @@
     if (!control) return;
     event.preventDefault();
     navigate(control.dataset.sessionNav);
+    if (control.classList.contains("brand")) {
+      const character = pages.get("character");
+      character.scrollTop = 0;
+      if (!wide.matches) character.scrollIntoView({block: "start"});
+    }
   });
   window.addEventListener("scroll", () => {
     if (page && !wide.matches) sessionView.setPosition("page:" + page, window.scrollY);
@@ -417,12 +467,12 @@
     }
     const attack = event.target.closest("[data-record-attack]");
     if (attack) {
-      encounterTracker.recordAttack(attack.dataset.recordAttack);
+      if (!attack.disabled) encounterTracker.recordAttack(attack.dataset.recordAttack, attack.closest("article"));
       return;
     }
     const feature = event.target.closest("[data-feature-use]");
     if (feature && !feature.disabled) {
-      playbook.activateFeature(feature.closest("article").dataset.pin);
+      playbook.activateFeature(feature.closest("article").dataset.pin, actionEconomy.timing(feature));
       return;
     }
     const resource = event.target.closest("[data-resource-detail]");
@@ -483,12 +533,15 @@
   const rows = groups.flatMap((group) => [...group.querySelectorAll(".option-row")]);
   sheetReference.setup(rows);
   setupReferencePages(rows);
+  consumableCards.start();
   setupFeatureGroups();
   document.querySelectorAll("details[data-view-disclosure]").forEach(sessionView.restoreDisclosure);
   document.documentElement.classList.add("dashboard-ready");
   const hash = location.hash.slice(1);
-  let initialPage = pages.has(sessionView.get("page")) ? sessionView.get("page") : "combat";
-  if (hash === "full-sheet") initialPage = "character";
+  const savedPage = sessionView.get("page");
+  const legacyNotes = ["notes", "notes-page"].includes(hash) || (!hash && savedPage === "notes");
+  let initialPage = legacyNotes || hash === "journal-page" ? "journal" : pages.has(savedPage) ? savedPage : "combat";
+  if (["full-sheet", "character-dialog", "character-overview"].includes(hash)) initialPage = "character";
   else if (hash === "combat" || hash === "pinned" || groups.some((group) => group.id === hash)) {
     initialPage = "combat";
     if (hash !== "combat") {
@@ -499,5 +552,6 @@
     }
   }
   navigate(initialPage);
+  if (legacyNotes) byId("notes-content").scrollIntoView({block: "nearest"});
   if (hash === "sheet-layout") byId(hash).closest("dialog").showModal();
 })();

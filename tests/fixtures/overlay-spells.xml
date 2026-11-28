@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic spells for the mechanics overlay tests. The descriptions are written for these
+     tests; only the names and book titles match published spells. -->
+<elements>
+  <element type="Spell" id="ID_TEST_SPELL_WALL_OF_FIRE" name="Wall of Fire" source="Player’s Handbook">
+    <description><p>A sheet of flame rises where you choose. A creature caught in it takes 5d8 fire damage.</p></description>
+    <setters><set name="level">4</set><set name="time">1 action</set><set name="range">120 feet</set><set name="school">Evocation</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_FIREBALL" name="Fireball" source="Player’s Handbook (2024)">
+    <description><p>Each creature in a 10-foot-radius sphere makes a Dexterity saving throw, taking 8d6 fire damage on a failed save or half as much damage on a successful one.</p></description>
+    <setters><set name="level">3</set><set name="time">1 action</set><set name="range">150 feet</set><set name="school">Evocation</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_WEB" name="Web" source="Homebrew Workshop">
+    <description><p>Sticky strands fill a 15-foot cube.</p></description>
+    <setters><set name="level">2</set><set name="time">1 action</set><set name="range">60 feet</set><set name="school">Conjuration</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_SHATTER" name="Shatter">
+    <description><p>A ringing noise bursts at a point you choose. Each creature nearby takes 3d8 thunder damage.</p></description>
+    <setters><set name="level">2</set><set name="time">1 action</set><set name="range">60 feet</set><set name="school">Evocation</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_SUMMON_BEAST" name="Summon Beast" source="Tasha’s Cauldron of Everything">
+    <description><p>You call a beast spirit that obeys you. Its statistics are written for this test only.</p></description>
+    <setters><set name="level">2</set><set name="time">1 action</set><set name="range">90 feet</set><set name="school">Conjuration</set><set name="isConcentration">true</set><set name="duration">Concentration, up to 1 hour</set></setters>
+  </element>
+  <element type="Spell" id="ID_TEST_SPELL_SUMMON_HOMEBREW" name="Summon Beast" source="Homebrew Workshop">
+    <description><p>A homebrew beast with its own numbers.</p></description>
+    <setters><set name="level">2</set><set name="time">1 action</set><set name="range">90 feet</set><set name="school">Conjuration</set></setters>
+  </element>
+</elements>

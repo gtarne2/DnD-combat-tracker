@@ -1,5 +1,6 @@
 <section id="playbook" data-view-scroll="tracked-abilities" aria-labelledby="playbook-heading">
   <div class="rail-heading"><h2 id="playbook-heading">Tracked abilities</h2><button type="button" id="add-ability">Add</button></div>
+  <label id="arcane-firearm" class="firearm-toggle" hidden><input type="checkbox"> Cast through Arcane Firearm <small>+1d8 to one Artificer spell damage roll</small></label>
   <div id="ability-list" class="companion-grid"></div>
   <details class="panel" id="known-infusion-panel" data-view-disclosure="known-infusions" hidden>
     <summary id="known-infusion-heading">Artificer infusions</summary>
@@ -15,14 +16,25 @@
   <div class="dialog-heading"><h2 id="protector-heading">Activate Protector</h2><form method="dialog"><button>Cancel</button></form></div>
   <form id="protector-form">
     <p id="protector-description"></p>
-    <label>Rolled temporary HP <input name="amount" type="number" min="1" max="4294967295" required></label>
+    <details id="protector-rules" class="more-options" hidden><summary>Cannon rules</summary><p></p></details>
+    <p class="protector-amount"><label>Temporary HP <input name="amount" type="number" min="1" max="4294967295" required></label> <button type="button" id="protector-roll" class="quiet-button">Roll 1d8 + modifier</button></p>
     <fieldset id="protector-targets"><legend>Recipients in range</legend></fieldset>
-    <p>Recipients keep their higher temporary HP total.</p>
+    <p id="protector-aura-note" class="hint"></p>
+    <p class="hint">Recipients keep their higher temporary HP total.</p>
     <p id="protector-feedback" role="status"></p>
     <div class="focus-form companion-edit-actions">
       <button name="mode" value="record" formnovalidate>Record activation only</button>
       <button name="mode" value="apply">Activate and apply HP</button>
     </div>
+  </form>
+</dialog>
+<dialog id="feature-amount-dialog" aria-labelledby="feature-amount-title">
+  <form id="feature-amount-form">
+    <h2 id="feature-amount-title"></h2>
+    <p id="feature-amount-remaining"></p>
+    <label>Healing recipient <select name="recipient"></select></label>
+    <label>Points to spend <input name="amount" type="number" min="1" required autofocus></label>
+    <div class="focus-form companion-edit-actions"><button type="button" id="cancel-feature-amount">Cancel</button><button>Record use</button></div>
   </form>
 </dialog>
 <dialog id="ability-editor" aria-labelledby="ability-heading">
@@ -41,6 +53,14 @@
       <label>Cost <input name="cost" type="number" min="1" max="4294967295" value="1" required></label>
       <label>Resets or ends on <select name="reset"><option value="">Manual</option><option value="short">Short or long rest</option><option value="long">Long rest</option></select></label>
       <label>Bonus action while active <input name="followup" maxlength="160" placeholder="Optional action name"></label>
+      <fieldset id="ability-attack-options" class="companion-wide" hidden>
+        <legend>Bonus while active on my character</legend>
+        <div class="companion-fields">
+          <label>Apply to <select name="attackTarget"></select></label>
+          <label>Attack bonus <input name="attackBonus" type="number" min="0" max="99" placeholder="0"></label>
+          <label id="ability-damage-bonus">Weapon damage bonus <input name="damageBonus" type="number" min="0" max="99" placeholder="0"></label>
+        </div>
+      </fieldset>
       <label class="companion-wide">Mechanical effects or notes <textarea name="notes" maxlength="4000" rows="3"></textarea></label>
     </div>
     <div class="focus-form companion-edit-actions">

@@ -93,12 +93,16 @@ const sheetReference = (() => {
     container.replaceChildren();
     if (entry.kind === "Attack" && !entry.gear) {
       const gear = linkedGear(entry);
-      if (gear) container.append(link(gear.id, `Gear · ${gear.name}`));
+      if (gear) {
+        container.append(link(gear.id, `Gear · ${gear.name}`));
+        container.append(button(`Table notes · ${gear.name}`, () => editNotes(gear)));
+      }
     }
     if (entry.gear) {
       for (const attack of catalog.values()) {
         if (attack.kind === "Attack" && !attack.gear && linkedGear(attack)?.id === entry.id) {
           container.append(link(attack.id, `Attack · ${attack.name}`));
+          container.append(button(`Table notes · ${attack.name}`, () => editNotes(attack)));
         }
       }
     }

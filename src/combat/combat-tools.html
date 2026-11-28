@@ -1,0 +1,28 @@
+<dialog id="spell-filters" aria-labelledby="spell-filters-title">
+  <form id="spell-filter-form">
+    <h2 id="spell-filters-title">Spell filters</h2>
+    <label><input type="checkbox" name="spellsOnly"> Show spells only</label>
+    <label>School <select name="school" aria-label="School"><option value="">Any school</option></select></label>
+    <label>Preparation <select name="preparation" aria-label="Preparation"><option value="">Any</option><option value="ready">Prepared or known</option><option value="unprepared">Unprepared</option></select></label>
+    <label>Ritual <select name="ritual" aria-label="Ritual"><option value="">Any</option><option value="yes">Ritual only</option><option value="no">Non-ritual only</option></select></label>
+    <label>Concentration <select name="concentration" aria-label="Concentration"><option value="">Any</option><option value="yes">Requires concentration</option><option value="no">No concentration</option></select></label>
+    <label>Materials <select name="materials" aria-label="Materials"><option value="">Any</option><option value="yes">Costly or consumed</option><option value="no">No listed material cost</option></select></label>
+    <div class="focus-form companion-edit-actions"><button type="button" id="clear-spell-filters">Clear filters</button><button>Done</button></div>
+  </form>
+</dialog>
+<dialog id="dawn-dialog" aria-labelledby="dawn-title">
+  <form id="dawn-form">
+    <h2 id="dawn-title">Advance to dawn</h2>
+    <p>Enter how much game time passes. Dawn recharges use the item's imported formula.</p>
+    <label>Hours until dawn <input name="hours" type="number" min="0" max="24" step="0.25" value="0" required></label>
+    <div class="focus-form companion-edit-actions"><button type="button" id="cancel-dawn">Cancel</button><button>Record dawn</button></div>
+  </form>
+</dialog>
+<dialog id="spell-target-dialog" aria-labelledby="spell-target-title">
+  <form id="spell-target-form">
+    <h2 id="spell-target-title">Manage spell targets</h2>
+    <div id="ongoing-spell-targets"></div>
+    <p id="spell-target-feedback" role="status"></p>
+    <div class="focus-form companion-edit-actions"><button type="button" id="cancel-spell-targets">Cancel</button><button>Save targets</button></div>
+  </form>
+</dialog>

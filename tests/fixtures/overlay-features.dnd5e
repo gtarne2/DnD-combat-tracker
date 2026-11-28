@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character>
+  <display-properties><name>Tinker</name><class>Artificer (5)</class><level>5</level></display-properties>
+  <build>
+    <input><name>Tinker</name></input>
+    <abilities><strength>10</strength><dexterity>14</dexterity><constitution>14</constitution><intelligence>16</intelligence><wisdom>12</wisdom><charisma>8</charisma></abilities>
+    <elements>
+      <element type="Archetype Feature" id="ID_TEST_TCE_ARTILLERIST_CANNON" name="Eldritch Cannon" />
+      <element type="Class Feature" id="ID_TEST_SECOND_WIND" name="Second Wind" />
+      <element type="Class Feature" id="ID_TEST_HOMEBREW_RAGE" name="Rage" />
+      <element type="Archetype Feature" id="ID_TEST_BATTLE_SMITH" name="Battle Smith Companion">
+        <element type="Companion" name="Choose a defender"><element type="Companion" id="ID_TEST_STEEL_DEFENDER" name="Steel Defender" /></element>
+      </element>
+    </elements>
+  </build>
+</character>

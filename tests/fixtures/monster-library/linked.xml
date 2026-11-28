@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+  <element id="ID_TEST_KITE_NEEDLE" type="Companion Action" name="Copper Needle">
+    <description><p>Ranged attack +0 at 20 feet.</p><p>Hit: 2 piercing damage.</p></description>
+  </element>
+  <element id="ID_TEST_KITE_GLIDE" type="Companion Reaction" name="Glide Aside">
+    <sheet><description>When pushed, the kite drifts upward.</description></sheet>
+  </element>
+  <element id="ID_TEST_KITE_HUM" type="Companion Trait" name="Quiet Hum">
+    <description><p>The kite hums softly when it is still.</p></description>
+  </element>
+  <append id="ID_TEST_COPPER_KITE">
+    <rules><grant type="Companion Trait" id="ID_TEST_KITE_HUM" /></rules>
+  </append>
+</elements>

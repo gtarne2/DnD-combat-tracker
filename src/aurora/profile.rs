@@ -21,6 +21,7 @@ pub struct KeyStats {
     pub max_hp: Option<i32>,
     pub armor_class: Option<i32>,
     pub speed: Option<String>,
+    pub scores: [Option<i32>; 6],
     pub modifiers: [Option<i32>; 6],
     pub saves: [Option<i32>; 6],
     pub checks: [Option<i32>; 6],
@@ -73,6 +74,7 @@ pub(super) fn read_profile(
     build: Node<'_, '_>,
     summary: &[SavedReference<'_, '_>],
     definitions: &BTreeMap<String, Option<ContentDefinition>>,
+    level: Option<u32>,
 ) -> CharacterProfile {
     use ProfileSection::{Background, Identity, Lore, Personality};
     let display = child(root, "display-properties");
@@ -149,11 +151,7 @@ pub(super) fn read_profile(
         .flat_map(|node| children_named(node, "element"))
         .filter(|node| node.attribute("type") == Some("Level"))
         .collect();
-    let level = display
-        .and_then(|node| child(node, "level"))
-        .and_then(number)
-        .or_else(|| (!levels.is_empty()).then_some(levels.len() as i32))
-        .filter(|level| *level > 0);
+    let level = level.and_then(|level| i32::try_from(level).ok());
     let inventory: BTreeMap<_, _> = child(build, "equipment")
         .into_iter()
         .flat_map(|items| children_named(items, "item"))
@@ -172,33 +170,43 @@ pub(super) fn read_profile(
                 .filter_map(|(&id, &equipped)| equipped.then_some(id)),
         )
         .collect::<BTreeSet<_>>();
+    let gear = worn_gear(build, definitions);
     // The summary lists actual active elements. Linked options can include unavailable grants.
     let modifiers: Vec<_> = active
         .iter()
         .filter_map(|id| definition(definitions, id))
         .flat_map(ContentDefinition::rules)
-        .filter(|rule| active_stat(rule, &active))
+        .filter(|rule| active_stat(rule, &active, gear))
         .collect();
 
-    let ability_modifiers = ABILITIES.map(|ability| {
+    let scores = ABILITIES.map(|ability| {
         let key = ability.to_ascii_lowercase();
         let base = child(build, "abilities")
             .and_then(|node| child(node, &key))
             .and_then(number)?;
         let bonus = stat_bonus(&modifiers, &key);
-        Some((base + bonus - 10).div_euclid(2))
+        Some(base + bonus)
     });
-    let rolls = read_rolls(summary, definitions, &active, level, ability_modifiers);
+    let ability_modifiers = scores.map(|score| score.map(|score| (score - 10).div_euclid(2)));
+    let rolls = read_rolls(
+        summary,
+        definitions,
+        &active,
+        gear,
+        level,
+        ability_modifiers,
+    );
     let max_hp = max_hp(&levels, summary, definitions, &active, ability_modifiers[2])
         .map(|base| base + stat_bonus(&modifiers, "hp"));
     let armor_class = armor_class(build, definitions, ability_modifiers[1])
-        .map(|base| base + stat_bonus(&modifiers, "ac"));
+        .map(|base| base + stat_bonus(&modifiers, "ac") + stat_bonus(&modifiers, "ac:misc"));
     let speed = movement(&modifiers);
     CharacterProfile {
         stats: KeyStats {
             max_hp,
             armor_class,
             speed,
+            scores,
             modifiers: ability_modifiers,
             saves: rolls.saves.map(|roll| roll.total()),
             checks: rolls.checks.map(|roll| roll.total()),
@@ -260,18 +268,79 @@ fn definition<'a>(
     definitions.get(id)?.as_ref()
 }
 
-fn active_stat(rule: &ContentElement, active: &BTreeSet<&str>) -> bool {
+fn active_stat(rule: &ContentElement, active: &BTreeSet<&str>, gear: WornGear) -> bool {
     if rule.tag != "stat"
         || rule.attributes.keys().any(|key| {
             !matches!(
                 key.as_str(),
-                "name" | "value" | "bonus" | "requirements" | "alt"
+                "name" | "value" | "bonus" | "requirements" | "alt" | "equipped"
             )
         })
     {
         return false;
     }
-    stat_requirement(rule, active) == Some(true)
+    stat_requirement(rule, active) == Some(true) && equipped_requirement(rule, gear) == Some(true)
+}
+
+/// The armor and shield the character has equipped, for rules that depend on them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct WornGear {
+    /// "light", "medium" or "heavy" when body armor is equipped.
+    armor: Option<&'static str>,
+    shield: bool,
+}
+
+fn worn_gear(
+    build: Node<'_, '_>,
+    definitions: &BTreeMap<String, Option<ContentDefinition>>,
+) -> WornGear {
+    let mut gear = WornGear::default();
+    for item in child(build, "equipment")
+        .into_iter()
+        .flat_map(|items| children_named(items, "item"))
+        .filter(|item| is_equipped(*item).is_some())
+    {
+        let Some(data) = item
+            .attribute("id")
+            .and_then(|id| definition(definitions, id))
+        else {
+            continue;
+        };
+        match setter(data, "armor") {
+            Some("Shield") => gear.shield = true,
+            Some("Light") => gear.armor = gear.armor.or(Some("light")),
+            Some("Medium") => gear.armor = gear.armor.or(Some("medium")),
+            Some("Heavy") => gear.armor = gear.armor.or(Some("heavy")),
+            _ => {}
+        }
+    }
+    gear
+}
+
+/// Whether a rule's `equipped` condition holds: `true` on an item's own rule (only equipped
+/// items reach the summary's active set), or bracketed armor and shield checks such as
+/// `[armor:none]` or `[armor:any],[shield:none]`. An unknown condition is unknown.
+pub(super) fn equipped_requirement(rule: &ContentElement, gear: WornGear) -> Option<bool> {
+    let Some(value) = rule.attributes.get("equipped").map(|value| value.trim()) else {
+        return Some(true);
+    };
+    if value.eq_ignore_ascii_case("true") {
+        return Some(true);
+    }
+    let mut holds = true;
+    for part in value.split(',').map(str::trim) {
+        let (kind, wanted) = part.strip_prefix('[')?.strip_suffix(']')?.split_once(':')?;
+        let wanted = wanted.trim().to_ascii_lowercase();
+        holds &= match (kind.trim().to_ascii_lowercase().as_str(), wanted.as_str()) {
+            ("armor", "none") => gear.armor.is_none(),
+            ("armor", "any") => gear.armor.is_some(),
+            ("armor", weight @ ("light" | "medium" | "heavy")) => gear.armor == Some(weight),
+            ("shield", "none") => !gear.shield,
+            ("shield", "any") => gear.shield,
+            _ => return None,
+        };
+    }
+    Some(holds)
 }
 
 pub(super) fn stat_requirement(rule: &ContentElement, active: &BTreeSet<&str>) -> Option<bool> {

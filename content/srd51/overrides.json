@@ -1,0 +1,74 @@
+{
+  "ID_SRD51_MONSTER_CLOAKER": {
+    "page": 268,
+    "reason": "Split the separate Phantasms action out of Moan.",
+    "category": "actions",
+    "replaces": "Moan",
+    "rules": [
+      {
+        "name": "Moan",
+        "title": "Moan",
+        "text": "Each creature within 60 feet of the cloaker that can hear its moan and that isn’t an aberration must succeed on a DC 13 Wisdom saving throw or become frightened until the end of the cloaker’s next turn. If a creature’s saving throw is successful, the creature is immune to the cloaker’s moan for the next 24 hours"
+      },
+      {
+        "name": "Phantasms",
+        "title": "Phantasms (Recharges after a Short or Long Rest)",
+        "text": "The cloaker magically creates three illusory duplicates of itself if it isn’t in bright light. The duplicates move with it and mimic its actions, shifting position so as to make it impossible to track which cloaker is the real one. If the cloaker is ever in an area of bright light, the duplicates disappear. Whenever any creature targets the cloaker with an attack or a harmful spell while a duplicate remains, that creature rolls randomly to determine whether it targets the cloaker or one of the duplicates. A creature is unaffected by this magical effect if it can’t see or if it relies on senses other than sight. A duplicate has the cloaker’s AC and uses its saving throws. If an attack hits a duplicate, or if a duplicate fails a saving throw against an effect that deals damage, the duplicate disappears."
+      }
+    ]
+  },
+  "ID_SRD51_MONSTER_NIGHT_HAG": {
+    "page": 319,
+    "reason": "Split the distinct Magic Resistance trait out of Innate Spellcasting.",
+    "category": "traits",
+    "replaces": "Innate Spellcasting",
+    "rules": [
+      {
+        "name": "Innate Spellcasting",
+        "title": "Innate Spellcasting",
+        "text": "The hag’s innate spellcasting ability is Charisma (spell save DC 14, +6 to hit with spell attacks). She can innately cast the following spells, requiring no material components: At will: detect magic, magic missile 2/day each: plane shift (self only), ray of enfeeblement, sleep"
+      },
+      {
+        "name": "Magic Resistance",
+        "title": "Magic Resistance",
+        "text": "The hag has advantage on saving throws against spells and other magical effects."
+      }
+    ]
+  },
+  "ID_SRD51_MONSTER_ONI": {
+    "page": 336,
+    "reason": "Split the distinct Magic Weapons trait out of Innate Spellcasting.",
+    "category": "traits",
+    "replaces": "Innate Spellcasting",
+    "rules": [
+      {
+        "name": "Innate Spellcasting",
+        "title": "Innate Spellcasting",
+        "text": "The oni’s innate spellcasting ability is Charisma (spell save DC 13). The oni can innately cast the following spells, requiring no material components: At will: darkness, invisibility 1/day each: charm person, cone of cold, gaseous form, sleep"
+      },
+      {
+        "name": "Magic Weapons",
+        "title": "Magic Weapons",
+        "text": "The oni’s weapon attacks are magical."
+      }
+    ]
+  },
+  "ID_SRD51_MONSTER_UNICORN": {
+    "page": 351,
+    "reason": "Split the distinct Magic Resistance trait out of Innate Spellcasting.",
+    "category": "traits",
+    "replaces": "Innate Spellcasting",
+    "rules": [
+      {
+        "name": "Innate Spellcasting",
+        "title": "Innate Spellcasting",
+        "text": "The unicorn’s innate spellcasting ability is Charisma (spell save DC 14). The unicorn can innately cast the following spells, requiring no components: At will: detect evil and good, druidcraft, pass without trace 1/day each: calm emotions, dispel evil and good, entangle"
+      },
+      {
+        "name": "Magic Resistance",
+        "title": "Magic Resistance",
+        "text": "The unicorn has advantage on saving throws against spells and other magical effects."
+      }
+    ]
+  }
+}

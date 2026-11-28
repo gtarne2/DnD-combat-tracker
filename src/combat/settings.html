@@ -1,0 +1,23 @@
+<dialog id="sheet-settings" aria-labelledby="sheet-settings-title">
+  <div class="dialog-heading"><h2 id="sheet-settings-title">Settings</h2><form method="dialog"><button>Close</button></form></div>
+  <p class="settings-note">Saved in this browser for every character.</p>
+  <fieldset class="settings-group">
+    <legend>Turn tracking</legend>
+    <label><input type="checkbox" data-sheet-setting="trackActions"> Track my action, bonus action and reaction in the DM's initiative</label>
+    <label><input type="checkbox" data-sheet-setting="trackActionsSolo"> Also track them in solo encounters on this sheet</label>
+    <p class="settings-hint">Spent actions show in the Combat options heading. Click a spent one to mark it ready again when the table rules otherwise. Companions with their own turn have Turn actions on their card.</p>
+  </fieldset>
+  <fieldset class="settings-group">
+    <legend>Assists</legend>
+    <label><input type="checkbox" data-sheet-setting="autoRollArea"> Roll area spell damage for me</label>
+    <p class="settings-hint">When off, type the damage you rolled at the table, or use the Roll button on the spell's card.</p>
+    <label><input type="checkbox" data-sheet-setting="concentrationReminder"> Pop up a concentration check when I take damage</label>
+    <p class="settings-hint">Shows the save DC. You roll and record the result. When off, the check waits in the Concentration box.</p>
+  </fieldset>
+  <fieldset class="settings-group">
+    <legend>Party offers</legend>
+    <label><input type="checkbox" data-sheet-setting="autoAcceptOffers"> Accept damage and healing from the party automatically</label>
+    <p class="settings-hint">Damage from the DM, and healing or temporary HP from other players, apply as soon as they arrive, with Undo on the encounter rail. Attack grants still ask.</p>
+  </fieldset>
+  <p id="sheet-settings-status" class="focus-feedback" role="status"></p>
+</dialog>

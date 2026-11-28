@@ -1,0 +1,16 @@
+<section class="journal-entries" aria-label="Journal entries">
+  <div class="focus-form"><label>Search journal <input id="journal-search" type="search"></label><button type="button" id="add-journal-entry">Add journal entry</button></div>
+  <div id="journal-entries"></div>
+</section>
+<dialog id="journal-entry-editor" aria-labelledby="journal-entry-heading">
+  <form id="journal-entry-form">
+    <h2 id="journal-entry-heading">Journal entry</h2>
+    <div class="companion-fields">
+      <label>Title <input name="title" required maxlength="120"></label>
+      <label>Date <input name="date" type="date" required></label>
+      <label class="companion-wide">Entry <textarea name="body" required rows="5" maxlength="20000"></textarea></label>
+      <label class="companion-wide">Link to activity or a sheet reference <select name="reference"></select></label>
+    </div>
+    <div class="focus-form companion-edit-actions"><button type="button" id="cancel-journal-entry">Cancel</button><button>Save entry</button><button type="button" id="remove-journal-entry" class="danger-outline" hidden>Delete entry</button></div>
+  </form>
+</dialog>

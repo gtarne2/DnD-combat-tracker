@@ -27,7 +27,8 @@ function setupQuickActions(groups, updateAction) {
   }
   for (const group of groups) {
     for (const source of group.querySelectorAll(".option-row[data-pin]")) {
-      if (!source.querySelector("[data-cast-spell], [data-use], [data-record-attack], [data-feature-use]")) continue;
+      if (source.querySelector("[data-feature-level-blocked]")) continue;
+      if (!source.querySelector("[data-cast-spell], [data-use], [data-record-attack], [data-feature-use], [data-charge-key]")) continue;
       const key = keyFor(source);
       if (!staticActions.has(key)) staticActions.set(key, {key, source, name: source.querySelector(".option-title").textContent});
     }
@@ -95,12 +96,14 @@ function setupQuickActions(groups, updateAction) {
   function optionAction(entry, state) {
     const article = node("article");
     article.dataset.pin = entry.source.dataset.pin;
+    article.dataset.sheetEntry = entry.source.dataset.sheetEntry || "";
     const title = node("span", entry.name);
     title.className = "option-title visually-hidden";
     const badge = node("span");
     badge.dataset.optionBadge = "";
     badge.className = "status-chip";
     const tools = entry.source.querySelector(".option-execute").cloneNode(true);
+    tools.querySelector("[data-bind-charge]")?.remove();
     const source = entry.source.querySelector("[data-focus-spell]");
     article.append(title, tools, badge);
     if (source) article.append(source.cloneNode(true));
@@ -138,7 +141,11 @@ function setupQuickActions(groups, updateAction) {
         container.append(details);
       }
     } else if (entry.id) {
-      container.append(button(entry.name, () => companionControls.createCannon(entry.id)));
+      const create = button(entry.name, () => companionControls.createCannon(entry.id));
+      const reason = actionEconomy.reason(state, "owner", "action");
+      create.disabled = Boolean(reason);
+      if (reason) create.title = reason;
+      container.append(create);
     } else if (!entry.source) {
       const control = node("button", entry.name);
       control.disabled = true;

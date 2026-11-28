@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<character>
+  <display-properties><name>Synthetic Progression</name><level>11</level></display-properties>
+  <build>
+    <input><name>Synthetic Progression</name></input>
+    <abilities><strength>10</strength><dexterity>16</dexterity><constitution>12</constitution><intelligence>14</intelligence><wisdom>16</wisdom><charisma>8</charisma></abilities>
+    <elements>
+      <element type="Level" id="ID_LEVEL_1" class="ID_TEST_CLASS_MONK"/>
+      <element type="Level" id="ID_LEVEL_2" class="ID_TEST_CLASS_MONK"/>
+      <element type="Level" id="ID_LEVEL_3" class="ID_TEST_CLASS_MONK"/>
+      <element type="Level" id="ID_LEVEL_4" class="ID_TEST_CLASS_MONK"/>
+      <element type="Level" id="ID_LEVEL_5" class="ID_TEST_CLASS_MONK"/>
+      <element type="Level" id="ID_LEVEL_6" class="ID_TEST_CLASS_BARD"/>
+      <element type="Level" id="ID_LEVEL_7" class="ID_TEST_CLASS_BARD"/>
+      <element type="Level" id="ID_LEVEL_8" class="ID_TEST_CLASS_BARD"/>
+      <element type="Level" id="ID_LEVEL_9" class="ID_TEST_CLASS_BARD"/>
+      <element type="Level" id="ID_LEVEL_10" class="ID_TEST_CLASS_PALADIN"/>
+      <element type="Level" id="ID_LEVEL_11" class="ID_TEST_CLASS_PALADIN"/>
+    </elements>
+    <sum>
+      <element type="Class" id="ID_TEST_CLASS_MONK"/>
+      <element type="Class" id="ID_TEST_CLASS_BARD"/>
+      <element type="Class" id="ID_TEST_CLASS_PALADIN"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_KI"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_SURGE"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_INSPIRATION"/>
+      <element type="Archetype" id="ID_TEST_ARCHETYPE_RESONANCE"/>
+      <element type="Archetype Feature" id="ID_TEST_FEATURE_UPGRADE"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_RESERVE"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_DIVINITY"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_HEALING_POOL"/>
+      <element type="Class Feature" id="ID_TEST_FEATURE_UNKNOWN"/>
+    </sum>
+    <magic>
+      <spellcasting name="Synthetic Wisdom list" source="ID_TEST_CLASS_MONK" ability="Wisdom">
+        <slots s1="4" s2="3" s3="2" s4="1"/>
+        <cantrips>
+          <spell id="ID_TEST_SPELL_ARC" name="Static Arc"/>
+          <spell id="ID_TEST_SPELL_BEAMS" name="Cobalt Rays"/>
+          <spell id="ID_TEST_SPELL_CONDITIONAL" name="Metal Mark"/>
+        </cantrips>
+        <spells>
+          <spell id="ID_TEST_SPELL_BURST" name="Lantern Burst" level="3" prepared="true"/>
+          <spell id="ID_TEST_SPELL_HEAL" name="Mend Wounds" level="1" prepared="true"/>
+          <spell id="ID_TEST_SPELL_DARTS" name="Numerous Darts" level="1" prepared="true"/>
+        </spells>
+      </spellcasting>
+    </magic>
+  </build>
+</character>

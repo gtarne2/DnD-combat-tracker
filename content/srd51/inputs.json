@@ -1,0 +1,16 @@
+{
+  "borealis_revision": "609b818ab4f911a64bacfd1c1377300e919d0a5a",
+  "official_pdf": {
+    "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf",
+    "sha256": "2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0"
+  },
+  "files": {
+    "ATTRIBUTION.md": "ea1f1936c0b9571f643205536a0a51815f83149546f93f27ac3fdb63b9b348c1",
+    "COVERAGE.md": "cded7f1aa3fa3b43c2e1c72e73ac6e1fd62b538cfc82b3561f4f028633359ed8",
+    "creatures.json": "bbb44a2b93b047721313ac2d7d765d21b1f83c762fabdd6c1f590887dd9e2f7a",
+    "monsters.json": "1e9fce58cefbc285829cc5e9a5a5448a2ff71ca13f537396c49cd8441bb4929d",
+    "npcs.json": "bfc4fe21eaaf81e16a2a27f8f518d7772ada403f7104555e06c72be3e5521b1f",
+    "pack.json": "0af5c1deabbb0596b0717afe5dbbcb70359c152e6ade764f39537512daa707ee",
+    "source.json": "dc7c09be0916d6b64b94bdc5c9b6b23e25287c914464c89d396a20256b46cba5"
+  }
+}
