@@ -294,7 +294,7 @@ const concentrationControls = (() => {
     return proposal.effect === "moonbeam" ? Number.MAX_SAFE_INTEGER
       : proposal.targetCounts[slotLevel(proposal, method, pool) - 1] || (proposal.buff ? 1 : 0);
   }
-  // Summon spells (R82): the overlay's creature numbers, worked out for the slot.
+  // Summon spells (R83): the overlay's creature numbers, worked out for the slot.
   function readSummon(text) {
     if (!text) return null;
     try { return JSON.parse(text); } catch { return null; }
@@ -320,7 +320,7 @@ const concentrationControls = (() => {
     const summon = directCast?.summon;
     if (!summon || summonField.hidden) return;
     const card = summonCard(summon, currentSlot(), castForm.elements.summonForm.value);
-    byId("cast-summon-preview").textContent = [card.name, card.armor, "HP " + card.maxHp, card.speed].join(" · ");
+    byId("cast-summon-preview").textContent = [card.name, "AC " + card.armor, "HP " + card.maxHp, card.speed].join(" · ");
   }
   castForm.elements.slot.addEventListener("change", renderSummon);
   castForm.elements.summonForm.addEventListener("change", renderSummon);
@@ -343,7 +343,7 @@ const concentrationControls = (() => {
       return !only || !form || only.split(/,\s*|\s+and\s+|\s+or\s+/i).some((part) => part.trim().toLowerCase() === form.toLowerCase());
     });
     return {name: summon.creature + (form ? " (" + form + ")" : ""), kind: [summon.size, summon.kind].filter(Boolean).join(" "),
-      armor: "AC " + ac, maxHp: hp, currentHp: hp, temporary: 0, speed,
+      armor: String(ac), maxHp: hp, currentHp: hp, temporary: 0, speed,
       stats: summon.abilities.length === 6 ? summon.abilities.map((score, i) => scores[i] + " " + score).join(" · ") : "",
       attacks: attacks.join("\n"), abilities: features.join("\n"), command: "Acts right after you on your turn.",
       duration: "1 hour", timerUnit: "seconds", remaining: 3600, initiative: null, turn: "owner", zeroHp: "vanish"};

@@ -63,6 +63,7 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | 5etools bestiary import | `cargo test --locked --test fivetools_import`. For real files kept outside Git, `FIVETOOLS_FILE=<path to bestiary-*.json> cargo test --locked --test fivetools_import -- --ignored`. The files are at `raw.githubusercontent.com/5etools-mirror-3/5etools-src` under `data/bestiary/`. |
 | Damage defenses, save spells sent from the sheet, enemy timers | `cargo test --locked --test table_rules` and `node tests/damage-defenses.cjs`. |
 | Token art | `node tests/owlbear-tokens.cjs`. Rebuild class icons with `node tools/build-class-tokens.cjs` (Playwright). |
+| Reaction calls, lasting areas, difficulty, fight recap, summons | `cargo test --locked --test table_tools --test mechanics_overlay`. In the Linux cloud, the shared `table-tools/table-demo.cjs` runs the DM and two players through all four table tools with the preview harness (`AURORA_DEMO=<path to table-demo.cjs> AURORA_SHOTS=<folder>`), and `table-tools/summon-check.cjs <shots folder>` casts Summon Beast on the `overlay-spells` fixture with a debug `combat-sheet`. |
 | Encounter export and import | `cargo test --locked --test encounter_portability`, then `node tests/party-launcher.cjs --encounters`. |
 | Bundled pack or notices | Use the reproducibility and source audits for [SRD 5.1](srd51-pack.md#reproduce-and-audit) or [SRD 5.2.1](srd521-pack.md#reproduce-and-audit), then run the packaged suite with `--srd51` or `--srd521`. |
 

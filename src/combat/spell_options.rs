@@ -24,7 +24,7 @@ pub struct SpellOptions {
     /// Stat changes the spell puts on its targets, from the mechanics overlay, such as
     /// `speed=10,seconds=3600` for Longstrider.
     pub buff: Option<String>,
-    /// The creature a summon spell calls, as JSON for the cast dialog (R82).
+    /// The creature a summon spell calls, as JSON for the cast dialog (R83).
     pub summon: Option<String>,
 }
 

@@ -1,5 +1,5 @@
-// Table tools beside initiative: reaction calls to players (R81), damage from lasting spell
-// areas (R83), encounter difficulty (R84) and the end-of-fight recap (R85).
+// Table tools beside initiative: reaction calls to players (R82), damage from lasting spell
+// areas (R84), encounter difficulty (R85) and the end-of-fight recap (R86).
 function setupDmTable({change, shownName, status}) {
   const el = id => document.getElementById(id);
   const make = (tag, text, className) => {
@@ -37,7 +37,7 @@ function setupDmTable({change, shownName, status}) {
     return Math.max(0, total);
   }
 
-  // Reaction calls (R81). The DM asks chosen players whether they react to what a creature is
+  // Reaction calls (R82). The DM asks chosen players whether they react to what a creature is
   // doing: leaving their reach, casting a spell or attacking. Each player answers from their
   // sheet, and the answers show here until the turn moves on.
   const TRIGGERS = {
@@ -117,7 +117,7 @@ function setupDmTable({change, shownName, status}) {
     }));
   }
 
-  // Lasting spell areas (R83). A creature takes the damage the first time on a turn that it
+  // Lasting spell areas (R84). A creature takes the damage the first time on a turn that it
   // enters the area or when it starts its turn there. With the Owlbear map linked, the
   // dashboard notices both for enemies and offers to queue the damage; any area can also be
   // queued by hand for a creature the DM picks.
@@ -209,7 +209,7 @@ function setupDmTable({change, shownName, status}) {
     el("dm-zone-list").replaceChildren(...items);
   }
 
-  // Encounter difficulty (R84) from each enemy's XP, or its challenge rating, against the
+  // Encounter difficulty (R85) from each enemy's XP, or its challenge rating, against the
   // party's thresholds: the 2014 DMG's adjusted XP or the 2024 DMG's XP budget.
   const CR_XP = {"0": 10, "1/8": 25, "1/4": 50, "1/2": 100, "1": 200, "2": 450, "3": 700, "4": 1100, "5": 1800, "6": 2300, "7": 2900, "8": 3900, "9": 5000, "10": 5900,
     "11": 7200, "12": 8400, "13": 10000, "14": 11500, "15": 13000, "16": 15000, "17": 18000, "18": 20000, "19": 22000, "20": 25000, "21": 33000, "22": 41000,
@@ -286,7 +286,7 @@ function setupDmTable({change, shownName, status}) {
     el("dm-difficulty-detail").textContent = result.detail + (result.unknown ? " " + result.unknown + (result.unknown === 1 ? " enemy has" : " enemies have") + " no challenge rating and isn't counted." : "");
   }
 
-  // Fight recap (R85), once the encounter has ended.
+  // Fight recap (R86), once the encounter has ended.
   let recapKey, recapText = "";
   el("dm-recap-copy").onclick = async () => {
     try { await navigator.clipboard.writeText(recapText); status.textContent = "Copied the recap."; }

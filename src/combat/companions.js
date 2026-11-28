@@ -105,7 +105,7 @@ const companionControls = (() => {
       return "creating " + template.name;
     });
   }
-  // A creature from a summon spell (R82), built by the cast dialog. A concentration summon
+  // A creature from a summon spell (R83), built by the cast dialog. A concentration summon
   // goes when that concentration ends.
   function conjure(state, values, focus) {
     const roster = state.companions ||= blank();

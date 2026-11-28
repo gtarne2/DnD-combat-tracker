@@ -1,4 +1,4 @@
-//! R81 reaction calls, R83 damage from lasting spell areas, and R85 the fight log.
+//! R82 reaction calls, R84 damage from lasting spell areas, and R86 the fight log.
 use Operation::*;
 use aurora_combat_tracker::party::initiative::FightEdit;
 use aurora_combat_tracker::party::{PartyError, Principal, RoomService, wire::*};

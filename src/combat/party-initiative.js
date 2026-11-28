@@ -227,7 +227,7 @@ const partyInitiative = (() => {
       }
     };
   }
-  // Reaction calls from the DM (R81): a creature is leaving reach, casting a spell or attacking.
+  // Reaction calls from the DM (R82): a creature is leaving reach, casting a spell or attacking.
   // The player answers React or Pass; an opportunity attack spends the reaction here, and a
   // reaction spell is cast from the sheet as usual.
   const CALL_PHRASES = {leaves_reach: "is leaving your reach", casts_spell: "is casting a spell", attacks: "is attacking", other: "is doing something"};
@@ -306,7 +306,7 @@ const partyInitiative = (() => {
       return card;
     }));
   }
-  // End-of-fight recap (R85): once the DM ends the encounter, the room's log summed up, with
+  // End-of-fight recap (R86): once the DM ends the encounter, the room's log summed up, with
   // a button to keep it in the Journal.
   let recapKey;
   function renderRecap(state) {
@@ -613,7 +613,7 @@ const partyInitiative = (() => {
     place: template => templateEdit({kind:"place_template", template}),
     // A save spell aimed from the cast dialog without a template (R76).
     sendSpell: request => templateEdit({kind:"send_spell", request}),
-    // Tells the fight log about a cast (R85). Only while the shared encounter is running.
+    // Tells the fight log about a cast (R86). Only while the shared encounter is running.
     logCast: spell => board()?.joined && board().running ? templateEdit({kind:"cast", spell}) : Promise.resolve(),
     rollDice,
     auraTargets,

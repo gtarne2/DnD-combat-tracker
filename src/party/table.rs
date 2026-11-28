@@ -1,5 +1,5 @@
-//! Table helpers beside shared initiative: reaction calls the DM sends to players (R81) and the
-//! fight log behind the end-of-fight recap (R85).
+//! Table helpers beside shared initiative: reaction calls the DM sends to players (R82) and the
+//! fight log behind the end-of-fight recap (R86).
 //!
 //! Both live on the `Fight`, so they share its revision, storage and privacy rules. Players see
 //! only calls addressed to them, and the log names hidden enemies as "A hidden creature".

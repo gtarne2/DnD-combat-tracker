@@ -329,14 +329,14 @@ pub enum Edit {
         id: Uuid,
     },
     /// The DM queues a lasting template's damage for creatures that start a turn in it or
-    /// enter it, such as Spirit Guardians (R83). It resolves like the caster's own send.
+    /// enter it, such as Spirit Guardians (R84). It resolves like the caster's own send.
     QueueZone {
         id: Uuid,
         template: Uuid,
         targets: Vec<Uuid>,
         amount: u32,
     },
-    /// The DM asks players whether they react to a creature (R81).
+    /// The DM asks players whether they react to a creature (R82).
     CallReaction {
         call: NewCall,
     },
@@ -349,7 +349,7 @@ pub enum Edit {
     DismissCall {
         id: Uuid,
     },
-    /// A player tells the fight log they cast a spell (R85).
+    /// A player tells the fight log they cast a spell (R86).
     Cast {
         spell: String,
     },

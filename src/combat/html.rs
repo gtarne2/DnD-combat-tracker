@@ -926,7 +926,7 @@ fn render_rolls(html: &mut String, sheet: &CombatSheet) {
         }
         html.push_str("></span>");
     }
-    // The first spellcasting attack, for summoned creatures' attacks (R82).
+    // The first spellcasting attack, for summoned creatures' attacks (R83).
     if let Some(attack) = sheet
         .casting_rolls
         .iter()

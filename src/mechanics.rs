@@ -41,7 +41,7 @@ struct OverlayFile {
     spell_summons: Vec<SpellSummon>,
 }
 
-/// A summon spell's creature (R82), such as Summon Beast's Bestial Spirit: AC, HP and attack
+/// A summon spell's creature (R83), such as Summon Beast's Bestial Spirit: AC, HP and attack
 /// numbers that grow with the slot level, plus names. No rules text; the spell's description
 /// still comes from the player's import. The sheet sends it to the cast dialog as JSON.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]

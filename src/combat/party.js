@@ -484,7 +484,7 @@ function setupTokenLook(request) {
   };
 }
 
-// End-of-fight recap (R85) from the room's fight log, shared by the DM dashboard and the
+// End-of-fight recap (R86) from the room's fight log, shared by the DM dashboard and the
 // player sheet. Players' logs already name hidden enemies "A hidden creature".
 function fightRecap(log) {
   const entries = Array.isArray(log) ? log : [];

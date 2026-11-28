@@ -1034,7 +1034,7 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .effect-mods { color: var(--teal); font-size: 12px; }
 .stat-boosted { color: var(--teal) !important; }
 .stat-boost-note { display: block; color: var(--teal); font-size: 11px; font-weight: 600; margin-top: 2px; }
-/* Reaction calls and the fight recap on the combat rail (R81, R85). */
+/* Reaction calls and the fight recap on the combat rail (R82, R86). */
 .party-calls { display: grid; gap: 6px; margin: 4px 0; }
 .party-calls[hidden], .party-recap[hidden] { display: none; }
 .party-call { border-left-color: var(--accent, #d8b45a); }

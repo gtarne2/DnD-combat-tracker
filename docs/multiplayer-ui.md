@@ -1,6 +1,6 @@
 # Multiplayer UI handoff
 
-Start here for a multiplayer UI rework. The baseline is P09D plus the table-feedback, Owlbear and playtest rounds through R80 (see the [handoff baseline](handoff.md#product-baseline)); the core multiplayer contract is R31–R53, with later behavior in R56–R80. Read the architecture section for the surface you are changing. Use the phase history for exact verification and P10 for remaining release work. [Requirements](requirements.md#user-requirements) · [Architecture](architecture.md#home-wi-fi-multiplayer) · [Current handoff](handoff.md) · [P10](local-multiplayer-plan.md#p10--package-and-rehearse-a-full-session)
+Start here for a multiplayer UI rework. The baseline is P09D plus the table-feedback, Owlbear and playtest rounds through R80, and the table tools R82–R86 (see the [handoff baseline](handoff.md#product-baseline)); the core multiplayer contract is R31–R53, with later behavior in R56–R86 (R81 is reserved by the Mac PR). Read the architecture section for the surface you are changing. Use the phase history for exact verification and P10 for remaining release work. [Requirements](requirements.md#user-requirements) · [Architecture](architecture.md#home-wi-fi-multiplayer) · [Current handoff](handoff.md) · [P10](local-multiplayer-plan.md#p10--package-and-rehearse-a-full-session)
 
 ## Entry points and owners
 

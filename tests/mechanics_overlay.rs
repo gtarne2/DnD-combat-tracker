@@ -166,7 +166,7 @@ fn the_sheet_uses_the_overlay_only_for_matching_imports() {
     assert!(html.contains("data-spell-look=\"fire\""));
     assert!(html.contains("data-spell-overlay"));
 
-    // R82: Summon Beast from Tasha's carries its spirit's numbers to the cast dialog, and the
+    // R83: Summon Beast from Tasha's carries its spirit's numbers to the cast dialog, and the
     // sheet names the caster's spell attack for its attacks.
     let summon = spell("Summon Beast")
         .summon
