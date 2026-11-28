@@ -104,16 +104,19 @@ module.exports = async function monsterLibrary({launch,pageFor,open,api}) {
     await library.waitFor({state:"hidden"});
   }
   async function saveRoster(name) {
+    await el("#dm-files-open").click();
     await el("#dm-save [name=name]").fill(name);
     await button("Save current roster").click();
     await el("#dm-saves option").filter({hasText:name}).waitFor({state:"attached"});
   }
   async function loadRoster(name, rows) {
+    await el("#dm-files-open").click();
     await el("#dm-saves").selectOption(name);
     await button("Load roster").click();
     await wait(async () => JSON.stringify((await board()).rows) === JSON.stringify(rows),"Named roster restored");
   }
   async function newEncounter() {
+    await el("#dm-files-open").click();
     await button("New encounter").click();
     await wait(async () => (await board()).rows.length===0,"New encounter is empty");
   }

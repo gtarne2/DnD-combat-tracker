@@ -189,6 +189,7 @@ module.exports = async function sharedInitiative({launch,pageFor,open,api}) {
   const deliveries = await page.json();
   assert.equal(deliveries.filter(d=>d.event.tick.wrap).length,2);
   for (const marker of [name,attack,alias,"Violet snare",'"hp"','"ac"']) assert.ok(!JSON.stringify(deliveries).includes(marker));
+  await dashboard.locator("#dm-files-open").click();
   const f = dashboard.locator("#dm-advance");
   await f.locator("[name=amount]").fill("3");
   await f.getByRole("button").click();
@@ -211,14 +212,17 @@ module.exports = async function sharedInitiative({launch,pageFor,open,api}) {
   await open(a,first);
   const aligned = await eventually(()=>metrics(a),s=>s.bound,"Resume from a restored backup");
   assert.deepEqual([aligned.elapsed,aligned.sequence,aligned.focus,aligned.current],[15,13,9,"owner"]);
+  await dashboard.locator("#dm-files-open").click();
   await dashboard.locator("#dm-save input").fill("Glass crossing");
   await dmButton("Save current roster").click();
   await eventually(board,s=>s.saves.includes("Glass crossing"),"Save roster");
   const saved = await board();
   await dmButton("End encounter").click();
   await eventually(()=>metrics(a),s=>!s.bound,"Release solo clock");
+  await dashboard.locator("#dm-files-open").click();
   await dmButton("New encounter").click();
   await eventually(board,s=>!s.rows.length,"New encounter");
+  await dashboard.locator("#dm-files-open").click();
   await dmButton("Load roster").click();
   await eventually(board,s=>s.rows.length===6,"Load saved roster");
   assert.deepEqual((await board()).rows,saved.rows);

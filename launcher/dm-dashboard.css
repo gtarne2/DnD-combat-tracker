@@ -563,3 +563,8 @@ button.dm-pill:hover:not(:disabled) { filter: brightness(1.25); }
 .dm-recap-line { margin: 2px 0; font-size: 13px; }
 .dm-member-link { cursor: pointer; }
 .dm-member-link:hover { text-decoration: underline; }
+
+/* Files dialog: game time, rosters and encounter files, opened from the header. */
+.dm-files-dialog { width: min(520px, calc(100vw - 32px)); }
+.dm-files-dialog .panel-heading { margin-bottom: 4px; }
+.dm-files-dialog .dm-tools { margin-top: 6px; }

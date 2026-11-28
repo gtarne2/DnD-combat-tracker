@@ -444,6 +444,7 @@ function setupDmInitiative(request, refresh) {
       return;
     }
     const row = selected();
+    if (kind === "load" || kind === "new") closeFiles();
     if (kind === "load") change({kind,name:el("dm-saves").value});
     else if (kind === "reveal") change({kind,id:row.id,revealed:!row.enemy.revealed});
     else if (kind === "remove" && row.damage_recipient) {
@@ -467,19 +468,27 @@ function setupDmInitiative(request, refresh) {
       else form.querySelector("[role=status]").textContent = "This enemy changed. Close and reopen its details to review the latest values.";
     }
   };
+  // Files in the header: game time, rosters and encounter files. Each action closes it, so the
+  // DM sees the result and the status line.
+  const files = el("dm-files");
+  function closeFiles() { if (files.open) files.close(); }
+  el("dm-files-open").onclick = () => files.showModal();
   el("dm-advance").onsubmit = event => {
     event.preventDefault();
+    closeFiles();
     const f = event.target.elements;
     change({kind:"advance",amount:f.amount.valueAsNumber,rounds:f.unit.value === "rounds"});
   };
   el("dm-save").onsubmit = event => {
     event.preventDefault();
+    closeFiles();
     change({kind:"save",name:event.target.elements.name.value.trim()});
   };
   // P10 portable encounters. The host owns the file; seats are re-paired explicitly on import.
   const importDialog = el("dm-encounter-import"), importForm = el("dm-encounter-import-form");
   let pendingEncounter;
   el("dm-export-encounter").onclick = async () => {
+    closeFiles();
     try {
       const file = await request("export_encounter");
       const blob = new Blob([JSON.stringify(file, null, 1) + "\n"], {type:"application/json"});
@@ -494,6 +503,7 @@ function setupDmInitiative(request, refresh) {
   el("dm-import-encounter").onchange = async event => {
     const file = event.target.files[0];
     event.target.value = "";
+    closeFiles();
     if (!file) return;
     try {
       // The local helper accepts request bodies up to 1 MiB.

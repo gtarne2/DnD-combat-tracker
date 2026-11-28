@@ -4,7 +4,7 @@
     <span class="dm-brand-mark"><svg class="icon" aria-hidden="true"><use href="#gi-dice-twenty-faces-twenty"/></svg></span>
     <div><p class="product-name">Aurora Combat Tracker</p><h1>DM dashboard</h1></div>
   </div>
-  <div class="dm-topbar-tools"><button type="button" id="dm-settings-open">Settings</button><div id="party-controls"></div></div>
+  <div class="dm-topbar-tools"><button type="button" id="dm-files-open" title="Game time, saved rosters and encounter files">Files</button><button type="button" id="dm-settings-open">Settings</button><div id="party-controls"></div></div>
 </header>
 <dialog id="dm-settings" aria-labelledby="dm-settings-title">
   <form method="dialog" class="dm-library-body">
@@ -109,8 +109,10 @@
         <div id="dm-recap-body"></div>
         <div class="dm-area-actions"><button type="button" id="dm-recap-copy">Copy recap</button><button type="button" id="dm-recap-clear" class="dm-danger-quiet">Clear recap</button></div>
       </section>
-      <details class="dm-more" id="dm-more-tools">
-      <summary>Game time, rosters and encounter files</summary>
+      <!-- Opened from Files in the header. It sits inside the panel so the panel's handlers reach it. -->
+      <dialog id="dm-files" class="dm-files-dialog" aria-labelledby="dm-files-title">
+      <header class="panel-heading"><h2 id="dm-files-title"><svg class="icon" aria-hidden="true"><use href="#gi-scroll-unfurled"/></svg>Game time, rosters and files</h2>
+        <form method="dialog"><button>Close</button></form></header>
       <div class="dm-tools">
         <form id="dm-advance" class="dm-tool"><span class="dm-tool-title"><svg class="icon" aria-hidden="true"><use href="#gi-hourglass"/></svg>Game time</span>
           <label>Advance game time <input name="amount" type="number" min="1" required></label>
@@ -125,7 +127,7 @@
           <label>Import encounter <input id="dm-import-encounter" type="file" accept=".json,application/json"></label>
         </div>
       </div>
-      </details>
+      </dialog>
     </div>
     <div class="dm-focus">
       <p class="dm-focus-empty" id="dm-focus-empty"><svg class="icon" aria-hidden="true"><use href="#gi-dragon-head"/></svg>Select a combatant to see its stat block and actions here.</p>

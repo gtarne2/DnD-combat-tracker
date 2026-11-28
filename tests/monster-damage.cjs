@@ -124,6 +124,7 @@ module.exports = async function monsterDamage({launch,pageFor,open,api}) {
   assert.equal(recorded.recipients[strikes[0]],playerId);
   assert.equal(recorded.recipients[strikes[5]],observerId);
   const history = dashboard.locator('#dm-action-history li[data-action-id="' + actionId + '"]');
+  await dashboard.locator("#dm-files-open").click();
   await dashboard.locator("#dm-save [name=name]").fill("Recorded before delivery");
   await button("Save current roster").click();
   await dashboard.locator("#dm-saves option").filter({hasText:"Recorded before delivery"}).waitFor({state:"attached"});
@@ -346,6 +347,7 @@ module.exports = async function monsterDamage({launch,pageFor,open,api}) {
   await button("End encounter").click();
   await dashboard.locator("#dm-round").getByText("Encounter inactive",{exact:true}).waitFor();
   const revision = (await state(dm)).combat.revision;
+  await dashboard.locator("#dm-files-open").click();
   await dashboard.locator("#dm-saves").selectOption("Recorded before delivery");
   await button("Load roster").click();
   await waitFor(()=>state(dm),view=>view.combat.revision===revision+1,"Named roster restored");

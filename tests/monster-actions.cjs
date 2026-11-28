@@ -222,6 +222,7 @@ module.exports = async function monsterActions({launch,pageFor,open,api,pkg}) {
   await order.selectOption(clone.id);
   await clickAndWait("Remove enemy");
 
+  await page.locator("#dm-files-open").click();
   await page.locator("#dm-save [name=name]").fill("Orchard rehearsal");
   await clickAndWait("Save current roster");
   await clickAndWait("End encounter");
@@ -234,6 +235,7 @@ module.exports = async function monsterActions({launch,pageFor,open,api,pkg}) {
   await button("Save correction").click();
   await modal.waitFor({state:"hidden"});
   assert.equal(beam(await row(first)).spent,false);
+  await page.locator("#dm-files-open").click();
   await page.locator("#dm-saves").selectOption("Orchard rehearsal");
   await clickAndWait("Load roster");
   assert.equal(beam(await row(first)).queued,6);
