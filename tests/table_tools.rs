@@ -190,6 +190,31 @@ fn players_answer_reaction_calls_addressed_to_them() {
             .iter()
             .any(|e| e["kind"] == "reaction" && e["note"] == "Counterspell")
     );
+    // A sheet that cannot react passes by itself and says why; a reaction cannot claim that.
+    let second = Uuid::new_v4();
+    edit(
+        &mut t.service,
+        t.room,
+        HOST,
+        json!({"kind":"call_reaction","call":{"id":second,"source":t.wolves[0],"trigger":"attacks","recipients":[t.lark_member]}}),
+    );
+    assert!(
+        try_edit(
+            &mut t.service,
+            t.room,
+            PLAYER,
+            json!({"kind":"answer_call","id":second,"answer":{"reacted":true,"unable":"used"}}),
+        )
+        .is_err()
+    );
+    edit(
+        &mut t.service,
+        t.room,
+        PLAYER,
+        json!({"kind":"answer_call","id":second,"answer":{"reacted":false,"unable":"used"}}),
+    );
+    let dm = view(&t.service, t.room, HOST);
+    assert_eq!(dm["calls"][1]["answers"][member]["unable"], "used");
     edit(&mut t.service, t.room, HOST, json!({"kind":"next"}));
     assert_eq!(view(&t.service, t.room, HOST)["calls"], json!([]));
 }

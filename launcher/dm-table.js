@@ -47,8 +47,29 @@ function setupDmTable({change, shownName, status}) {
     other: {label: "Other", phrase: "is doing something", hint: "Any reaction"},
   };
   const drafts = new Map();
+  // What the sheets' own passes taught us (R82): a member whose reaction is spent until their
+  // next turn, and the kinds of call a member's sheet has no reaction for. Those members start
+  // unticked, and the DM can still tick them.
+  const spent = new Map(), cannot = new Map();
+  const blocked = (member, trigger) => spent.has(member) ? "reaction used" : cannot.get(member)?.has(trigger) ? "nothing to react with" : "";
+  function learn() {
+    const board = room.combat;
+    if (!board.running) { spent.clear(); cannot.clear(); return; }
+    // A reaction comes back at the start of its owner's next turn, not one already under way.
+    const turn = board.round + ":" + board.current;
+    const current = board.rows.find(r => r.id === board.current);
+    if (current?.damage_recipient && spent.has(current.damage_recipient) && spent.get(current.damage_recipient) !== turn) spent.delete(current.damage_recipient);
+    for (const call of board.calls || []) for (const [member, answer] of Object.entries(call.answers || {})) {
+      if (answer.unable === "used" || answer.reacted) { if (!spent.has(member)) spent.set(member, turn); }
+      else if (answer.unable === "no_reaction") {
+        if (!cannot.has(member)) cannot.set(member, new Set());
+        cannot.get(member).add(call.trigger);
+      }
+    }
+  }
   function callForm(row) {
-    const draft = drafts.get(row.id) || {trigger: "casts_spell", detail: "", unticked: new Set()};
+    learn();
+    const draft = drafts.get(row.id) || {trigger: "casts_spell", detail: "", picked: new Map()};
     drafts.set(row.id, draft);
     const fold = make("details", null, "dm-call-form");
     fold.append(make("summary", "Ask players for reactions"));
@@ -58,32 +79,42 @@ function setupDmTable({change, shownName, status}) {
     const detail = Object.assign(document.createElement("input"), {maxLength: 80, value: draft.detail});
     detail.setAttribute("aria-label", "Detail for players");
     const placeholder = () => { detail.placeholder = draft.trigger === "casts_spell" ? "Spell and level, such as Fireball (3rd)" : draft.trigger === "attacks" ? "Target, such as Lark" : "Optional detail"; };
+    const who = make("div", null, "dm-call-who");
+    const list = players();
+    const ticked = player => draft.picked.has(player.damage_recipient) ? draft.picked.get(player.damage_recipient) : !blocked(player.damage_recipient, draft.trigger);
+    function renderWho() {
+      who.replaceChildren(...list.map(player => {
+        const member = player.damage_recipient;
+        const why = blocked(member, draft.trigger);
+        const label = make("label", null, why ? "dm-muted" : null);
+        const box = Object.assign(document.createElement("input"), {type: "checkbox", checked: ticked(player)});
+        box.onchange = () => draft.picked.set(member, box.checked);
+        label.append(box, " " + player.name + (why ? " (" + why + ")" : ""));
+        return label;
+      }));
+    }
     for (const [value, trigger] of Object.entries(TRIGGERS)) {
       const pick = button(trigger.label, () => {
         draft.trigger = value;
+        draft.picked.clear();
         for (const other of triggers.children) other.setAttribute("aria-pressed", String(other === pick));
         placeholder();
+        renderWho();
       });
       pick.title = trigger.hint;
       pick.setAttribute("aria-pressed", String(draft.trigger === value));
       triggers.append(pick);
     }
     placeholder();
+    renderWho();
+    fold.addEventListener("toggle", () => { if (fold.open) { learn(); renderWho(); } });
     detail.oninput = () => { draft.detail = detail.value; };
-    const who = make("div", null, "dm-call-who");
-    const list = players();
-    for (const player of list) {
-      const label = make("label");
-      const box = Object.assign(document.createElement("input"), {type: "checkbox", checked: !draft.unticked.has(player.damage_recipient)});
-      box.onchange = () => box.checked ? draft.unticked.delete(player.damage_recipient) : draft.unticked.add(player.damage_recipient);
-      label.append(box, " " + player.name);
-      who.append(label);
-    }
     const send = button("Ask", async () => {
-      const recipients = list.map(p => p.damage_recipient).filter(member => !draft.unticked.has(member));
+      const recipients = list.filter(ticked).map(p => p.damage_recipient);
       if (!recipients.length) { status.textContent = "Tick at least one player to ask."; return; }
       if (await change({kind: "call_reaction", call: {id: crypto.randomUUID(), source: row.id, trigger: draft.trigger, detail: draft.detail.trim(), recipients}})) {
         draft.detail = "";
+        draft.picked.clear();
         status.textContent = "Asked " + recipients.length + (recipients.length === 1 ? " player" : " players") + " about " + shownName(row) + ".";
       }
     }, "dm-primary");
@@ -93,6 +124,7 @@ function setupDmTable({change, shownName, status}) {
   }
   let callsKey;
   function renderCalls() {
+    learn();
     const calls = room.combat.calls || [];
     const key = JSON.stringify([calls, room.combat.rows.map(r => [r.id, r.name])]);
     if (key === callsKey) return;
@@ -106,7 +138,8 @@ function setupDmTable({change, shownName, status}) {
       for (const member of call.recipients) {
         const answer = call.answers?.[member];
         const item = make("li");
-        item.append(make("strong", memberName(member) + " "), make("span", !answer ? "Waiting…" : answer.reacted ? "Reacts" + (answer.note ? ": " + answer.note : "") : "Passes", answer?.reacted ? "dm-call-react" : "dm-muted"));
+        const passed = answer?.unable === "used" ? "Can't: reaction already used" : answer?.unable === "no_reaction" ? "Can't: nothing to react with" : "Passes";
+        item.append(make("strong", memberName(member) + " "), make("span", !answer ? "Waiting…" : answer.reacted ? "Reacts" + (answer.note ? ": " + answer.note : "") : passed, answer?.reacted ? "dm-call-react" : "dm-muted"));
         answers.append(item);
       }
       box.append(answers);

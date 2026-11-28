@@ -252,16 +252,49 @@ const partyInitiative = (() => {
       : trigger === "attacks" ? find(/^shield\b|protection|parry|uncanny dodge|silvery barbs/i)
       : trigger === "leaves_reach" ? OPPORTUNITY : null) || OTHER;
   }
+  // A player who can't react is never prompted: the sheet passes for them and tells the DM
+  // why (their reaction is spent, or nothing on the sheet answers this kind of call). A spell
+  // call needs a Counterspell-like reaction, an attack call a Shield-like one; anyone can make
+  // an opportunity attack. Names are matched across every option and feature on the sheet,
+  // because some reactions (such as the Protection fighting style) aren't tagged as reactions.
+  const ANSWERS = {
+    casts_spell: /counterspell|silvery barbs|^shield\b|absorb elements|spell ?breaker/i,
+    attacks: /^shield\b|protection|interception|parry|uncanny dodge|defensive duelist|deflect|silvery barbs|warding flare|cutting words|riposte|sentinel|hellish rebuke|tactical shift|bulwark/i,
+  };
+  function sheetNames() {
+    const names = new Set(reactionOptions());
+    for (const title of document.querySelectorAll("#action-groups .option-title")) {
+      const name = title.textContent.trim();
+      if (name) names.add(name);
+    }
+    return [...names];
+  }
+  function unable(call, used) {
+    if (used) return "used";
+    const pattern = ANSWERS[call.trigger];
+    return pattern && !sheetNames().some(name => pattern.test(name)) ? "no_reaction" : null;
+  }
+  const autoPassed = new Set();
+  async function autoPass(call, reason) {
+    if (autoPassed.has(call.id)) return;
+    autoPassed.add(call.id);
+    try { await templateEdit({kind: "answer_call", id: call.id, answer: {reacted: false, note: "", unable: reason}}); }
+    catch (error) { autoPassed.delete(call.id); railError(error.message); }
+  }
   function renderCalls(state) {
     const host = document.getElementById("party-calls");
     if (!host) return;
-    const calls = board() ? state.combat.calls || [] : [];
+    const encounter = previewEncounter.current();
+    const used = actionEconomy.tracking(encounter, "owner") ? actionEconomy.reason(encounter, "owner", "reaction", true) : "";
+    const all = board() ? state.combat.calls || [] : [];
+    for (const call of all) if (!call.answer) { const reason = unable(call, used); if (reason) autoPass(call, reason); }
+    const calls = all.filter(call => !(call.answer ? call.answer.unable : autoPassed.has(call.id)));
     const options = reactionOptions();
-    const used = actionEconomy.reason(previewEncounter.current(), "owner", "reaction", true);
     const key = JSON.stringify([calls, options, used, callBusy]);
     if (key === callsKey) return;
     callsKey = key;
     for (const id of callChoices.keys()) if (!calls.some(call => call.id === id)) callChoices.delete(id);
+    for (const id of autoPassed) if (!all.some(call => call.id === id)) autoPassed.delete(id);
     host.hidden = !calls.length;
     host.replaceChildren(...calls.map(call => {
       const card = document.createElement("form");
@@ -285,7 +318,7 @@ const partyInitiative = (() => {
       pass.textContent = "Pass";
       react.disabled = pass.disabled = callBusy;
       const note = document.createElement("small");
-      note.textContent = used ? "Your reaction looks used this round. You can still answer." : select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual.";
+      note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual.";
       select.addEventListener("change", () => { note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual."; });
       const answer = async reacted => {
         if (callBusy) return;

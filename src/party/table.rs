@@ -45,6 +45,20 @@ pub struct CallAnswer {
     /// What the player uses, such as "Counterspell (3rd level)".
     #[serde(default)]
     pub note: String,
+    /// Set when the sheet passed by itself because the player could not react, so the player
+    /// was never prompted. The DM's form leaves them unticked for the same kind of call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unable: Option<Unable>,
+}
+
+/// Why a sheet answered a call without asking its player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Unable {
+    /// The reaction is already spent this round.
+    Used,
+    /// The sheet has no reaction that answers this kind of call.
+    NoReaction,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -1742,7 +1742,10 @@ impl Fight {
                     .iter_mut()
                     .find(|c| c.call.id == *id && c.call.recipients.contains(&actor))
                     .ok_or(Rejection::StaleWindow)?;
-                if !short_text(&answer.note) || call.answers.contains_key(&actor) {
+                if !short_text(&answer.note)
+                    || (answer.reacted && answer.unable.is_some())
+                    || call.answers.contains_key(&actor)
+                {
                     return Err(Rejection::InvalidInput);
                 }
                 let mut answer = answer.clone();
