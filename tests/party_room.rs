@@ -941,3 +941,34 @@ fn vitals_carry_death_saves_only_while_dying() {
         serde_json::from_value::<Vitals>(json!({"death_saves": {"successes": 300}})).is_err()
     );
 }
+
+#[test]
+fn only_the_host_calls_a_rest() {
+    let db = Database::new();
+    let mut service = db.open();
+    let (room, first, second) = roster(&mut service, HostMode::Dm);
+    let rest = |recipient| Send {
+        action_id: Uuid::new_v4(),
+        recipient,
+        source: "Long rest".into(),
+        effect: Effect::Rest(RestKind::Long),
+    };
+    rejected(
+        service.execute(FIRST, &command(room, rest(second))),
+        Rejection::InvalidInput,
+    );
+    let Receipt::Offer { offer_id, status } = run(&mut service, room, HOST, rest(first)) else {
+        panic!("expected an offer");
+    };
+    assert_eq!(status, Status::Pending);
+    let wire = serde_json::to_value(Effect::Rest(RestKind::Short)).unwrap();
+    assert_eq!(wire, json!({"kind": "rest", "amount": "short"}));
+    run(&mut service, room, FIRST, Claim { offer_id });
+    assert_eq!(
+        run(&mut service, room, FIRST, Accept { offer_id }),
+        Receipt::Offer {
+            offer_id,
+            status: Status::Accepted
+        }
+    );
+}

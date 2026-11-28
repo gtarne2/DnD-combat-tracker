@@ -95,6 +95,16 @@ pub enum Effect {
     /// A spell or effect another player puts on this player, such as Longstrider or Bless,
     /// with the stat changes the recipient's sheet applies while it lasts (R79).
     Buff(StatBuff),
+    /// The DM calls a short or long rest for the party. Each sheet takes it with its own
+    /// choices (Hit Dice, prepared spells) and then accepts the offer (R90).
+    Rest(RestKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RestKind {
+    Short,
+    Long,
 }
 
 impl Effect {

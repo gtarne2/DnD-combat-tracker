@@ -763,8 +763,53 @@ function setupDmInitiative(request, refresh) {
     }));
   }
 
+  // R90: party rests. One button sends a rest offer to every player with the same action ID;
+  // each sheet takes the rest with its own choices and answers. The line below shows who's done.
+  const restBox = el("dm-rest"), restStatus = el("dm-rest-status");
+  let restBusy = false;
+  // Offers come back in no particular order, so remember which call is the latest.
+  let lastRest = null;
+  try { lastRest = localStorage.getItem("aurora-dm-last-rest"); } catch {}
+  function renderRest() {
+    const players = (room?.members || []).filter(m => m.member_id !== room.self_id);
+    restBox.hidden = !room || room.ended || !players.length;
+    for (const button of restBox.querySelectorAll("[data-party-rest]")) button.disabled = restBusy;
+    const rests = (room?.offers || []).filter(offer => offer.effect.kind === "rest" && offer.sender === room.self_id);
+    const latest = rests.find(offer => offer.action_id === lastRest);
+    if (!latest || restBusy) return;
+    const batch = rests.filter(offer => offer.action_id === latest.action_id);
+    const name = id => room.members?.find(m => m.member_id === id)?.name || "A player who left";
+    const group = statuses => batch.filter(offer => statuses.includes(offer.status)).map(offer => name(offer.recipient));
+    const done = group(["accepted"]), waiting = group(["pending", "claimed"]), skipped = group(["declined"]);
+    restStatus.textContent = (latest.effect.amount === "long" ? "Long rest" : "Short rest") + ": "
+      + [done.length ? done.join(", ") + " done" : "", waiting.length ? "waiting on " + waiting.join(", ") : "",
+        skipped.length ? skipped.join(", ") + " skipped" : ""].filter(Boolean).join(" · ") + ".";
+  }
+  restBox.addEventListener("click", async event => {
+    const kind = event.target.closest("[data-party-rest]")?.dataset.partyRest;
+    if (!kind || restBusy || !room) return;
+    const players = (room.members || []).filter(m => m.member_id !== room.self_id && m.active !== false);
+    const action_id = crypto.randomUUID();
+    lastRest = action_id;
+    try { localStorage.setItem("aurora-dm-last-rest", action_id); } catch {}
+    restBusy = true;
+    renderRest();
+    const failed = [];
+    for (const member of players) {
+      try {
+        await request("offer", {room_id: room.room_id, command_id: crypto.randomUUID(), command: {kind: "send", action_id,
+          recipient: member.member_id, source: kind === "long" ? "Long rest" : "Short rest", effect: {kind: "rest", amount: kind}}});
+      } catch (error) { failed.push(member.name); console.warn("rest offer", error.message); }
+    }
+    restBusy = false;
+    restStatus.textContent = (kind === "long" ? "Long rest" : "Short rest") + " called for the party."
+      + (failed.length ? " Couldn't reach " + failed.join(", ") + "." : "");
+    await refresh();
+  });
+
   return async state => {
     room = state;
+    renderRest();
     panel.hidden = !room?.combat || room.ended;
     if (!panel.hidden) watchConcentration();
     if (panel.hidden) {

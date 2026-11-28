@@ -272,6 +272,25 @@ function initiativeWriter(request) {
     }
     return amount <= temporary ? "You already have " + temporary + " temp HP, so it adds nothing" : "Temp HP " + temporary + " → " + amount;
   }
+  // R90: the DM calls a rest. Take it opens this sheet's rest dialog; once the player confirms
+  // there, the offer is accepted. Skip declines it. A rest already taken counts as handled.
+  let calledRest = null;
+  function restButtons(offer, state, add) {
+    const kind = offer.effect.amount === "long" ? "long" : "short";
+    add("Take " + kind + " rest", async () => {
+      calledRest = {offer, room: state.room_id};
+      document.querySelector('#rest-picker [data-rest="' + kind + '"]').click();
+    }, true);
+    add("Already rested", () => decide(state.room_id, offer, "handled"));
+    if (offer.status === "pending") add("Skip", () => decide(state.room_id, offer, "decline"));
+  }
+  document.addEventListener("sheet-rest-taken", event => {
+    const called = calledRest;
+    calledRest = null;
+    if (!called || called.offer.effect.amount !== event.detail.kind) return;
+    perform(() => decide(called.room, called.offer, "handled").then(() =>
+      notice((event.detail.kind === "long" ? "Long" : "Short") + " rest taken. The DM can see you're done.")));
+  });
   function renderRail(state, addressed, members) {
     if (!rail || !state) return;
     for (const offer of addressed) {
@@ -287,8 +306,10 @@ function initiativeWriter(request) {
     const incoming = state.ended ? [] : addressed.filter(offer => offer.recipient === state.self_id
       && HP_KINDS.includes(offer.effect.kind) && ["pending", "claimed"].includes(offer.status)
       && !(sheetSettings.get("autoAcceptOffers") && offer.status === "pending" && !autoFailed.has(offer.offer_id)));
+    const rests = state.ended ? [] : addressed.filter(offer => offer.recipient === state.self_id
+      && offer.effect.kind === "rest" && ["pending", "claimed"].includes(offer.status));
     const current = previewEncounter.current();
-    const key = JSON.stringify([incoming, notices.map(n => [n.id, n.undoState === current]), busy, current.progress?.hp, current.focus?.active?.id]);
+    const key = JSON.stringify([incoming, rests, notices.map(n => [n.id, n.undoState === current]), busy, current.progress?.hp, current.focus?.active?.id]);
     if (key === railKey) return;
     railKey = key;
     const cards = incoming.map(offer => {
@@ -317,6 +338,29 @@ function initiativeWriter(request) {
       action("Decline", "decline");
       return card;
     });
+    for (const offer of rests) {
+      const card = document.createElement("article");
+      card.className = "party-card party-offer-card";
+      card.dataset.kind = "rest";
+      card.dataset.offerId = offer.offer_id;
+      const heading = document.createElement("strong");
+      heading.textContent = "The DM calls a " + (offer.effect.amount === "long" ? "long" : "short") + " rest";
+      const outcome = document.createElement("p");
+      outcome.textContent = offer.effect.amount === "long"
+        ? "Opens your long rest: HP, spells and resources come back."
+        : "Opens your short rest: spend Hit Dice and recover short-rest resources.";
+      card.append(heading, outcome);
+      restButtons(offer, state, (label, work, primary) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.disabled = busy;
+        if (primary) button.className = "party-offer-accept";
+        button.onclick = () => perform(() => work().catch(error => { notice(error.message); throw error; }));
+        card.append(button);
+      });
+      cards.push(card);
+    }
     const lines = notices.map(item => {
       const line = document.createElement("p");
       line.className = "party-offer-notice";
@@ -357,7 +401,7 @@ function initiativeWriter(request) {
       if (recipients.some(member => member.member_id === previous)) field.value = previous;
     }
     const addressed = (state.offers || []).filter(offer => offer.effect.kind === "damage"
-      || hasSheet && ["healing", "temporary_hp", "grant", "buff"].includes(offer.effect.kind));
+      || hasSheet && ["healing", "temporary_hp", "grant", "buff", "rest"].includes(offer.effect.kind));
     if (!hasSheet) offers.parentElement.hidden = !addressed.length;
     const open = offer => ["pending", "claimed"].includes(offer.status) || offer.reversal_requested;
     const earlier = addressed.filter(offer => !open(offer)).reverse();
@@ -381,7 +425,8 @@ function initiativeWriter(request) {
         const heading = document.createElement("p");
         const grant = offer.effect.kind === "grant" && offer.effect.amount;
         const buff = offer.effect.kind === "buff" && offer.effect.amount;
-        const mechanics = buff ? effectControls.describeMods(effectControls.fromWire(buff)) || "Buff" : grant ? `${grant.category} attack · ${grant.attack} to hit · ${grant.damage} damage · ${{short_rest: "ends on short or long rest", long_rest: "ends on long rest", source_ends: "ends with source"}[grant.end_rule]}` : `${offer.effect.amount} ${effect}`;
+        const rest = offer.effect.kind === "rest" && offer.effect.amount;
+        const mechanics = rest ? (rest === "long" ? "Long rest" : "Short rest") : buff ? effectControls.describeMods(effectControls.fromWire(buff)) || "Buff" : grant ? `${grant.category} attack · ${grant.attack} to hit · ${grant.damage} damage · ${{short_rest: "ends on short or long rest", long_rest: "ends on long rest", source_ends: "ends with source"}[grant.end_rule]}` : `${offer.effect.amount} ${effect}`;
         heading.textContent = `${offer.source} · ${mechanics}${names} · ${offer.status[0].toUpperCase() + offer.status.slice(1)}`;
         row.append(heading);
         function action(label, work) {
@@ -400,7 +445,9 @@ function initiativeWriter(request) {
           for (const [key, name] of attackModifiers.eligibleTargets(grant.category)) selection.add(new Option(name, key));
           row.append(selection);
         }
-        if (incoming && offer.status === "pending" && !state.ended) {
+        if (incoming && rest && ["pending", "claimed"].includes(offer.status) && !state.ended) {
+          restButtons(offer, state, (label, work) => action(label, work));
+        } else if (incoming && offer.status === "pending" && !state.ended) {
           action("Accept", () => decide(state.room_id, offer, "apply", selection?.value));
           action("Decline", () => decide(state.room_id, offer, "decline"));
         } else if (incoming && offer.status === "claimed") {
@@ -417,7 +464,7 @@ function initiativeWriter(request) {
           const correction = document.createElement("p");
           correction.textContent = incoming ? "The sender requests a correction. Review your activity and use Undo or adjust your sheet." : "Correction requested.";
           row.append(correction);
-        } else if (!incoming && offer.status === "accepted" && !grant && !buff && !state.ended) {
+        } else if (!incoming && offer.status === "accepted" && !grant && !buff && !rest && !state.ended) {
           action("Request reversal", () => writeOffer(state.room_id, {kind: "request_reversal", offer_id: offer.offer_id}));
         }
         if (!open(offer)) row.dataset.earlier = "true";
