@@ -143,7 +143,7 @@ const concentrationControls = (() => {
   }
 
   function finishCast(proposal, method, pool = "") {
-    let placement = null, spellSend = null;
+    let placement = null, spellSend = null, castName = null;
     const done = previewEncounter.transact((state) => {
       if (!playbook.isPrepared(proposal.key, state) && method !== "ritual") {
         status.textContent = "This spell is unprepared. Choose a prepared spell or a ritual.";
@@ -188,8 +188,13 @@ const concentrationControls = (() => {
           return false;
         }
         if (proposal.effect === "shield") effectControls.recordShield(state, proposal.name, source);
+        if (proposal.summon && proposal.summonCreate) {
+          const card = summonCard(proposal.summon, slotLevel(proposal, method, pool) || proposal.summon.level, proposal.summonForm);
+          companionControls.conjure(state, card, proposal.focus ? state.focus.active?.id : null);
+        }
         const situational = proposal.advantageSelected ? "Advantage · " + proposal.advantage : "";
         previewEncounter.log(state, "cast", ["Cast " + proposal.name, kind, roll, situational].filter(Boolean).join(" · "), source);
+        castName = String(proposal.name).slice(0, 80);
       }
       if (result && proposal.map) {
         placement = {...proposal.map, id: crypto.randomUUID(), spell: proposal.name};
@@ -226,6 +231,7 @@ const concentrationControls = (() => {
       return result;
     });
     Promise.resolve(done).then(async () => {
+      if (castName) partyInitiative.templates.logCast(castName).catch(() => {});
       if (spellSend) {
         try {
           await partyInitiative.templates.sendSpell(spellSend);
@@ -287,6 +293,60 @@ const concentrationControls = (() => {
   function targetLimit(proposal, method, pool) {
     return proposal.effect === "moonbeam" ? Number.MAX_SAFE_INTEGER
       : proposal.targetCounts[slotLevel(proposal, method, pool) - 1] || (proposal.buff ? 1 : 0);
+  }
+  // Summon spells (R82): the overlay's creature numbers, worked out for the slot.
+  function readSummon(text) {
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return null; }
+  }
+  const summonField = byId("cast-summon-field");
+  function openSummon(proposal) {
+    summonField.hidden = !proposal.summon;
+    if (!proposal.summon) return;
+    const select = castForm.elements.summonForm;
+    select.replaceChildren(...proposal.summon.forms.map((form) => new Option(form, form)));
+    byId("cast-summon-form-label").hidden = !proposal.summon.forms.length;
+    castForm.elements.summon.checked = true;
+    renderSummon();
+  }
+  function currentSlot() {
+    const proposal = directCast;
+    if (!proposal) return null;
+    const choice = castForm.elements.slot.value;
+    const method = proposal.level === 0 ? "cantrip" : ["free", "ritual"].includes(choice) ? choice : "slot";
+    return method === "slot" && choice ? Number(choice.split(":")[1]) : proposal.level || proposal.summon?.level || 1;
+  }
+  function renderSummon() {
+    const summon = directCast?.summon;
+    if (!summon || summonField.hidden) return;
+    const card = summonCard(summon, currentSlot(), castForm.elements.summonForm.value);
+    byId("cast-summon-preview").textContent = [card.name, card.armor, "HP " + card.maxHp, card.speed].join(" · ");
+  }
+  castForm.elements.slot.addEventListener("change", renderSummon);
+  castForm.elements.summonForm.addEventListener("change", renderSummon);
+  function summonCard(summon, slot, form) {
+    const level = Math.max(summon.level, Number(slot) || summon.level);
+    const fits = (forms) => !forms?.length || forms.includes(form);
+    const hpBase = summon.hp.form?.[form] ?? summon.hp.base;
+    const hp = hpBase + summon.hp.per_level * (level - summon.level);
+    const ac = summon.ac.base + level + (summon.ac.form?.[form] || 0);
+    const attack = byId("spell-rolls")?.dataset.attack;
+    const attacks = summon.attacks.filter((entry) => fits(entry.forms)).map((entry) =>
+      [entry.name + ": " + [entry.kind, entry.reach].filter(Boolean).join(", "),
+        attack ? attack + " to hit" : "your spell attack to hit",
+        entry.dice ? entry.dice + " + " + (entry.bonus + level) + (entry.type ? " " + entry.type : "") : ""].filter(Boolean).join(" · "));
+    if (summon.multiattack) attacks.unshift("Multiattack: " + Math.floor(level / 2) + (Math.floor(level / 2) === 1 ? " attack" : " attacks"));
+    const scores = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
+    const speed = [summon.speed, summon.form_speed?.[form]].filter(Boolean).join(", ");
+    const features = summon.features.filter((name) => {
+      const only = name.match(/\(([^()]*) only\)/i)?.[1];
+      return !only || !form || only.split(/,\s*|\s+and\s+|\s+or\s+/i).some((part) => part.trim().toLowerCase() === form.toLowerCase());
+    });
+    return {name: summon.creature + (form ? " (" + form + ")" : ""), kind: [summon.size, summon.kind].filter(Boolean).join(" "),
+      armor: "AC " + ac, maxHp: hp, currentHp: hp, temporary: 0, speed,
+      stats: summon.abilities.length === 6 ? summon.abilities.map((score, i) => scores[i] + " " + score).join(" · ") : "",
+      attacks: attacks.join("\n"), abilities: features.join("\n"), command: "Acts right after you on your turn.",
+      duration: "1 hour", timerUnit: "seconds", remaining: 3600, initiative: null, turn: "owner", zeroHp: "vanish"};
   }
   /** Stat changes from the sheet's `data-spell-buff`, such as `speed=10,seconds=3600`. */
   function readBuff(text) {
@@ -425,11 +485,11 @@ const concentrationControls = (() => {
       targetCounts: tools.dataset.targetCounts?.split(",").map(Number) || [],
       advantage: tools.dataset.conditionalAdvantage, dc: tools.dataset.saveDc, damage: tools.dataset.baseDamage,
       damageType: tools.dataset.damageType, spellSave: tools.dataset.spellSave, colour: tools.dataset.spellColour,
-      look: tools.dataset.spellLook, buff: readBuff(tools.dataset.spellBuff)};
+      look: tools.dataset.spellLook, buff: readBuff(tools.dataset.spellBuff), summon: readSummon(tools.dataset.spellSummon)};
     proposal.healing = tools.hasAttribute("data-healing-cast");
     const mapReady = partyInitiative.templates.available() && Boolean(tools.dataset.spellArea);
     const saveSpell = partyInitiative.templates.available() && Boolean(proposal.spellSave && proposal.dc && proposal.damage);
-    if (level === 0 && !proposal.healing && !proposal.buff && !active && !ritualOnly && !proposal.advantage && !mapReady && !saveSpell) {
+    if (level === 0 && !proposal.healing && !proposal.buff && !proposal.summon && !active && !ritualOnly && !proposal.advantage && !mapReady && !saveSpell) {
       finishCast(proposal, "cantrip");
       return;
     }
@@ -481,6 +541,7 @@ const concentrationControls = (() => {
       .map((pool) => new Option(pool.name, pool.key)));
     openSave(proposal);
     openMap(tools, Boolean(focus));
+    openSummon(proposal);
     renderCost();
     castDialog.showModal();
   }
@@ -522,6 +583,8 @@ const concentrationControls = (() => {
       proposal.saveTargets = byId("cast-save-field").hidden ? [] : new FormData(castForm).getAll("saveTarget");
       proposal.saveDamage = castForm.elements.saveDamage.value === "" ? null : castForm.elements.saveDamage.valueAsNumber;
       proposal.targets = new FormData(castForm).getAll("target");
+      proposal.summonCreate = Boolean(proposal.summon) && castForm.elements.summon.checked;
+      proposal.summonForm = castForm.elements.summonForm.value || "";
       if (proposal.targets.length > targetLimit(proposal, method, pool)) {
         byId("cast-target-feedback").textContent = "Too many targets for this slot.";
         return;

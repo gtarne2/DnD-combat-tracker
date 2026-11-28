@@ -671,6 +671,7 @@ impl Room {
                 let Receipt::Offer { offer_id, .. } = change.receipt else {
                     unreachable!()
                 };
+                self.fight.log_strike_damage(action_id, strike_id, amount);
                 DamageResult::Sent(offer_id)
             }
         };

@@ -499,7 +499,7 @@ article p { white-space: pre-line; overflow-wrap: anywhere; margin: 4px 0; color
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
-.dm-zone-note { margin: 6px 0; padding: 7px 10px; border-radius: 8px; background: #2a2140; color: var(--gold); font-size: 13px; }
+
 .dm-areas { margin-top: 8px; padding: 9px 10px; border: 1px solid #6b4fa8; border-radius: 8px; background: #161227; }
 .dm-areas h3 { margin: 0; font-size: 13px; color: var(--gold); text-transform: uppercase; letter-spacing: .06em; }
 .dm-area { margin-top: 8px; border-top: 1px solid #33294d; padding-top: 6px; }
@@ -539,3 +539,23 @@ button.dm-pill:hover:not(:disabled) { filter: brightness(1.25); }
 .dm-concentration-check span { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .dm-concentration-check strong { color: var(--gold); }
 .dm-concentration-check small { color: var(--muted); overflow-wrap: anywhere; }
+/* Reaction calls, lasting areas, difficulty and recap (R81, R83–R85). */
+.dm-call-form { margin-top: 8px; }
+.dm-call-form > summary { cursor: pointer; color: var(--gold); font-size: 13px; }
+.dm-call-triggers { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.dm-call-triggers button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.dm-call-form input[maxlength] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+.dm-call-who { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; font-size: 13px; }
+.dm-call-answers { margin: 0; padding-left: 18px; font-size: 13px; }
+.dm-call-react { color: var(--gold); }
+.dm-zones .dm-area-actions select { max-width: 14em; }
+.dm-difficulty { margin: 6px 0; padding: 6px 10px; border: 1px solid #33294d; border-radius: 8px; background: #161227; font-size: 13px; }
+.dm-difficulty-line { margin: 0; }
+.dm-difficulty-line[data-rating="deadly"] strong, .dm-difficulty-line[data-rating="above-high"] strong { color: #ff8a7a; }
+.dm-difficulty-line[data-rating="hard"] strong, .dm-difficulty-line[data-rating="high"] strong { color: var(--gold); }
+.dm-difficulty-more { margin-top: 4px; }
+.dm-difficulty-more summary { cursor: pointer; color: var(--faint); font-size: 12px; }
+.dm-difficulty-more label { display: inline-flex; gap: 4px; align-items: center; margin: 4px 10px 0 0; }
+.dm-difficulty-more input[type="number"] { width: 4em; }
+.dm-recap-head { margin: 6px 0 2px; font-weight: 600; }
+.dm-recap-line { margin: 2px 0; font-size: 13px; }

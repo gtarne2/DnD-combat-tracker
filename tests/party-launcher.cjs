@@ -18,7 +18,7 @@ const distribution=fs.readdirSync(pkg).sort();
 const csc=path.join(process.env.SystemRoot,"Microsoft.NET","Framework64","v4.0.30319","csc.exe");
 const harness=path.join(pkg,"PartyHarness.exe");
 const dmAssets=["html","js","css"].map(ext=>"/resource:"+path.join(root,"launcher","dm-dashboard."+ext)+",dm-dashboard."+ext);
-for (const file of ["dm-initiative.js","dm-monsters.js","dm-monster-assist.js","dm-monster-actions.js"]) dmAssets.push("/resource:"+path.join(root,"launcher",file)+","+file);
+for (const file of ["dm-initiative.js","dm-monsters.js","dm-monster-assist.js","dm-monster-actions.js","dm-table.js"]) dmAssets.push("/resource:"+path.join(root,"launcher",file)+","+file);
 execFileSync(csc,["/nologo","/main:PartyHarness","/out:"+harness,"/reference:System.Windows.Forms.dll","/reference:System.Drawing.dll","/reference:System.Web.Extensions.dll","/resource:"+path.join(root,"src","combat","party.js")+",party.js",...dmAssets,...["tests/PartyHarness.cs","launcher/TrackerLauncher.cs","launcher/RefreshBridge.cs","launcher/PartySession.cs"].map(f=>path.join(root,f))],{cwd:root});
 const processes=new Set(), profiles=[];
 async function launch(profile,mode,invite="") {

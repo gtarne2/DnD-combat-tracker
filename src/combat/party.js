@@ -483,3 +483,56 @@ function setupTokenLook(request) {
     if (next !== session) { session = next; void send(); }
   };
 }
+
+// End-of-fight recap (R85) from the room's fight log, shared by the DM dashboard and the
+// player sheet. Players' logs already name hidden enemies "A hidden creature".
+function fightRecap(log) {
+  const entries = Array.isArray(log) ? log : [];
+  if (!entries.length) return null;
+  const rounds = Math.max(1, ...entries.map(entry => entry.round || 1));
+  const party = new Map();
+  const person = named => {
+    const key = named.member_id || named.id;
+    if (!party.has(key)) party.set(key, {name: named.name, dealt: 0, taken: 0, best: null, downs: [], spells: [], reactions: []});
+    return party.get(key);
+  };
+  const defeated = [];
+  let unattributed = 0, enemyDamage = 0;
+  for (const entry of entries) {
+    if (entry.kind === "damage") {
+      if (entry.to.enemy) {
+        enemyDamage += entry.amount;
+        if (entry.by && !entry.by.enemy) {
+          const who = person(entry.by);
+          who.dealt += entry.amount;
+          if (!who.best || entry.amount > who.best.amount) who.best = {amount: entry.amount, what: entry.what, to: entry.to.name};
+        } else if (!entry.by) unattributed += entry.amount;
+      } else person(entry.to).taken += entry.amount;
+    } else if (entry.kind === "down") {
+      defeated.push(entry.who.name);
+      if (entry.by && !entry.by.enemy) person(entry.by).downs.push(entry.who.name);
+    } else if (entry.kind === "spell") person(entry.by).spells.push(entry.spell);
+    else if (entry.kind === "reaction") person(entry.by).reactions.push(entry.note);
+  }
+  const count = list => {
+    const tally = new Map();
+    for (const item of list) tally.set(item, (tally.get(item) || 0) + 1);
+    return [...tally].map(([name, n]) => n > 1 ? name + " ×" + n : name).join(", ");
+  };
+  const lines = [];
+  lines.push(rounds + (rounds === 1 ? " round" : " rounds") + " · " + defeated.length + (defeated.length === 1 ? " enemy" : " enemies") + " defeated" + (enemyDamage ? " · " + enemyDamage + " damage to enemies" : ""));
+  if (defeated.length) lines.push("Defeated: " + count(defeated));
+  const people = [...party.values()].sort((a, b) => b.dealt - a.dealt || a.name.localeCompare(b.name));
+  for (const who of people) {
+    const parts = [];
+    if (who.dealt) parts.push("dealt " + who.dealt);
+    if (who.best) parts.push("biggest hit " + who.best.amount + (who.best.what ? " (" + who.best.what + ")" : "") + " on " + who.best.to);
+    if (who.downs.length) parts.push("finished " + count(who.downs));
+    if (who.taken) parts.push("took " + who.taken);
+    if (who.spells.length) parts.push("cast " + count(who.spells));
+    if (who.reactions.length) parts.push("reacted with " + count(who.reactions));
+    if (parts.length) lines.push(who.name + ": " + parts.join(" · "));
+  }
+  if (unattributed) lines.push("Other damage to enemies: " + unattributed);
+  return {rounds, defeated, people, lines, text: lines.join("\n")};
+}

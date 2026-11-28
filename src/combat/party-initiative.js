@@ -184,6 +184,8 @@ const partyInitiative = (() => {
       // Only when this poll brought no clock events, so the room view and the clock agree.
       if (after === (align ? saved - 1 : saved)) await dropLeftover();
       if (panel.hidden) return;
+      renderCalls(state);
+      renderRecap(state);
       await syncTemplates(state);
       const mine = state.combat.rows.find(row => row.key === "owner");
       const sheet = previewEncounter.current();
@@ -224,6 +226,108 @@ const partyInitiative = (() => {
         document.dispatchEvent(new Event("preview-encounter-change"));
       }
     };
+  }
+  // Reaction calls from the DM (R81): a creature is leaving reach, casting a spell or attacking.
+  // The player answers React or Pass; an opportunity attack spends the reaction here, and a
+  // reaction spell is cast from the sheet as usual.
+  const CALL_PHRASES = {leaves_reach: "is leaving your reach", casts_spell: "is casting a spell", attacks: "is attacking", other: "is doing something"};
+  const OPPORTUNITY = "Opportunity attack";
+  const callChoices = new Map();
+  let callsKey, callBusy = false;
+  function reactionOptions() {
+    const names = [OPPORTUNITY];
+    for (const tools of document.querySelectorAll('.option-execute[data-turn-cost="reaction"]')) {
+      const row = tools.closest("article");
+      const title = row?.querySelector(".option-title") || row?.querySelector("h3");
+      const name = title?.textContent.trim();
+      if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+  }
+  function defaultReaction(trigger, options) {
+    const find = pattern => options.find(name => pattern.test(name));
+    return (trigger === "casts_spell" ? find(/counterspell|silvery barbs/i)
+      : trigger === "attacks" ? find(/^shield\b|protection|parry|uncanny dodge|silvery barbs/i)
+      : trigger === "leaves_reach" ? OPPORTUNITY : null) || options[0];
+  }
+  function renderCalls(state) {
+    const host = document.getElementById("party-calls");
+    if (!host) return;
+    const calls = board() ? state.combat.calls || [] : [];
+    const options = reactionOptions();
+    const used = actionEconomy.reason(previewEncounter.current(), "owner", "reaction", true);
+    const key = JSON.stringify([calls, options, used, callBusy]);
+    if (key === callsKey) return;
+    callsKey = key;
+    for (const id of callChoices.keys()) if (!calls.some(call => call.id === id)) callChoices.delete(id);
+    host.hidden = !calls.length;
+    host.replaceChildren(...calls.map(call => {
+      const card = document.createElement("form");
+      card.className = "focus-form party-card party-call";
+      const heading = document.createElement("strong");
+      heading.textContent = call.source + " " + (CALL_PHRASES[call.trigger] || CALL_PHRASES.other) + (call.detail ? ": " + call.detail : "") + ".";
+      card.append(heading);
+      if (call.answer) {
+        card.append(" " + (call.answer.reacted ? "You react" + (call.answer.note ? " with " + call.answer.note : "") + ". The DM has your answer." : "You pass."));
+        return card;
+      }
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Reaction to use");
+      for (const name of options) select.add(new Option(name, name));
+      select.value = callChoices.get(call.id) || defaultReaction(call.trigger, options);
+      select.onchange = () => callChoices.set(call.id, select.value);
+      const react = document.createElement("button");
+      react.textContent = "React";
+      const pass = document.createElement("button");
+      pass.type = "button";
+      pass.textContent = "Pass";
+      react.disabled = pass.disabled = callBusy;
+      const note = document.createElement("small");
+      note.textContent = used ? "Your reaction looks used this round. You can still answer." : select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual.";
+      select.addEventListener("change", () => { note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual."; });
+      const answer = async reacted => {
+        if (callBusy) return;
+        callBusy = true;
+        callsKey = null;
+        try {
+          await templateEdit({kind: "answer_call", id: call.id, answer: {reacted, note: reacted ? select.value : ""}});
+          if (reacted && select.value === OPPORTUNITY)
+            await previewEncounter.transact(draft => actionEconomy.spend(draft, "owner", "reaction", true) && "an opportunity attack");
+        } catch (error) { railError(error.message); }
+        finally { callBusy = false; callsKey = null; renderCalls(view); }
+      };
+      card.onsubmit = event => { event.preventDefault(); answer(true); };
+      pass.onclick = () => answer(false);
+      const label = document.createElement("label");
+      label.append("Use ", select);
+      card.append(label, react, pass, note);
+      return card;
+    }));
+  }
+  // End-of-fight recap (R85): once the DM ends the encounter, the room's log summed up, with
+  // a button to keep it in the Journal.
+  let recapKey;
+  function renderRecap(state) {
+    const host = document.getElementById("party-recap");
+    if (!host) return;
+    const recap = board() && !state.combat.running ? fightRecap(state.combat.log) : null;
+    const key = JSON.stringify([recap?.text]);
+    if (key === recapKey) return;
+    recapKey = key;
+    host.hidden = !recap;
+    document.getElementById("party-recap-body").replaceChildren(...(recap?.lines || []).map(text => {
+      const line = document.createElement("p");
+      line.textContent = text;
+      return line;
+    }));
+    document.getElementById("party-recap-journal").onclick = () => recap && journalControls.draft("Fight recap", recap.text);
+  }
+  function railError(message) {
+    const note = document.getElementById("party-encounter-note");
+    if (!note) return;
+    note.textContent = message;
+    note.dataset.error = "true";
+    setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
   }
   // A Protector cannon shows its 10-foot healing range on the map for as long as it is
   // around, as a template centred on the cannon's token. Its inside list picks the allies a
@@ -507,6 +611,8 @@ const partyInitiative = (() => {
     place: template => templateEdit({kind:"place_template", template}),
     // A save spell aimed from the cast dialog without a template (R76).
     sendSpell: request => templateEdit({kind:"send_spell", request}),
+    // Tells the fight log about a cast (R85). Only while the shared encounter is running.
+    logCast: spell => board()?.joined && board().running ? templateEdit({kind:"cast", spell}) : Promise.resolve(),
     rollDice,
     auraTargets,
   };

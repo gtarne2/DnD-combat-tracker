@@ -11,7 +11,7 @@
 
 use std::{collections::HashMap, sync::OnceLock};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::combat::{AreaShape, SpellArea};
 
@@ -37,6 +37,104 @@ struct OverlayFile {
     companions: Vec<CompanionMechanics>,
     #[serde(default)]
     buffs: Vec<BuffMechanics>,
+    #[serde(default)]
+    spell_summons: Vec<SpellSummon>,
+}
+
+/// A summon spell's creature (R82), such as Summon Beast's Bestial Spirit: AC, HP and attack
+/// numbers that grow with the slot level, plus names. No rules text; the spell's description
+/// still comes from the player's import. The sheet sends it to the cast dialog as JSON.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SpellSummon {
+    pub name: String,
+    #[serde(default)]
+    pub sources: Vec<String>,
+    /// The spell's own level, which the HP growth counts from.
+    pub level: u8,
+    pub creature: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub size: String,
+    /// Forms the caster picks from, such as Air, Land and Water.
+    #[serde(default)]
+    pub forms: Vec<String>,
+    pub ac: SummonNumber,
+    pub hp: SummonHp,
+    #[serde(default)]
+    pub speed: String,
+    #[serde(default)]
+    pub form_speed: std::collections::BTreeMap<String, String>,
+    /// Strength to Charisma.
+    #[serde(default)]
+    pub abilities: Vec<i32>,
+    /// Attacks equal to half the slot level, rounded down.
+    #[serde(default)]
+    pub multiattack: bool,
+    #[serde(default)]
+    pub attacks: Vec<SummonAttack>,
+    /// Trait and other action names, such as "Pack Tactics (Land and Water Only)".
+    #[serde(default)]
+    pub features: Vec<String>,
+}
+
+/// AC: a base plus the slot level, plus an extra amount for some forms.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SummonNumber {
+    pub base: i32,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub form: std::collections::BTreeMap<String, i32>,
+}
+
+/// HP: a base (or a base per form) plus an amount for each slot level above the spell's.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SummonHp {
+    pub base: u32,
+    pub per_level: u32,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub form: std::collections::BTreeMap<String, u32>,
+}
+
+/// An attack whose damage is the dice plus a bonus plus the slot level, and whose attack
+/// bonus is the caster's spell attack.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SummonAttack {
+    pub name: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub reach: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dice: Option<String>,
+    #[serde(default)]
+    pub bonus: i32,
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub damage_type: Option<String>,
+    /// Forms that have this attack. Empty means every form.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub forms: Vec<String>,
+}
+
+impl SpellSummon {
+    fn valid(&self) -> bool {
+        let dice = |text: &str| {
+            text.split_once('d').is_some_and(|(count, sides)| {
+                count.parse::<u8>().is_ok_and(|n| (1..=20).contains(&n))
+                    && sides
+                        .parse::<u8>()
+                        .is_ok_and(|n| matches!(n, 4 | 6 | 8 | 10 | 12 | 20))
+            })
+        };
+        (1..=9).contains(&self.level)
+            && !self.creature.trim().is_empty()
+            && (0..=30).contains(&self.ac.base)
+            && self.hp.base <= 1000
+            && self.hp.per_level <= 100
+            && self.abilities.iter().all(|score| (1..=30).contains(score))
+            && self.attacks.iter().all(|attack| {
+                attack.dice.as_deref().is_none_or(dice) && (-10..=20).contains(&attack.bonus)
+            })
+    }
 }
 
 /// Stat changes a spell puts on its targets, such as Longstrider's +10 feet of speed (R79).
@@ -287,6 +385,7 @@ pub struct Overlay {
     summons: Vec<SummonMechanics>,
     companions: Vec<CompanionMechanics>,
     buffs: Vec<BuffMechanics>,
+    spell_summons: Vec<SpellSummon>,
 }
 
 /// An entry with this name from the import's book, or the first when the import names none.
@@ -385,6 +484,11 @@ impl Overlay {
                 .buffs
                 .into_iter()
                 .filter(BuffMechanics::valid)
+                .collect(),
+            spell_summons: file
+                .spell_summons
+                .into_iter()
+                .filter(SpellSummon::valid)
                 .collect(),
         })
     }
@@ -491,6 +595,13 @@ impl Overlay {
     /// The stat changes a buff spell makes, if the overlay knows it for the import's book.
     pub fn buff(&self, name: &str, source: Option<&str>) -> Option<&BuffMechanics> {
         by_book(self, &self.buffs, name, source, |entry| {
+            (entry.name.as_str(), entry.sources.as_slice())
+        })
+    }
+
+    /// The creature a summon spell calls, if the overlay knows it for the import's book.
+    pub fn spell_summon(&self, name: &str, source: Option<&str>) -> Option<&SpellSummon> {
+        by_book(self, &self.spell_summons, name, source, |entry| {
             (entry.name.as_str(), entry.sources.as_slice())
         })
     }

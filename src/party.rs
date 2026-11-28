@@ -4,6 +4,7 @@ pub mod interruptions;
 mod model;
 mod monster_actions;
 mod store;
+mod table;
 pub mod wire;
 
 use model::{ConnectionChange, Connections, Presence, Room};

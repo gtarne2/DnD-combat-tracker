@@ -242,6 +242,7 @@ function setupDmInitiative(request, refresh) {
     }
     if (enemy.timers?.length) card.append(timerTags(row));
     card.append(timerForm(row));
+    if (board.running) card.append(table.callForm(row));
     if (enemy.notes) card.append(make("p", enemy.notes, "dm-enemy-notes"));
   }
   // Quick damage and healing for the selected enemy, without opening Edit enemy. The typed
@@ -289,7 +290,10 @@ function setupDmInitiative(request, refresh) {
       const hp = sign < 0 ? Math.max(0, enemy.hp - taken) : Math.min(enemy.max_hp ?? Number.MAX_SAFE_INTEGER, enemy.hp + value);
       const next = {revealed:enemy.revealed, hp, max_hp:enemy.max_hp, ac:enemy.ac};
       for (const name of ["name","alias","conditions","notes"]) next[name] = enemy[name] ?? "";
-      if (await change({kind:"enemy", id:row.id, score:row.score, enemy:next})) {
+      // The fight log credits damage to whoever's turn it is, unless that is this enemy.
+      const board = room.combat;
+      const source = sign < 0 && board.running && board.current && board.current !== row.id ? board.current : undefined;
+      if (await change({kind:"enemy", id:row.id, score:row.score, enemy:next, ...(source ? {source} : {})})) {
         quickAmount = "";
         const why = result.note && taken !== value ? " (" + value + ", " + result.note + ")" : "";
         status.textContent = (sign < 0 ? "Damaged " + shownName(row) + " by " + taken + why : "Healed " + shownName(row) + " by " + value) + ". HP " + hp + (enemy.max_hp == null ? "" : " / " + enemy.max_hp) + ".";
@@ -410,6 +414,7 @@ function setupDmInitiative(request, refresh) {
   }
 
   setupMonsterLibrary(request, change);
+  const table = setupDmTable({change, shownName, status});
   // Remember whether the DM keeps the selected enemy's stat block open.
   const statBlockDetails = el("dm-instance-stat-block");
   try { statBlockDetails.open = localStorage.getItem("aurora-dm-stat-block-open") === "true"; } catch {}
@@ -590,15 +595,7 @@ function setupDmInitiative(request, refresh) {
   function renderAreas() {
     const board = room.combat;
     const pending = (board.areas || []).filter(area => !area.results);
-    // Zone spells: who starts this turn inside a lasting template.
-    const current = board.running && board.rows.find(row => row.id === board.current);
-    const zones = current ? (board.templates || []).filter(t => t.lasts === "concentration" && (t.inside || []).includes(current.id)) : [];
-    const zoneNote = el("dm-zone-note");
-    zoneNote.hidden = !zones.length;
-    zoneNote.textContent = zones.map(t => {
-      const caster = board.rows.find(row => row.damage_recipient === t.member_id)?.name || "its caster";
-      return current.name + " starts its turn inside " + t.spell + " (" + caster + "). " + caster + " can send it again from their sheet.";
-    }).join(" ");
+    // Zone spells that start or enter a turn inside a lasting template are in dm-table.js.
     const key = JSON.stringify([pending, board.rows.map(r => [r.id, r.name]), room.members?.map(m => [m.member_id, m.inspection?.details?.saves]), busy]);
     if (key === areasKey) return;
     areasKey = key;
@@ -773,6 +770,7 @@ function setupDmInitiative(request, refresh) {
       room.offers?.filter(offer => offer.effect.kind === "damage")
     ]);
     renderAreas();
+    table.render(room);
     if (signature === next) {
       renderTurns();
       const row = selected();

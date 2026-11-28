@@ -99,7 +99,7 @@ internal sealed class PartySession : IDisposable
             "<title>DM dashboard · Aurora Combat Tracker</title><style>" + ReadAsset("dm-dashboard.css") +
             "</style></head><body data-party-lobby='true' data-party-url='" + WebUtility.HtmlEncode(Url) +
             "' data-refresh-url='" + WebUtility.HtmlEncode(refreshUrl) + "'>" +
-            ReadAsset("dm-dashboard.html") + "<script>" + ReadAsset("dm-dashboard.js") + "\n" + ReadAsset("dm-initiative.js") + "\n" + ReadAsset("dm-monsters.js") + "\n" + ReadAsset("dm-monster-assist.js") + "\n" + ReadAsset("dm-monster-actions.js") + "\n" + ReadAsset("party.js") +
+            ReadAsset("dm-dashboard.html") + "<script>" + ReadAsset("dm-dashboard.js") + "\n" + ReadAsset("dm-initiative.js") + "\n" + ReadAsset("dm-monsters.js") + "\n" + ReadAsset("dm-monster-assist.js") + "\n" + ReadAsset("dm-monster-actions.js") + "\n" + ReadAsset("dm-table.js") + "\n" + ReadAsset("party.js") +
             "</script></body></html>", new UTF8Encoding(false));
         return lobby;
     }

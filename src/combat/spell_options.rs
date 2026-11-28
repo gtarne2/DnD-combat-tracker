@@ -24,6 +24,8 @@ pub struct SpellOptions {
     /// Stat changes the spell puts on its targets, from the mechanics overlay, such as
     /// `speed=10,seconds=3600` for Longstrider.
     pub buff: Option<String>,
+    /// The creature a summon spell calls, as JSON for the cast dialog (R82).
+    pub summon: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -232,6 +234,9 @@ impl SpellOptions {
                 self.target_counts = buff.target_counts(level);
             }
         }
+        if let Some(summon) = overlay.spell_summon(name, source) {
+            self.summon = serde_json::to_string(summon).ok();
+        }
         let entry = overlay.spell(name, source);
         if let Some(entry) = entry {
             self.overlay = true;
@@ -355,6 +360,7 @@ impl SpellOptions {
             look: None,
             overlay: false,
             buff: None,
+            summon: None,
         }
     }
 }

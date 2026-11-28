@@ -154,6 +154,9 @@ const overlay = {
   companions: curated.companions || [],
   // Stat changes of buff spells such as Longstrider (R79), hand-written only.
   buffs: curated.buffs || [],
+  // Summon spells such as Summon Beast (R82): numbers by slot level, built once from the
+  // bestiary's summonedBySpell records and kept by hand in curated.json.
+  spell_summons: curated.spell_summons || [],
 };
 fs.writeFileSync(path.join(here, "overlay.json"), JSON.stringify(overlay, null, 1) + "\n");
 console.log(`${total} area spells, ${spells.length} overlay entries (${curatedCount} reviewed by hand).`);
