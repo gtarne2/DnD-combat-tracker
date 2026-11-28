@@ -1472,7 +1472,14 @@ impl Fight {
         cmd: &FightEdit,
         players: &BTreeMap<Uuid, String>,
     ) -> Result<Vec<(Uuid, Event)>, Rejection> {
-        self.check_revision(cmd)?;
+        // A cast is logged against whatever revision the room is at (see below).
+        if matches!(cmd.edit, Edit::Cast { .. }) {
+            if self.id != cmd.encounter_id {
+                return Err(Rejection::RevisionConflict);
+            }
+        } else {
+            self.check_revision(cmd)?;
+        }
         if dm
             == matches!(
                 cmd.edit,
@@ -2220,7 +2227,11 @@ impl Fight {
                 && !stopped
                 && !(t.template.lasts == Lasting::Turn && ended_turn == Some(t.member))
         });
-        self.revision += 1;
+        // A cast only feeds the fight log, which nobody sees until the fight ends. Leaving the
+        // revision alone keeps the DM's next click from colliding with every player's casts.
+        if !matches!(cmd.edit, Edit::Cast { .. }) {
+            self.revision += 1;
+        }
         let after = self.members();
         let mut deliveries = vec![];
         for member in before.union(&after).copied() {

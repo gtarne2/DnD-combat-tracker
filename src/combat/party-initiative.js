@@ -234,6 +234,7 @@ const partyInitiative = (() => {
   const OPPORTUNITY = "Opportunity attack";
   const callChoices = new Map();
   let callsKey, callBusy = false;
+  const OTHER = "Another reaction";
   function reactionOptions() {
     const names = [OPPORTUNITY];
     for (const tools of document.querySelectorAll('.option-execute[data-turn-cost="reaction"]')) {
@@ -242,13 +243,14 @@ const partyInitiative = (() => {
       const name = title?.textContent.trim();
       if (name && !names.includes(name)) names.push(name);
     }
+    names.push(OTHER);
     return names;
   }
   function defaultReaction(trigger, options) {
     const find = pattern => options.find(name => pattern.test(name));
     return (trigger === "casts_spell" ? find(/counterspell|silvery barbs/i)
       : trigger === "attacks" ? find(/^shield\b|protection|parry|uncanny dodge|silvery barbs/i)
-      : trigger === "leaves_reach" ? OPPORTUNITY : null) || options[0];
+      : trigger === "leaves_reach" ? OPPORTUNITY : null) || OTHER;
   }
   function renderCalls(state) {
     const host = document.getElementById("party-calls");
@@ -290,7 +292,7 @@ const partyInitiative = (() => {
         callBusy = true;
         callsKey = null;
         try {
-          await templateEdit({kind: "answer_call", id: call.id, answer: {reacted, note: reacted ? select.value : ""}});
+          await templateEdit({kind: "answer_call", id: call.id, answer: {reacted, note: reacted && select.value !== OTHER ? select.value : ""}});
           if (reacted && select.value === OPPORTUNITY)
             await previewEncounter.transact(draft => actionEconomy.spend(draft, "owner", "reaction", true) && "an opportunity attack");
         } catch (error) { railError(error.message); }
