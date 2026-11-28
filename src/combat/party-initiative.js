@@ -112,6 +112,7 @@ const partyInitiative = (() => {
     function railError(message) {
       const note = document.getElementById("party-encounter-note");
       note.textContent = message;
+      note.hidden = false;
       note.dataset.error = "true";
       setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
     }
@@ -184,6 +185,8 @@ const partyInitiative = (() => {
       // Only when this poll brought no clock events, so the room view and the clock agree.
       if (after === (align ? saved - 1 : saved)) await dropLeftover();
       if (panel.hidden) return;
+      renderCalls(state);
+      renderRecap(state);
       await syncTemplates(state);
       const mine = state.combat.rows.find(row => row.key === "owner");
       const sheet = previewEncounter.current();
@@ -224,6 +227,144 @@ const partyInitiative = (() => {
         document.dispatchEvent(new Event("preview-encounter-change"));
       }
     };
+  }
+  // Reaction calls from the DM (R82): a creature is leaving reach, casting a spell or attacking.
+  // The player answers React or Pass; an opportunity attack spends the reaction here, and a
+  // reaction spell is cast from the sheet as usual.
+  const CALL_PHRASES = {leaves_reach: "is leaving your reach", casts_spell: "is casting a spell", attacks: "is attacking", other: "is doing something"};
+  const OPPORTUNITY = "Opportunity attack";
+  const callChoices = new Map();
+  let callsKey, callBusy = false;
+  const OTHER = "Another reaction";
+  function reactionOptions() {
+    const names = [OPPORTUNITY];
+    for (const tools of document.querySelectorAll('.option-execute[data-turn-cost="reaction"]')) {
+      const row = tools.closest("article");
+      const title = row?.querySelector(".option-title") || row?.querySelector("h3");
+      const name = title?.textContent.trim();
+      if (name && !names.includes(name)) names.push(name);
+    }
+    names.push(OTHER);
+    return names;
+  }
+  function defaultReaction(trigger, options) {
+    const find = pattern => options.find(name => pattern.test(name));
+    return (trigger === "casts_spell" ? find(/counterspell|silvery barbs/i)
+      : trigger === "attacks" ? find(/^shield\b|protection|parry|uncanny dodge|silvery barbs/i)
+      : trigger === "leaves_reach" ? OPPORTUNITY : null) || OTHER;
+  }
+  // A player who can't react is never prompted: the sheet passes for them and tells the DM
+  // why (their reaction is spent, or nothing on the sheet answers this kind of call). A spell
+  // call needs a Counterspell-like reaction, an attack call a Shield-like one; anyone can make
+  // an opportunity attack. Names are matched across every option and feature on the sheet,
+  // because some reactions (such as the Protection fighting style) aren't tagged as reactions.
+  const ANSWERS = {
+    casts_spell: /counterspell|silvery barbs|^shield\b|absorb elements|spell ?breaker/i,
+    attacks: /^shield\b|protection|interception|parry|uncanny dodge|defensive duelist|deflect|silvery barbs|warding flare|cutting words|riposte|sentinel|hellish rebuke|tactical shift|bulwark/i,
+  };
+  function sheetNames() {
+    const names = new Set(reactionOptions());
+    for (const title of document.querySelectorAll("#action-groups .option-title")) {
+      const name = title.textContent.trim();
+      if (name) names.add(name);
+    }
+    return [...names];
+  }
+  function unable(call, used) {
+    if (used) return "used";
+    const pattern = ANSWERS[call.trigger];
+    return pattern && !sheetNames().some(name => pattern.test(name)) ? "no_reaction" : null;
+  }
+  const autoPassed = new Set();
+  async function autoPass(call, reason) {
+    if (autoPassed.has(call.id)) return;
+    autoPassed.add(call.id);
+    try { await templateEdit({kind: "answer_call", id: call.id, answer: {reacted: false, note: "", unable: reason}}); }
+    catch (error) { autoPassed.delete(call.id); railError(error.message); }
+  }
+  function renderCalls(state) {
+    const host = document.getElementById("party-calls");
+    if (!host) return;
+    const encounter = previewEncounter.current();
+    const used = actionEconomy.tracking(encounter, "owner") ? actionEconomy.reason(encounter, "owner", "reaction", true) : "";
+    const all = board() ? state.combat.calls || [] : [];
+    for (const call of all) if (!call.answer) { const reason = unable(call, used); if (reason) autoPass(call, reason); }
+    const calls = all.filter(call => !(call.answer ? call.answer.unable : autoPassed.has(call.id)));
+    const options = reactionOptions();
+    const key = JSON.stringify([calls, options, used, callBusy]);
+    if (key === callsKey) return;
+    callsKey = key;
+    for (const id of callChoices.keys()) if (!calls.some(call => call.id === id)) callChoices.delete(id);
+    for (const id of autoPassed) if (!all.some(call => call.id === id)) autoPassed.delete(id);
+    host.hidden = !calls.length;
+    host.replaceChildren(...calls.map(call => {
+      const card = document.createElement("form");
+      card.className = "focus-form party-card party-call";
+      const heading = document.createElement("strong");
+      heading.textContent = call.source + " " + (CALL_PHRASES[call.trigger] || CALL_PHRASES.other) + (call.detail ? ": " + call.detail : "") + ".";
+      card.append(heading);
+      if (call.answer) {
+        card.append(" " + (call.answer.reacted ? "You react" + (call.answer.note ? " with " + call.answer.note : "") + ". The DM has your answer." : "You pass."));
+        return card;
+      }
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Reaction to use");
+      for (const name of options) select.add(new Option(name, name));
+      select.value = callChoices.get(call.id) || defaultReaction(call.trigger, options);
+      select.onchange = () => callChoices.set(call.id, select.value);
+      const react = document.createElement("button");
+      react.textContent = "React";
+      const pass = document.createElement("button");
+      pass.type = "button";
+      pass.textContent = "Pass";
+      react.disabled = pass.disabled = callBusy;
+      const note = document.createElement("small");
+      note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual.";
+      select.addEventListener("change", () => { note.textContent = select.value === OPPORTUNITY ? "Reacting spends your reaction here." : "Cast or use it from your sheet as usual."; });
+      const answer = async reacted => {
+        if (callBusy) return;
+        callBusy = true;
+        callsKey = null;
+        try {
+          await templateEdit({kind: "answer_call", id: call.id, answer: {reacted, note: reacted && select.value !== OTHER ? select.value : ""}});
+          if (reacted && select.value === OPPORTUNITY)
+            await previewEncounter.transact(draft => actionEconomy.spend(draft, "owner", "reaction", true) && "an opportunity attack");
+        } catch (error) { railError(error.message); }
+        finally { callBusy = false; callsKey = null; renderCalls(view); }
+      };
+      card.onsubmit = event => { event.preventDefault(); answer(true); };
+      pass.onclick = () => answer(false);
+      const label = document.createElement("label");
+      label.append("Use ", select);
+      card.append(label, react, pass, note);
+      return card;
+    }));
+  }
+  // End-of-fight recap (R86): once the DM ends the encounter, the room's log summed up, with
+  // a button to keep it in the Journal.
+  let recapKey;
+  function renderRecap(state) {
+    const host = document.getElementById("party-recap");
+    if (!host) return;
+    const recap = board() && !state.combat.running ? fightRecap(state.combat.log) : null;
+    const key = JSON.stringify([recap?.text]);
+    if (key === recapKey) return;
+    recapKey = key;
+    host.hidden = !recap;
+    document.getElementById("party-recap-body").replaceChildren(...(recap?.lines || []).map(text => {
+      const line = document.createElement("p");
+      line.textContent = text;
+      return line;
+    }));
+    document.getElementById("party-recap-journal").onclick = () => recap && journalControls.draft("Fight recap", recap.text);
+  }
+  function railError(message) {
+    const note = document.getElementById("party-encounter-note");
+    if (!note) return;
+    note.textContent = message;
+    note.hidden = false;
+    note.dataset.error = "true";
+    setTimeout(() => { delete note.dataset.error; document.dispatchEvent(new Event("preview-encounter-change")); }, 6000);
   }
   // A Protector cannon shows its 10-foot healing range on the map for as long as it is
   // around, as a template centred on the cannon's token. Its inside list picks the allies a
@@ -267,7 +408,8 @@ const partyInitiative = (() => {
     return result;
   }
   // Owlbear spell templates. The room keeps them; the DM's Owlbear extension draws them.
-  const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"around me"};
+  const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"aura around you"};
+  const LASTS = {turn:"This turn", concentration:"While you concentrate", removed:"Until you remove it"};
   async function templateEdit(edit) {
     if (!sendEdit || !board()?.joined) throw new Error("Join the party encounter to place templates.");
     for (let attempt = 1; ; attempt++) {
@@ -379,14 +521,23 @@ const partyInitiative = (() => {
         try { await templateEdit({kind:"clear_template", id:template.id}); }
         catch (error) { remove.disabled = false; remove.title = error.message; }
       };
-      title.append(name, " · " + template.size + " ft " + SHAPES[template.shape] + " ", remove);
+      // The name on its own line with the remove button beside it, and the shape and duration
+      // underneath, so a long name never splits the size across lines.
+      title.className = "party-template-head";
+      const heading = document.createElement("span");
+      const meta = document.createElement("small");
+      meta.textContent = template.size + "-ft " + (SHAPES[template.shape] || template.shape) + (LASTS[template.lasts] ? " · " + LASTS[template.lasts] : "");
+      heading.append(name, meta);
+      title.append(heading, remove);
       card.append(title);
+      if (template.damage) card.append(ruleLine(template));
       const pick = pickFor(template);
       const suggested = new Set(template.inside || []);
       const note = document.createElement("p");
       note.className = "party-template-note";
-      note.textContent = template.inside === undefined ? "Waiting for the DM's map to say who is inside."
-        : suggested.size ? "Inside on the map:" : "Nobody is inside on the map.";
+      note.className = "party-template-label";
+      note.textContent = template.inside === undefined ? "Targets · waiting for the map"
+        : suggested.size ? "Targets · inside on the map" : "Targets · nobody inside on the map";
       card.append(note);
       const list = document.createElement("div");
       list.className = "party-template-targets";
@@ -407,7 +558,7 @@ const partyInitiative = (() => {
       if (others.length) {
         const more = document.createElement("details");
         const summary = document.createElement("summary");
-        summary.textContent = "Add someone else";
+        summary.textContent = "Add a target";
         more.append(summary, ...others.map(box));
         list.append(more);
       }
@@ -438,6 +589,15 @@ const partyInitiative = (() => {
       return card;
     }));
   }
+  // "3d8 radiant · WIS save DC 15, half" under the template's name.
+  function ruleLine(template) {
+    const rule = document.createElement("p");
+    rule.className = "party-template-rule";
+    const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
+      + (template.save.on_success === "half" ? ", half" : ", none") + " on a success" : "";
+    rule.textContent = template.damage + " " + (template.damage_type || "") + save;
+    return rule;
+  }
   // The damage line, the send button and the outcome of the latest application.
   function areaControls(template, pick, chosen, rows) {
     const nodes = [];
@@ -455,8 +615,6 @@ const partyInitiative = (() => {
     }
     const line = document.createElement("p");
     line.className = "party-template-damage";
-    const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
-      + (template.save.on_success === "half" ? ", half on a success" : ", none on a success") : "";
     const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? "", placeholder:"Total"});
     amount.setAttribute("aria-label", template.spell + " damage");
     amount.oninput = () => {
@@ -466,19 +624,15 @@ const partyInitiative = (() => {
     const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button",
       textContent: pick.rolled == null ? "Roll" : "Reroll", title:"Roll " + template.damage});
     reroll.onclick = () => { pick.rolled = rollDice(template.damage); renderTemplates(); };
-    // The rule on its own line, then the total and the roll button.
-    const rule = document.createElement("p");
-    rule.className = "party-template-note";
-    rule.textContent = template.damage + " " + (template.damage_type || "") + save;
-    line.append("Damage ", amount, " ", reroll);
-    nodes.push(rule, line);
+    line.append(amount, reroll);
     const names = new Map(rows.map(row => [row.id, rowName(row)]));
     if (latest) {
       const outcome = document.createElement("p");
-      outcome.className = "party-template-note";
+      outcome.className = "party-template-status";
+      outcome.dataset.state = latest.results ? "applied" : "waiting";
       outcome.textContent = latest.results
-        ? "Applied by the DM: " + (latest.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
-        : "Sent " + latest.amount + " damage to the DM. Waiting for saves.";
+        ? "DM applied: " + (latest.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
+        : "Sent " + latest.amount + ". Waiting for the DM.";
       nodes.push(outcome);
     }
     // Instant spells are sent once. Zone spells can be sent again on later turns.
@@ -486,7 +640,8 @@ const partyInitiative = (() => {
     const pending = latest && !latest.results;
     const blocked = () => !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled);
     send = Object.assign(document.createElement("button"), {type:"button",
-      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM", disabled: blocked()});
+      className:"party-template-send", textContent: latest && repeat ? "Send again" : "Send to DM", disabled: blocked()});
+    send.title = "Send the damage and targets to the DM, who rolls saves and applies it";
     send.onclick = async () => {
       send.disabled = true;
       try {
@@ -495,9 +650,8 @@ const partyInitiative = (() => {
         pick.sentRoll = pick.rolled;
       } catch (error) { send.disabled = false; send.title = error.message; }
     };
-    const actions = document.createElement("p");
-    actions.append(send);
-    nodes.push(actions);
+    line.append(send);
+    nodes.push(line);
     return nodes;
   }
   const templates = {
@@ -507,6 +661,8 @@ const partyInitiative = (() => {
     place: template => templateEdit({kind:"place_template", template}),
     // A save spell aimed from the cast dialog without a template (R76).
     sendSpell: request => templateEdit({kind:"send_spell", request}),
+    // Tells the fight log about a cast (R86). Only while the shared encounter is running.
+    logCast: spell => board()?.joined && board().running ? templateEdit({kind:"cast", spell}) : Promise.resolve(),
     rollDice,
     auraTargets,
   };

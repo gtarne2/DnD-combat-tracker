@@ -55,6 +55,15 @@
         <button data-edit="start" class="dm-secondary"><svg class="icon" aria-hidden="true"><use href="#gi-crossed-swords"/></svg><span>Start / resume encounter</span></button>
         <button data-edit="end" class="dm-danger"><svg class="icon" aria-hidden="true"><use href="#gi-stop-sign"/></svg><span>End encounter</span></button>
       </div>
+      <div id="dm-difficulty" class="dm-difficulty" hidden>
+        <p id="dm-difficulty-line" class="dm-difficulty-line" role="status"></p>
+        <details class="dm-difficulty-more"><summary>Party and rules</summary>
+          <label>Party level <input id="dm-party-level" type="number" min="1" max="20" value="1"></label>
+          <label>Players <input id="dm-party-size" type="number" min="1" max="12" placeholder="auto"></label>
+          <label>Rules <select id="dm-difficulty-rules"><option value="auto">Match the monster packs</option><option value="2014">2014 DMG</option><option value="2024">2024 DMG</option></select></label>
+          <p id="dm-difficulty-detail" class="dm-waiting-hint"></p>
+        </details>
+      </div>
       <ul id="dm-concentration" class="dm-concentration" aria-live="polite" hidden></ul>
       <ol id="dm-turns" class="dm-turns" aria-hidden="true"></ol>
       <p class="dm-turns-empty" id="dm-turns-empty">No combatants yet. Players appear here when they join the room. Add enemies from the Monster library.</p>
@@ -83,11 +92,24 @@
         </div>
       </details>
       <p id="dm-initiative-status" class="dm-status" role="status"></p>
-      <p id="dm-zone-note" class="dm-zone-note" role="status" hidden></p>
+      <section id="dm-calls" class="dm-areas dm-calls" aria-labelledby="dm-calls-title" hidden>
+        <h3 id="dm-calls-title">Reaction calls</h3>
+        <div id="dm-call-list"></div>
+      </section>
+      <section id="dm-zones" class="dm-areas dm-zones" aria-labelledby="dm-zones-title" hidden>
+        <h3 id="dm-zones-title">Lasting spell areas</h3>
+        <p class="dm-waiting-hint">A creature takes the damage the first time on a turn that it enters the area or when it starts its turn there. Queue it, then resolve it with the other area spells.</p>
+        <div id="dm-zone-list"></div>
+      </section>
       <section id="dm-areas" class="dm-areas" aria-labelledby="dm-areas-title" hidden>
         <h3 id="dm-areas-title">Area spells to resolve</h3>
         <p class="dm-waiting-hint">Assist rolls each save from the stat block or the player's shared sheet. Check the results, then Apply.</p>
         <div id="dm-area-list"></div>
+      </section>
+      <section id="dm-recap" class="dm-areas dm-recap" aria-labelledby="dm-recap-title" hidden>
+        <h3 id="dm-recap-title">Fight recap</h3>
+        <div id="dm-recap-body"></div>
+        <div class="dm-area-actions"><button type="button" id="dm-recap-copy">Copy recap</button><button type="button" id="dm-recap-clear" class="dm-danger-quiet">Clear recap</button></div>
       </section>
       <details class="dm-more" id="dm-more-tools">
       <summary>Game time, rosters and encounter files</summary>

@@ -62,6 +62,11 @@
     <fieldset id="cast-healing-field" hidden><legend>Apply rolled healing</legend>
       <div id="cast-healing-targets"></div><label>HP per selected target <input name="healing" type="number" min="1" max="4294967295"></label>
     </fieldset>
+    <fieldset id="cast-summon-field" hidden><legend>Summoned creature</legend>
+      <label id="cast-summon-form-label">Form <select name="summonForm"></select></label>
+      <label><input type="checkbox" name="summon" checked> Add it to Companions</label>
+      <p id="cast-summon-preview" class="cast-summon-preview"></p>
+    </fieldset>
     <fieldset id="cast-target-field" hidden><legend>Spell targets</legend><div id="cast-targets"></div><p id="cast-target-feedback" role="status"></p></fieldset>
     <fieldset id="cast-map-field" hidden><legend>Owlbear template</legend>
       <label><input type="checkbox" name="mapPlace"> Place a template at my token</label>

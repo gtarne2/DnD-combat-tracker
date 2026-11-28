@@ -165,6 +165,22 @@ fn the_sheet_uses_the_overlay_only_for_matching_imports() {
     assert!(html.contains(&format!("data-spell-colour=\"{}\"", fire.unwrap())));
     assert!(html.contains("data-spell-look=\"fire\""));
     assert!(html.contains("data-spell-overlay"));
+
+    // R83: Summon Beast from Tasha's carries its spirit's numbers to the cast dialog, and the
+    // sheet names the caster's spell attack for its attacks.
+    let summon = spell("Summon Beast")
+        .summon
+        .expect("Summon Beast has overlay numbers");
+    let parsed: serde_json::Value = serde_json::from_str(&summon).unwrap();
+    assert_eq!(parsed["creature"], "Bestial Spirit");
+    assert_eq!(parsed["level"], 2);
+    assert_eq!(parsed["forms"], serde_json::json!(["Air", "Land", "Water"]));
+    assert_eq!(parsed["hp"]["form"]["Air"], 20);
+    assert_eq!(parsed["attacks"][0]["dice"], "1d8");
+    assert!(html.contains("data-spell-summon=\"{&quot;name&quot;:&quot;Summon Beast&quot;"));
+    assert!(html.contains("id=\"spell-rolls\" hidden data-attack=\"+7\""));
+    let entry = overlay().spell_summon("Summon Beast", Some("Homebrew Workshop"));
+    assert!(entry.is_none(), "a homebrew book keeps its own text");
 }
 
 #[test]

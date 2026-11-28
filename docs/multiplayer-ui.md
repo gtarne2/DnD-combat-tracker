@@ -1,6 +1,6 @@
 # Multiplayer UI handoff
 
-Start here for a multiplayer UI rework. The baseline is P09D, and the user-facing contract is R31–R53. Read the architecture section for the surface you are changing. Use the phase history for exact verification and P10 for remaining release work. [Requirements](requirements.md#user-requirements) · [Architecture](architecture.md#home-wi-fi-multiplayer) · [Current handoff](handoff.md) · [P10](local-multiplayer-plan.md#p10--package-and-rehearse-a-full-session)
+Start here for a multiplayer UI rework. The baseline is P09D plus the table-feedback, Owlbear and playtest rounds through R80, and the table tools R82–R86 (see the [handoff baseline](handoff.md#product-baseline)); the core multiplayer contract is R31–R53, with later behavior in R56–R86 (R81 is reserved by the Mac PR). Read the architecture section for the surface you are changing. Use the phase history for exact verification and P10 for remaining release work. [Requirements](requirements.md#user-requirements) · [Architecture](architecture.md#home-wi-fi-multiplayer) · [Current handoff](handoff.md) · [P10](local-multiplayer-plan.md#p10--package-and-rehearse-a-full-session)
 
 ## Entry points and owners
 
@@ -25,7 +25,7 @@ The Windows launcher embeds the DM assets through [build.cmd](../launcher/build.
 
 - Treat browser projections as the view state. The browser polls its capability-scoped loopback helper from `party.js`. The guest helper separately long-polls the LAN host. A browser redraw, an initiative revision, an inspection publication and a mechanical clock delivery can arrive at different times. Updates to presence, shared AC and offers can occur without an initiative revision. Keep drafts, selection and focus stable on unrelated polls, and clear private content promptly when permission changes.
 - Keep authenticated commands and their outcomes in the owning layer. [RoomService](../src/party.rs) owns command replay and serialization, [the room model](../src/party/model.rs) owns room state transitions, and the player writer owns local HP, effects, slots and receipts. Persist the same IDs across a retry and render success after the owning commit. Keep capability URLs, raw saves, unshared fields, private rolls and live ledgers out of screenshots, logs and portable backups.
-- Protocol 2 is the shipped LAN packet version. `/v1/party` is the existing endpoint path. Use matching helper packages for all peers. Same-room roster saves and player backups exist. Portable DM encounter export/import and re-pairing in a new room are P10 work. [Transport](architecture.md#windows-launcher-and-party-transport) · [Portable backup boundaries](architecture.md#session-portability-and-combat-controls)
+- Protocol 2 is the shipped LAN packet version. `/v1/party` is the existing endpoint path. Use matching helper packages for all peers. Same-room roster saves, player backups and portable DM encounter export/import with re-pairing in a new room (P10 first part) exist. The full packaged rehearsal is the remaining P10 work. [Transport](architecture.md#windows-launcher-and-party-transport) · [Portable backup boundaries](architecture.md#session-portability-and-combat-controls)
 
 ## Test the rework
 

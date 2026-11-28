@@ -292,6 +292,13 @@ impl Actions {
         strike.assist_damage = review.assist_damage;
         Ok(true)
     }
+    /// The name of a recorded action, such as "Multiattack".
+    pub(super) fn action_name(&self, action: Uuid) -> Option<String> {
+        self.history
+            .iter()
+            .find(|entry| entry.input.id == action)
+            .map(|entry| entry.name.clone())
+    }
     pub(super) fn strike(
         &self,
         action: Uuid,

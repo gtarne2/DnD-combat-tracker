@@ -1,11 +1,14 @@
 # Aurora Combat Tracker
 
-A personal Windows companion app for characters built in Aurora. It brings attacks, spells, scrolls, and companion abilities together on a combat sheet and keeps encounter state between sessions.
+A personal Windows companion app for D&D 5e characters built in Aurora. It brings attacks, spells, scrolls, and companion abilities together on a combat sheet and keeps encounter state between sessions. A DM can host a home Wi-Fi party with a dashboard, monster library and shared initiative, and link it to an Owlbear Rodeo map.
+
+Current development happens on the `dev` branch. Start with the [handoff](docs/handoff.md) for what ships, what is open and what is planned.
 
 - [User requirements](docs/requirements.md)
 - [Architecture](docs/architecture.md)
 - [Windows development and workflow](docs/development.md)
 - [Multiplayer UI handoff](docs/multiplayer-ui.md)
+- [Owlbear Rodeo extension](owlbear/) · manifest `https://gtarne2.github.io/DnD-combat-tracker/manifest.json`
 - [Shared agent instructions](AGENTS.md) · [Current development handoff](docs/handoff.md)
 
 ## Open the tracker on Windows
@@ -25,6 +28,18 @@ Use the same current package on every computer. For an **Incompatible party vers
 In **Host as DM**, open **Monster library** to search the bundled SRD packs offline. The library opens on **2014 (SRD 5.1)**. Choose **2024 (SRD 5.2.1)** from Pack to use the newer rules in the same encounter. Select a creature to preview its rules and add it to initiative. **Pack credits** shows the source and license. [2014 notices](content/monster-packs/SRD-5.1-NOTICES.txt) · [2024 notices](content/monster-packs/SRD-5.2.1-NOTICES.txt)
 
 Players submit their turn order in **Combat → Initiative**. In **Session → Party**, they choose **Party name only**, **Vitals**, or **Character details** and can answer DM questions and accept or decline offers at any sharing level. The DM starts and advances the encounter, records strikes under **Monster actions**, and uses **Recorded actions** to ask about a strike or confirm final damage. **Manual** is the default. **Assist** offers optional rolls, comparisons and damage suggestions from available rules and defenses. **Save current roster** saves the DM's roster and position in the same room. **Export encounter** saves the order, enemies with their stat blocks and counters, round and turn pointer to a JSON file without player identities or recorded strikes. To continue in another room, end the current encounter, choose **Import encounter**, pair each exported player seat with a player who has joined (or leave it out), then **Start / resume encounter**.
+
+To bring in more monsters, choose **Import 5etools files** or **Import 5etools folder** in the Monster library and select bestiary JSON such as `data/bestiary/bestiary-mm.json`. Each file becomes a pack named after its book and edition. To load the same books every time, add the files or folders to **5etools bestiary JSON** on the launcher's first screen; a DM room loads them when it starts.
+
+When the DM applies damage to an enemy, choose a damage type and the card applies the monster's immunities, resistances and vulnerabilities, with a **Magical or silvered** check for clauses that depend on it. **Add a timed condition** on an enemy counts down at the start or end of a chosen turn; players never see timers. A joined player casting a save spell can choose **Saving throws by the DM** to send the targets and damage to the DM's area queue, where **All failed** or **All saved** settles them in one click before **Apply**. Buff spells such as Bless, Longstrider, Shield of Faith and Warding Bond show a target list in the cast dialog and apply on each chosen player's sheet. Effects can also carry stat changes in **Stat changes**.
+
+Damage and healing sent to a player appear on their encounter rail with what accepting would do (for example HP 27 → 15 and the concentration DC), and a sheet setting can accept them automatically with Undo.
+
+During a fight, the DM can ask players about a reaction from an enemy card (**Leaves reach**, **Casts a spell**, **Attacks**): each asked player answers **React** or **Pass** on their encounter rail. A player whose reaction is spent, or who has nothing that answers that kind of call, isn't prompted; their sheet passes and the dashboard says why. The dashboard rates the encounter's difficulty for the party level and size (2014 or 2024 rules), lists **Lasting spell areas** such as Spirit Guardians so their damage can be rolled and queued when an enemy enters or starts its turn inside, and shows a fight recap when the encounter ends, which players can add to their Journal. Summon spells from Tasha's, the 2024 Player's Handbook and Fizban's (such as Summon Beast) offer **Add it to Companions** in the cast dialog, with the creature's numbers at the chosen slot.
+
+### Owlbear Rodeo
+
+In Owlbear Rodeo, add the extension from `https://gtarne2.github.io/DnD-combat-tracker/manifest.json`. On the DM's PC, open the extension, open its bridge window and enter the pairing code shown on the DM dashboard. The DM adds the encounter to the map from the extension; hidden enemies stay hidden and unnamed until revealed, and enemy tokens never show HP. Players with the extension loaded can place spell templates from the cast dialog, see who is inside, and send area damage to the DM's queue. The token whose turn it is gets a yellow ring and a downed row gets a red ring. A player's sheet portrait (with a crop editor) becomes their token, otherwise a class icon; **Art…** in the extension sets art for a creature type or class.
 
 Supported cantrips show their dice at your character's level. Choose a slot in the cast dialog to
 preview supported damage, healing, or projectile counts. Class features can use imported counters

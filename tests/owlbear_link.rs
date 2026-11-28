@@ -816,7 +816,7 @@ fn an_area_spell_resolves_through_the_dm_queue() {
     let offers = serde_json::to_value(offers).unwrap();
     assert_eq!(offers.as_array().unwrap().len(), 1);
     assert_eq!(offers[0]["effect"], json!({"kind":"damage","amount":14}));
-    assert_eq!(offers[0]["source"], "Fireball (area)");
+    assert_eq!(offers[0]["source"], "Fireball (area, fire, saved)");
     assert!(
         serde_json::to_value(service.poll(PLAYER, room, 0).unwrap().offers)
             .unwrap()

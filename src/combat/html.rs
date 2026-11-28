@@ -726,6 +726,7 @@ fn render_option_row(html: &mut String, option: &CombatOption, group: ActionGrou
     roll_attribute(html, "data-spell-colour", spell.colour.as_deref());
     roll_attribute(html, "data-spell-look", spell.look.as_deref());
     roll_attribute(html, "data-spell-buff", spell.buff.as_deref());
+    roll_attribute(html, "data-spell-summon", spell.summon.as_deref());
     if spell.overlay {
         html.push_str(" data-spell-overlay");
     }
@@ -924,6 +925,18 @@ fn render_rolls(html: &mut String, sheet: &CombatSheet) {
             }
         }
         html.push_str("></span>");
+    }
+    // The first spellcasting attack, for summoned creatures' attacks (R83).
+    if let Some(attack) = sheet
+        .casting_rolls
+        .iter()
+        .find_map(|casting| casting.attack_bonus)
+    {
+        write!(
+            html,
+            "<span id=\"spell-rolls\" hidden data-attack=\"{attack:+}\"></span>"
+        )
+        .unwrap();
     }
     let rolls = &sheet.profile.rolls;
     html.push_str("<dialog id=\"roll-dialog\" aria-labelledby=\"roll-heading\"><div class=\"dialog-heading\"><h2 id=\"roll-heading\">Roll Bonuses</h2><form method=\"dialog\"><button>Close</button></form></div><div class=\"roll-tools\"><label class=\"visually-hidden\" for=\"roll-search\">Search roll bonuses</label><input id=\"roll-search\" type=\"search\" placeholder=\"Search rolls\" autofocus><div class=\"roll-tabs\" role=\"group\" aria-label=\"Roll categories\">");

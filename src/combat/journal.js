@@ -1,4 +1,4 @@
-(() => {
+const journalControls = (() => {
   const byId = (id) => document.getElementById(id);
   const dialog = byId("journal-entry-editor");
   const form = byId("journal-entry-form");
@@ -88,4 +88,6 @@
   };
   document.addEventListener("preview-encounter-change", render);
   render();
+  // Opens the entry editor with a title and text filled in, such as a fight recap.
+  return {draft: (title, body) => open({title, body})};
 })();

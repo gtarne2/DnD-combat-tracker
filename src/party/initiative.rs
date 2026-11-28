@@ -2,6 +2,10 @@ use super::interruptions::WindowEdit;
 use super::monster_actions::{
     ActionEdit, Actions, DamageDecision, DamageRoll, Outcome, Reset, StrikeReview,
 };
+use super::table::{
+    CallAnswer, LogEntry, LogEvent, MAX_CALL_RECIPIENTS, MAX_CALLS, MAX_LOG, Named, NewCall,
+    ReactionCall, short_text,
+};
 use super::wire::{Event, Rejection};
 use crate::monsters::Snapshot;
 use serde::{Deserialize, Serialize};
@@ -324,6 +328,33 @@ pub enum Edit {
     DismissArea {
         id: Uuid,
     },
+    /// The DM queues a lasting template's damage for creatures that start a turn in it or
+    /// enter it, such as Spirit Guardians (R84). It resolves like the caster's own send.
+    QueueZone {
+        id: Uuid,
+        template: Uuid,
+        targets: Vec<Uuid>,
+        amount: u32,
+    },
+    /// The DM asks players whether they react to a creature (R82).
+    CallReaction {
+        call: NewCall,
+    },
+    /// A player answers a reaction call addressed to them.
+    AnswerCall {
+        id: Uuid,
+        answer: CallAnswer,
+    },
+    /// The DM closes a reaction call.
+    DismissCall {
+        id: Uuid,
+    },
+    /// A player tells the fight log they cast a spell (R86).
+    Cast {
+        spell: String,
+    },
+    /// The DM clears the fight log before the next fight.
+    ClearLog,
     /// The owner of the current row ends that turn. Same effect as the DM's Next.
     EndTurn {
         id: Uuid,
@@ -338,6 +369,9 @@ pub enum Edit {
         id: Option<Uuid>,
         score: i32,
         enemy: Enemy,
+        /// Who caused an HP loss, for the fight log: usually the row whose turn it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<Uuid>,
     },
     AddMonsters {
         template: Box<Snapshot>,
@@ -728,6 +762,10 @@ pub struct Fight {
     templates: Vec<PlacedTemplate>,
     #[serde(default)]
     areas: Vec<QueuedArea>,
+    #[serde(default)]
+    calls: Vec<ReactionCall>,
+    #[serde(default)]
+    log: Vec<LogEntry>,
 }
 
 impl Default for Fight {
@@ -744,6 +782,8 @@ impl Default for Fight {
             saves: BTreeMap::new(),
             templates: Vec::new(),
             areas: Vec::new(),
+            calls: Vec::new(),
+            log: Vec::new(),
         }
     }
 }
@@ -843,6 +883,43 @@ fn number_duplicates(rows: &mut [Row], added: usize) {
 
 pub(super) fn label(value: &str) -> bool {
     !value.trim().is_empty() && value.chars().count() <= 120 && !value.chars().any(char::is_control)
+}
+
+/// A row as the fight log names it.
+fn named(rows: &[Row], id: Uuid) -> Option<Named> {
+    let row = rows.iter().find(|r| r.id == id)?;
+    Some(match &row.actor {
+        Participant::Enemy(enemy) => Named {
+            id,
+            name: enemy.name.clone(),
+            alias: enemy.revealed.then(|| enemy.alias.clone()),
+            enemy: true,
+            member: None,
+        },
+        Participant::Player { member, name, .. } | Participant::Companion { member, name, .. } => {
+            Named {
+                id,
+                name: name.clone(),
+                alias: None,
+                enemy: false,
+                member: Some(*member),
+            }
+        }
+    })
+}
+
+/// The row of a member's own character.
+fn player_row(rows: &[Row], member: Uuid) -> Option<Uuid> {
+    rows.iter()
+        .find(|r| r.player() == Some(member))
+        .map(|r| r.id)
+}
+
+fn push_log(log: &mut Vec<LogEntry>, round: u32, event: LogEvent) {
+    if log.len() >= MAX_LOG {
+        log.remove(0);
+    }
+    log.push(LogEntry { round, event });
 }
 
 impl Fight {
@@ -966,6 +1043,35 @@ impl Fight {
                 })
                 .collect::<Vec<_>>()
         );
+        let rows = &self.position.rows;
+        let source_name = |id: Uuid| match rows.iter().find(|r| r.id == id).map(|r| &r.actor) {
+            Some(Participant::Enemy(enemy)) if dm => enemy.name.clone(),
+            Some(Participant::Enemy(enemy)) if enemy.revealed => enemy.alias.clone(),
+            Some(Participant::Enemy(_)) | None => "A hidden creature".into(),
+            Some(Participant::Player { name, .. } | Participant::Companion { name, .. }) => {
+                name.clone()
+            }
+        };
+        view["calls"] = json!(
+            self.calls
+                .iter()
+                .filter(|c| dm || c.call.recipients.contains(&viewer))
+                .map(|c| c.view(viewer, dm, source_name(c.call.source)))
+                .collect::<Vec<_>>()
+        );
+        // The DM follows the log live; players get the recap once the fight has ended.
+        if dm || !self.running {
+            let revealed = |id: Uuid| match rows.iter().find(|r| r.id == id).map(|r| &r.actor) {
+                Some(Participant::Enemy(enemy)) if enemy.revealed => Some(enemy.alias.clone()),
+                _ => None,
+            };
+            view["log"] = json!(
+                self.log
+                    .iter()
+                    .map(|entry| entry.view(dm, &revealed))
+                    .collect::<Vec<_>>()
+            );
+        }
         view
     }
 
@@ -1153,13 +1259,14 @@ impl Fight {
     }
 
     /// Record the DM's decision on a queued area and lower each enemy's HP. Returns the players
-    /// to send damage offers to, as (member, amount), and the spell name for the offer source.
+    /// to send damage offers to, as (member, amount, offer source). The source names the spell,
+    /// its damage type and the player's save, such as "Fireball (area, fire, saved)".
     pub(super) fn apply_area(
         &mut self,
         cmd: &FightEdit,
         id: Uuid,
         results: &[AreaResult],
-    ) -> Result<(String, Vec<(Uuid, u32)>), Rejection> {
+    ) -> Result<Vec<(Uuid, u32, String)>, Rejection> {
         self.check_revision(cmd)?;
         let area = self
             .areas
@@ -1183,27 +1290,72 @@ impl Fight {
         }
         // The offer's source on the player's sheet: an area from the map, or a spell aimed
         // from the sheet.
-        let spell = if area.request.template.is_nil() {
-            format!("{} (spell)", area.spell)
+        let how = if area.request.template.is_nil() {
+            "spell"
         } else {
-            format!("{} (area)", area.spell)
+            "area"
+        };
+        let damage_type = area.damage_type.clone();
+        let spell_name = area.spell.clone();
+        let source = |save: Option<&str>| {
+            let mut parts = vec![how.to_string()];
+            parts.extend(damage_type.clone());
+            match save {
+                Some("succeeded") => parts.push("saved".into()),
+                Some("failed") => parts.push("failed save".into()),
+                _ => {}
+            }
+            format!("{} ({})", spell_name, parts.join(", "))
         };
         let mut offers = Vec::new();
+        let caster = player_row(&self.position.rows, area.member)
+            .and_then(|row| named(&self.position.rows, row));
+        let what = Some(area.spell.clone());
+        let round = self.position.round;
         for result in results {
+            let target = named(&self.position.rows, result.row);
             let Some(row) = self.position.rows.iter_mut().find(|r| r.id == result.row) else {
                 continue;
             };
+            let mut lost = 0;
+            let mut downed = false;
             match &mut row.actor {
                 Participant::Enemy(enemy) => {
                     if let Some(hp) = &mut enemy.hp {
+                        let before = *hp;
                         *hp = hp.saturating_sub(result.amount);
+                        lost = before - *hp;
+                        downed = before > 0 && *hp == 0;
                     }
                 }
                 Participant::Player { member, .. } if result.amount > 0 => {
-                    offers.push((*member, result.amount));
+                    offers.push((*member, result.amount, source(result.save.as_deref())));
+                    lost = result.amount;
                 }
                 // Companions and zero damage are settled at the table.
                 _ => {}
+            }
+            if let Some(to) = target.filter(|_| lost > 0) {
+                push_log(
+                    &mut self.log,
+                    round,
+                    LogEvent::Damage {
+                        by: caster.clone(),
+                        to: to.clone(),
+                        amount: lost,
+                        what: what.clone(),
+                    },
+                );
+                if downed {
+                    push_log(
+                        &mut self.log,
+                        round,
+                        LogEvent::Down {
+                            who: to,
+                            by: caster.clone(),
+                        },
+                    );
+                }
             }
         }
         let area = self
@@ -1232,7 +1384,40 @@ impl Fight {
             });
         }
         self.revised();
-        Ok((spell, offers))
+        Ok(offers)
+    }
+
+    /// Log damage the DM sent a player for a recorded monster strike.
+    pub(super) fn log_strike_damage(&mut self, action: Uuid, strike: Uuid, amount: u32) {
+        let Some((source, target)) = self.position.rows.iter().find_map(|row| {
+            let (strike, _) = row.actions.strike(action, strike)?;
+            Some((row.id, strike.target))
+        }) else {
+            return;
+        };
+        let rows = &self.position.rows;
+        let what = rows
+            .iter()
+            .find(|r| r.id == source)
+            .and_then(|r| r.actions.action_name(action));
+        let (Some(by), Some(to)) = (
+            named(rows, source),
+            target.and_then(|t| {
+                named(rows, t).or_else(|| player_row(rows, t).and_then(|r| named(rows, r)))
+            }),
+        ) else {
+            return;
+        };
+        push_log(
+            &mut self.log,
+            self.position.round,
+            LogEvent::Damage {
+                by: Some(by),
+                to,
+                amount,
+                what,
+            },
+        );
     }
 
     /// IDs of the templates on the map.
@@ -1300,7 +1485,14 @@ impl Fight {
         cmd: &FightEdit,
         players: &BTreeMap<Uuid, String>,
     ) -> Result<Vec<(Uuid, Event)>, Rejection> {
-        self.check_revision(cmd)?;
+        // A cast is logged against whatever revision the room is at (see below).
+        if matches!(cmd.edit, Edit::Cast { .. }) {
+            if self.id != cmd.encounter_id {
+                return Err(Rejection::RevisionConflict);
+            }
+        } else {
+            self.check_revision(cmd)?;
+        }
         if dm
             == matches!(
                 cmd.edit,
@@ -1312,6 +1504,8 @@ impl Fight {
                     | Edit::ConfirmTemplate { .. }
                     | Edit::SendArea { .. }
                     | Edit::SendSpell { .. }
+                    | Edit::AnswerCall { .. }
+                    | Edit::Cast { .. }
             )
         {
             return Err(Rejection::Forbidden);
@@ -1494,6 +1688,121 @@ impl Fight {
                     results: None,
                 });
             }
+            Edit::QueueZone {
+                id,
+                template,
+                targets,
+                amount,
+            } => {
+                let unique: BTreeSet<Uuid> = targets.iter().copied().collect();
+                let placed = self
+                    .templates
+                    .iter()
+                    .find(|t| t.template.id == *template)
+                    .ok_or(Rejection::InvalidInput)?;
+                if targets.is_empty()
+                    || unique.len() != targets.len()
+                    || targets.len() > MAX_TEMPLATE_TARGETS
+                    || *amount > 100_000
+                    || placed.template.damage.is_none()
+                    || !targets.iter().all(|t| rows.iter().any(|r| r.id == *t))
+                    || self.areas.iter().any(|a| a.request.id == *id)
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                self.areas.push(QueuedArea {
+                    member: placed.member,
+                    spell: placed.template.spell.clone(),
+                    request: AreaRequest {
+                        id: *id,
+                        template: *template,
+                        amount: *amount,
+                        targets: targets.clone(),
+                    },
+                    damage_type: placed.template.damage_type.clone(),
+                    save: placed.template.save.clone(),
+                    round: self.position.round,
+                    results: None,
+                });
+            }
+            Edit::CallReaction { call } if self.running => {
+                let unique: BTreeSet<Uuid> = call.recipients.iter().copied().collect();
+                let members: BTreeSet<Uuid> = rows.iter().filter_map(Row::player).collect();
+                if call.recipients.is_empty()
+                    || unique.len() != call.recipients.len()
+                    || call.recipients.len() > MAX_CALL_RECIPIENTS
+                    || !unique.is_subset(&members)
+                    || !short_text(&call.detail)
+                    || !rows.iter().any(|r| r.id == call.source)
+                    || self.calls.iter().any(|c| c.call.id == call.id)
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                if self.calls.len() >= MAX_CALLS {
+                    self.calls.remove(0);
+                }
+                let mut call = call.clone();
+                call.detail = call.detail.trim().to_string();
+                self.calls.push(ReactionCall {
+                    call,
+                    round: self.position.round,
+                    answers: BTreeMap::new(),
+                });
+            }
+            Edit::AnswerCall { id, answer } => {
+                let call = self
+                    .calls
+                    .iter_mut()
+                    .find(|c| c.call.id == *id && c.call.recipients.contains(&actor))
+                    .ok_or(Rejection::StaleWindow)?;
+                if !short_text(&answer.note)
+                    || (answer.reacted && answer.unable.is_some())
+                    || call.answers.contains_key(&actor)
+                {
+                    return Err(Rejection::InvalidInput);
+                }
+                let mut answer = answer.clone();
+                answer.note = answer.note.trim().to_string();
+                call.answers.insert(actor, answer.clone());
+                if answer.reacted
+                    && let Some(by) = player_row(rows, actor).and_then(|row| named(rows, row))
+                {
+                    let note = if answer.note.is_empty() {
+                        "Reaction".to_string()
+                    } else {
+                        answer.note
+                    };
+                    push_log(
+                        &mut self.log,
+                        self.position.round,
+                        LogEvent::Reaction { by, note },
+                    );
+                }
+            }
+            Edit::DismissCall { id } => {
+                let before = self.calls.len();
+                self.calls.retain(|c| c.call.id != *id);
+                if self.calls.len() == before {
+                    return Err(Rejection::InvalidInput);
+                }
+            }
+            Edit::Cast { spell } if self.running => {
+                if !label(spell) || spell.chars().count() > 80 {
+                    return Err(Rejection::InvalidInput);
+                }
+                let by = player_row(rows, actor)
+                    .and_then(|row| named(rows, row))
+                    .ok_or(Rejection::InvalidInput)?;
+                push_log(
+                    &mut self.log,
+                    self.position.round,
+                    LogEvent::Spell {
+                        by,
+                        spell: spell.trim().to_string(),
+                    },
+                );
+            }
+            Edit::ClearLog => self.log.clear(),
             Edit::AddTimer { id, timer } => {
                 if !valid_timer(timer)
                     || timer.remaining == 0
@@ -1564,12 +1873,25 @@ impl Fight {
                 self.templates
                     .retain(|t| !(t.member == actor && t.template.id == *id));
             }
-            Edit::Enemy { id, score, enemy } => {
+            Edit::Enemy {
+                id,
+                score,
+                enemy,
+                source,
+            } => {
                 if !valid_enemy(enemy) {
                     return Err(Rejection::InvalidInput);
                 }
                 let added = rows.len();
                 if let Some(id) = id {
+                    let by = source.and_then(|s| named(rows, s));
+                    let old_hp = rows
+                        .iter()
+                        .find(|r| r.id == *id)
+                        .and_then(|r| match &r.actor {
+                            Participant::Enemy(e) => e.hp,
+                            _ => None,
+                        });
                     let row = rows
                         .iter_mut()
                         .find(|r| r.id == *id && r.member().is_none())
@@ -1582,6 +1904,25 @@ impl Fight {
                     updated.template = previous.template.clone();
                     updated.timers = previous.timers.clone();
                     row.actor = Participant::Enemy(updated);
+                    if let (Some(before), Some(after)) = (old_hp, enemy.hp)
+                        && after < before
+                        && let Some(to) = named(rows, *id)
+                    {
+                        let round = self.position.round;
+                        push_log(
+                            &mut self.log,
+                            round,
+                            LogEvent::Damage {
+                                by: by.clone(),
+                                to: to.clone(),
+                                amount: before - after,
+                                what: None,
+                            },
+                        );
+                        if after == 0 {
+                            push_log(&mut self.log, round, LogEvent::Down { who: to, by });
+                        }
+                    }
                 } else {
                     rows.push(Row {
                         id: Uuid::new_v4(),
@@ -1887,13 +2228,26 @@ impl Fight {
             Edit::New | Edit::Load { .. } | Edit::Import { .. }
         ) {
             self.areas.clear();
+            self.log.clear();
+        }
+        // A fresh start (not a resume) begins a new fight log.
+        if phase == Phase::Enter && !was_running {
+            self.log.clear();
+        }
+        // Reaction calls are about the moment: they go when the turn moves on or the fight stops.
+        if phase == Phase::Step || !self.running {
+            self.calls.clear();
         }
         self.templates.retain(|t| {
             casters.contains(&t.member)
                 && !stopped
                 && !(t.template.lasts == Lasting::Turn && ended_turn == Some(t.member))
         });
-        self.revision += 1;
+        // A cast only feeds the fight log, which nobody sees until the fight ends. Leaving the
+        // revision alone keeps the DM's next click from colliding with every player's casts.
+        if !matches!(cmd.edit, Edit::Cast { .. }) {
+            self.revision += 1;
+        }
         let after = self.members();
         let mut deliveries = vec![];
         for member in before.union(&after).copied() {

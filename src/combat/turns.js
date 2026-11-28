@@ -160,7 +160,8 @@ const encounterTracker = (() => {
       if (!note.dataset.error) note.textContent = !joined ? "Roll initiative to join. The DM can also add you."
         : !running ? "You're in. The DM starts the encounter."
         : mine(active) ? "It's your turn. Press End Turn when you're done."
-        : "The DM runs the turn order.";
+        : "";
+      note.hidden = !note.textContent;
     }
     document.body.classList.toggle("party-encounter-active", party);
     const lastAttack = byId("last-attack");

@@ -4065,5 +4065,1173 @@
    "seconds": 3600,
    "targets": 1
   }
+ ],
+ "spell_summons": [
+  {
+   "name": "Summon Aberration",
+   "sources": [
+    "TCE"
+   ],
+   "level": 4,
+   "creature": "Aberrant Spirit",
+   "kind": "aberration",
+   "size": "Medium",
+   "forms": [
+    "Slaad",
+    "Star Spawn",
+    "Beholderkin"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 40
+   },
+   "speed": "30 ft.",
+   "abilities": [
+    16,
+    10,
+    15,
+    16,
+    10,
+    6
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Eye Ray",
+     "kind": "Ranged spell",
+     "reach": "range 150 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "psychic",
+     "forms": [
+      "Beholderkin"
+     ]
+    },
+    {
+     "name": "Claws",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 3,
+     "type": "slashing",
+     "forms": [
+      "Slaad"
+     ]
+    },
+    {
+     "name": "Psychic Slam",
+     "kind": "Melee spell",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "psychic",
+     "forms": [
+      "Star Spawn"
+     ]
+    }
+   ],
+   "features": [
+    "Regeneration (Slaad Only)",
+    "Whispering Aura (Star Spawn Only)"
+   ],
+   "form_speed": {
+    "Beholderkin": "fly 30 ft. (hover)"
+   }
+  },
+  {
+   "name": "Summon Aberration",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 4,
+   "creature": "Aberrant Spirit",
+   "kind": "aberration",
+   "size": "Medium",
+   "forms": [
+    "Slaad",
+    "Mind Flayer",
+    "Beholderkin"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 40
+   },
+   "speed": "30 ft.",
+   "form_speed": {
+    "Beholderkin": "fly 30 ft. (hover)"
+   },
+   "abilities": [
+    16,
+    10,
+    15,
+    16,
+    10,
+    6
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Claw",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 3,
+     "type": "slashing",
+     "forms": [
+      "Slaad"
+     ]
+    },
+    {
+     "name": "Eye Ray",
+     "kind": "Ranged",
+     "reach": "range 150 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "psychic",
+     "forms": [
+      "Beholderkin"
+     ]
+    },
+    {
+     "name": "Psychic Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "psychic",
+     "forms": [
+      "Mind Flayer"
+     ]
+    }
+   ],
+   "features": [
+    "Regeneration (Slaad Only)",
+    "Whispering Aura (Mind Flayer Only)"
+   ]
+  },
+  {
+   "name": "Summon Beast",
+   "sources": [
+    "TCE"
+   ],
+   "level": 2,
+   "creature": "Bestial Spirit",
+   "kind": "beast",
+   "size": "Small",
+   "forms": [
+    "Air",
+    "Land",
+    "Water"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 5,
+    "form": {
+     "Air": 20,
+     "Land": 30,
+     "Water": 30
+    },
+    "base": 30
+   },
+   "speed": "30 ft.",
+   "form_speed": {
+    "Land": "climb 30 ft.",
+    "Air": "fly 60 ft.",
+    "Water": "swim 30 ft."
+   },
+   "abilities": [
+    18,
+    11,
+    16,
+    4,
+    14,
+    5
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Maul",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 4,
+     "type": "piercing"
+    }
+   ],
+   "features": [
+    "Water Breathing (Water Only)",
+    "Flyby (Air Only)",
+    "Pack Tactics (Land and Water Only)"
+   ]
+  },
+  {
+   "name": "Summon Beast",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 2,
+   "creature": "Bestial Spirit",
+   "kind": "beast",
+   "size": "Small",
+   "forms": [
+    "Air",
+    "Land",
+    "Water"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 5,
+    "form": {
+     "Air": 20,
+     "Land": 30,
+     "Water": 30
+    },
+    "base": 30
+   },
+   "speed": "30 ft.",
+   "form_speed": {
+    "Land": "climb 30 ft.",
+    "Air": "fly 60 ft.",
+    "Water": "swim 30 ft."
+   },
+   "abilities": [
+    18,
+    11,
+    16,
+    4,
+    14,
+    5
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Rend",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 4,
+     "type": "piercing"
+    }
+   ],
+   "features": [
+    "Flyby (Air Only)",
+    "Pack Tactics (Land and Water Only)",
+    "Water Breathing (Water Only)"
+   ]
+  },
+  {
+   "name": "Summon Celestial",
+   "sources": [
+    "TCE"
+   ],
+   "level": 5,
+   "creature": "Celestial Spirit",
+   "kind": "celestial",
+   "size": "Large",
+   "forms": [
+    "Defender",
+    "Avenger"
+   ],
+   "ac": {
+    "base": 11,
+    "form": {
+     "Defender": 2
+    }
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 40
+   },
+   "speed": "30 ft., fly 40 ft.",
+   "abilities": [
+    16,
+    14,
+    16,
+    10,
+    14,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Radiant Bow",
+     "kind": "Ranged",
+     "reach": "range 150/600 ft.",
+     "dice": "2d6",
+     "bonus": 2,
+     "type": "radiant",
+     "forms": [
+      "Avenger"
+     ]
+    },
+    {
+     "name": "Radiant Mace",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 3,
+     "type": "radiant",
+     "forms": [
+      "Defender"
+     ]
+    }
+   ],
+   "features": [
+    "Healing Touch (1/Day) (action)"
+   ]
+  },
+  {
+   "name": "Summon Celestial",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 5,
+   "creature": "Celestial Spirit",
+   "kind": "celestial",
+   "size": "Large",
+   "forms": [
+    "Defender",
+    "Avenger"
+   ],
+   "ac": {
+    "base": 11,
+    "form": {
+     "Defender": 2
+    }
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 40
+   },
+   "speed": "30 ft., fly 40 ft.",
+   "abilities": [
+    16,
+    14,
+    16,
+    10,
+    14,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Radiant Bow",
+     "kind": "Ranged",
+     "reach": "range 600 ft.",
+     "dice": "2d6",
+     "bonus": 2,
+     "type": "radiant",
+     "forms": [
+      "Avenger"
+     ]
+    },
+    {
+     "name": "Radiant Mace",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 3,
+     "type": "radiant",
+     "forms": [
+      "Defender"
+     ]
+    }
+   ],
+   "features": [
+    "Healing Touch (1/Day) (action)"
+   ]
+  },
+  {
+   "name": "Summon Construct",
+   "sources": [
+    "TCE"
+   ],
+   "level": 4,
+   "creature": "Construct Spirit",
+   "kind": "construct",
+   "size": "Medium",
+   "forms": [
+    "Metal",
+    "Stone",
+    "Clay"
+   ],
+   "ac": {
+    "base": 13
+   },
+   "hp": {
+    "per_level": 15,
+    "base": 40
+   },
+   "speed": "30 ft.",
+   "abilities": [
+    18,
+    10,
+    18,
+    14,
+    11,
+    5
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 4,
+     "type": "bludgeoning"
+    }
+   ],
+   "features": [
+    "Heated Body (Metal Only)",
+    "Stony Lethargy (Stone Only)",
+    "Berserk Lashing (Clay Only) (reaction)"
+   ]
+  },
+  {
+   "name": "Summon Construct",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 4,
+   "creature": "Construct Spirit",
+   "kind": "construct",
+   "size": "Medium",
+   "forms": [
+    "Metal",
+    "Stone",
+    "Clay"
+   ],
+   "ac": {
+    "base": 13
+   },
+   "hp": {
+    "per_level": 15,
+    "base": 40
+   },
+   "speed": "30 ft.",
+   "abilities": [
+    18,
+    10,
+    18,
+    14,
+    11,
+    5
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 4,
+     "type": "bludgeoning"
+    }
+   ],
+   "features": [
+    "Heated Body (Metal Only)",
+    "Stony Lethargy (Stone Only)",
+    "Berserk Lashing (Clay Only) (reaction)"
+   ]
+  },
+  {
+   "name": "Summon Draconic Spirit",
+   "sources": [
+    "FTD"
+   ],
+   "level": 5,
+   "creature": "Draconic Spirit",
+   "kind": "dragon",
+   "size": "Large",
+   "forms": [
+    "Chromatic",
+    "Gem",
+    "Metallic"
+   ],
+   "ac": {
+    "base": 14
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 50
+   },
+   "speed": "30 ft., fly 60 ft., swim 30 ft.",
+   "abilities": [
+    19,
+    14,
+    17,
+    10,
+    14,
+    14
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Rend",
+     "kind": "Melee",
+     "reach": "reach 10 ft.",
+     "dice": "1d6",
+     "bonus": 4,
+     "type": "piercing"
+    }
+   ],
+   "features": [
+    "Shared Resistances",
+    "Breath Weapon (action)"
+   ]
+  },
+  {
+   "name": "Summon Dragon",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 5,
+   "creature": "Draconic Spirit",
+   "kind": "dragon",
+   "size": "Large",
+   "forms": [
+    "Chromatic",
+    "Gem",
+    "Metallic"
+   ],
+   "ac": {
+    "base": 14
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 50
+   },
+   "speed": "30 ft., fly 60 ft., swim 30 ft.",
+   "abilities": [
+    19,
+    14,
+    17,
+    10,
+    14,
+    14
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Rend",
+     "kind": "Melee",
+     "reach": "",
+     "dice": "1d6",
+     "bonus": 4,
+     "type": "piercing"
+    }
+   ],
+   "features": [
+    "Shared Resistances",
+    "Breath Weapon (action)"
+   ]
+  },
+  {
+   "name": "Summon Elemental",
+   "sources": [
+    "TCE"
+   ],
+   "level": 4,
+   "creature": "Elemental Spirit",
+   "kind": "elemental",
+   "size": "Medium",
+   "forms": [
+    "Air",
+    "Earth",
+    "Fire",
+    "Water"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 50
+   },
+   "speed": "40 ft.",
+   "form_speed": {
+    "Air": "fly 40 ft. (hover)",
+    "Earth": "burrow 40 ft.",
+    "Water": "swim 40 ft."
+   },
+   "abilities": [
+    18,
+    15,
+    17,
+    4,
+    10,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 4,
+     "type": "bludgeoning"
+    }
+   ],
+   "features": [
+    "Amorphous Form (Air, Fire, and Water Only)"
+   ]
+  },
+  {
+   "name": "Summon Elemental",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 4,
+   "creature": "Elemental Spirit",
+   "kind": "elemental",
+   "size": "Medium",
+   "forms": [
+    "Air",
+    "Earth",
+    "Fire",
+    "Water"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 50
+   },
+   "speed": "40 ft.",
+   "form_speed": {
+    "Air": "fly 40 ft. (hover)",
+    "Earth": "burrow 40 ft.",
+    "Water": "swim 40 ft."
+   },
+   "abilities": [
+    18,
+    15,
+    17,
+    4,
+    10,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 4,
+     "type": "lightning",
+     "forms": [
+      "Air"
+     ]
+    },
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 4,
+     "type": "bludgeoning",
+     "forms": [
+      "Earth"
+     ]
+    },
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 4,
+     "type": "fire",
+     "forms": [
+      "Fire"
+     ]
+    },
+    {
+     "name": "Slam",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d10",
+     "bonus": 4,
+     "type": "cold",
+     "forms": [
+      "Water"
+     ]
+    }
+   ],
+   "features": [
+    "Amorphous Form (Air, Fire, and Water Only)"
+   ]
+  },
+  {
+   "name": "Summon Fey",
+   "sources": [
+    "TCE"
+   ],
+   "level": 3,
+   "creature": "Fey Spirit",
+   "kind": "fey",
+   "size": "Small",
+   "forms": [
+    "Fuming",
+    "Mirthful",
+    "Tricksy"
+   ],
+   "ac": {
+    "base": 12
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 30
+   },
+   "speed": "40 ft.",
+   "abilities": [
+    13,
+    16,
+    14,
+    14,
+    11,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Shortsword",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d6",
+     "bonus": 3,
+     "type": "piercing"
+    }
+   ],
+   "features": [
+    "Fey Step (bonus action)"
+   ]
+  },
+  {
+   "name": "Summon Fey",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 3,
+   "creature": "Fey Spirit",
+   "kind": "fey",
+   "size": "Small",
+   "forms": [
+    "Fuming",
+    "Mirthful",
+    "Tricksy"
+   ],
+   "ac": {
+    "base": 12
+   },
+   "hp": {
+    "per_level": 10,
+    "base": 30
+   },
+   "speed": "30 ft., fly 30 ft.",
+   "abilities": [
+    13,
+    16,
+    14,
+    14,
+    11,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Fey Blade",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "2d6",
+     "bonus": 3,
+     "type": "force"
+    }
+   ],
+   "features": [
+    "Fey Step (bonus action)"
+   ]
+  },
+  {
+   "name": "Summon Fiend",
+   "sources": [
+    "TCE"
+   ],
+   "level": 6,
+   "creature": "Fiendish Spirit",
+   "kind": "fiend",
+   "size": "Large",
+   "forms": [
+    "Demon",
+    "Devil",
+    "Yugoloth"
+   ],
+   "ac": {
+    "base": 12
+   },
+   "hp": {
+    "per_level": 15,
+    "form": {
+     "Demon": 50,
+     "Devil": 40,
+     "Yugoloth": 60
+    },
+    "base": 60
+   },
+   "speed": "40 ft.",
+   "form_speed": {
+    "Demon": "climb 40 ft.",
+    "Devil": "fly 60 ft."
+   },
+   "abilities": [
+    13,
+    16,
+    15,
+    10,
+    10,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Bite",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d12",
+     "bonus": 3,
+     "type": "necrotic",
+     "forms": [
+      "Demon"
+     ]
+    },
+    {
+     "name": "Claws",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "slashing",
+     "forms": [
+      "Yugoloth"
+     ]
+    },
+    {
+     "name": "Hurl Flame",
+     "kind": "Ranged spell",
+     "reach": "range 150 ft.",
+     "dice": "2d6",
+     "bonus": 3,
+     "type": "fire",
+     "forms": [
+      "Devil"
+     ]
+    }
+   ],
+   "features": [
+    "Magic Resistance",
+    "Death Throes (Demon Only)",
+    "Devil's Sight (Devil Only)"
+   ]
+  },
+  {
+   "name": "Summon Fiend",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 6,
+   "creature": "Fiendish Spirit",
+   "kind": "fiend",
+   "size": "Large",
+   "forms": [
+    "Demon",
+    "Devil",
+    "Yugoloth"
+   ],
+   "ac": {
+    "base": 12
+   },
+   "hp": {
+    "per_level": 15,
+    "form": {
+     "Demon": 50,
+     "Devil": 40,
+     "Yugoloth": 60
+    },
+    "base": 60
+   },
+   "speed": "40 ft.",
+   "form_speed": {
+    "Demon": "climb 40 ft.",
+    "Devil": "fly 60 ft."
+   },
+   "abilities": [
+    13,
+    16,
+    15,
+    10,
+    10,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Bite",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d12",
+     "bonus": 3,
+     "type": "necrotic",
+     "forms": [
+      "Demon"
+     ]
+    },
+    {
+     "name": "Claws",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "slashing",
+     "forms": [
+      "Yugoloth"
+     ]
+    },
+    {
+     "name": "Fiery Strike",
+     "kind": "m,r",
+     "reach": "reach 5 ft.",
+     "dice": "2d6",
+     "bonus": 3,
+     "type": "fire",
+     "forms": [
+      "Devil"
+     ]
+    }
+   ],
+   "features": [
+    "Death Throes (Demon Only)",
+    "Devil's Sight (Devil Only)",
+    "Magic Resistance"
+   ]
+  },
+  {
+   "name": "Summon Shadowspawn",
+   "sources": [
+    "TCE"
+   ],
+   "level": 3,
+   "creature": "Shadow Spirit",
+   "kind": "monstrosity",
+   "size": "Medium",
+   "forms": [
+    "Fury",
+    "Despair",
+    "Fear"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 15,
+    "base": 35
+   },
+   "speed": "40 ft.",
+   "abilities": [
+    13,
+    16,
+    15,
+    4,
+    10,
+    16
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Chilling Rend",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d12",
+     "bonus": 3,
+     "type": "cold"
+    }
+   ],
+   "features": [
+    "Terror Frenzy (Fury Only)",
+    "Weight of Sorrow (Despair Only)",
+    "Dreadful Scream (1/Day) (action)",
+    "Shadow Stealth (Fear Only) (bonus action)"
+   ]
+  },
+  {
+   "name": "Summon Undead",
+   "sources": [
+    "TCE"
+   ],
+   "level": 3,
+   "creature": "Undead Spirit",
+   "kind": "undead",
+   "size": "Medium",
+   "forms": [
+    "Ghostly",
+    "Putrid",
+    "Skeletal"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 10,
+    "form": {
+     "Ghostly": 30,
+     "Putrid": 30,
+     "Skeletal": 20
+    },
+    "base": 30
+   },
+   "speed": "30 ft.",
+   "abilities": [
+    12,
+    16,
+    15,
+    4,
+    10,
+    9
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Deathly Touch",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "necrotic",
+     "forms": [
+      "Ghostly"
+     ]
+    },
+    {
+     "name": "Grave Bolt",
+     "kind": "Ranged spell",
+     "reach": "range 150 ft.",
+     "dice": "2d4",
+     "bonus": 3,
+     "type": "necrotic",
+     "forms": [
+      "Skeletal"
+     ]
+    },
+    {
+     "name": "Rotting Claw",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d6",
+     "bonus": 3,
+     "type": "slashing",
+     "forms": [
+      "Putrid"
+     ]
+    }
+   ],
+   "features": [
+    "Incorporeal Passage (Ghostly Only)",
+    "Festering Aura (Putrid Only)"
+   ],
+   "form_speed": {
+    "Ghostly": "fly 40 ft. (hover)"
+   }
+  },
+  {
+   "name": "Summon Undead",
+   "sources": [
+    "XPHB"
+   ],
+   "level": 3,
+   "creature": "Undead Spirit",
+   "kind": "undead",
+   "size": "Medium",
+   "forms": [
+    "Ghostly",
+    "Putrid",
+    "Skeletal"
+   ],
+   "ac": {
+    "base": 11
+   },
+   "hp": {
+    "per_level": 10,
+    "form": {
+     "Ghostly": 30,
+     "Putrid": 30,
+     "Skeletal": 20
+    },
+    "base": 30
+   },
+   "speed": "30 ft.",
+   "form_speed": {
+    "Ghostly": "fly 40 ft. (hover)"
+   },
+   "abilities": [
+    12,
+    16,
+    15,
+    4,
+    10,
+    9
+   ],
+   "multiattack": true,
+   "attacks": [
+    {
+     "name": "Deathly Touch",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d8",
+     "bonus": 3,
+     "type": "necrotic",
+     "forms": [
+      "Ghostly"
+     ]
+    },
+    {
+     "name": "Grave Bolt",
+     "kind": "Ranged",
+     "reach": "range 150 ft.",
+     "dice": "2d4",
+     "bonus": 3,
+     "type": "necrotic",
+     "forms": [
+      "Skeletal"
+     ]
+    },
+    {
+     "name": "Rotting Claw",
+     "kind": "Melee",
+     "reach": "reach 5 ft.",
+     "dice": "1d6",
+     "bonus": 3,
+     "type": "slashing",
+     "forms": [
+      "Putrid"
+     ]
+    }
+   ],
+   "features": [
+    "Festering Aura (Putrid Only)",
+    "Incorporeal Passage (Ghostly Only)"
+   ]
+  }
  ]
 }

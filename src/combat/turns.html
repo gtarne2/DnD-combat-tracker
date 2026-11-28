@@ -1,15 +1,22 @@
 <section id="encounter" aria-labelledby="encounter-heading">
   <div class="initiative-heading"><h2 id="encounter-heading">Encounter</h2><button type="button" class="quiet-button danger-outline" data-dialog="end-encounter-dialog" id="end-encounter" aria-haspopup="dialog">End Encounter</button></div>
   <div class="initiative-current"><strong id="round-number">Round 1</strong><p id="current-turn"></p><button type="button" class="quiet-button" data-dialog="encounter-settings" id="manage-initiative">Initiative</button></div>
+  <div id="party-offer-rail" class="party-offer-rail" hidden aria-label="Offers for you" aria-live="polite"></div>
   <div id="party-encounter" class="party-encounter" hidden>
     <p class="party-encounter-title"><svg class="icon" aria-hidden="true"><use href="#gi-tabletop-players"/></svg><strong>Party encounter</strong><span id="party-encounter-who"></span></p>
     <p id="party-encounter-note" role="status"></p>
-    <div id="party-templates" class="party-templates" hidden aria-label="Your spell templates and saves sent to the DM"></div>
     <form id="party-join-form" class="party-join" hidden>
       <label>Your initiative <input name="score" type="number" min="-2147483648" max="2147483647" required></label>
       <button>Join encounter</button>
     </form>
   </div>
+  <div id="party-calls" class="party-calls" hidden aria-label="Reaction calls from the DM" aria-live="polite"></div>
+  <div id="party-templates" class="party-templates" hidden aria-label="Your spell templates and saves sent to the DM"></div>
+  <section id="party-recap" class="party-recap" hidden aria-labelledby="party-recap-title">
+    <h3 id="party-recap-title">Fight recap</h3>
+    <div id="party-recap-body"></div>
+    <button type="button" id="party-recap-journal">Add to Journal</button>
+  </section>
   <ol id="combat-turn-order" aria-label="Initiative order"></ol>
 
   <div class="initiative-footer">

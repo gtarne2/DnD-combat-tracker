@@ -58,13 +58,33 @@ Use a check that reaches the affected entry point. Add only the neighboring chec
 | DM save and reaction questions | `node tests/party-launcher.cjs --strike-windows` and the same command with `--fallback-writer`. |
 | DM Assist and damage suggestions | `node tests/party-launcher.cjs --monster-assist`. Add `--assist` to the strike-window and damage suites to exercise their flows in Assist. |
 | Monster library or encounter snapshots | `node tests/party-launcher.cjs --monsters`. |
-| Owlbear Rodeo link | `cargo test --locked --test owlbear_link --test spell_areas` and `node tests/owlbear-tokens.cjs` (token and template sync against a stand-in SDK, no browser), then `node tests/owlbear-bridge.cjs` with `AURORA_PARTY` pointing at the built helper. The helper runtime is Windows-only, so off Windows this needs a local preview build of the helper. |
+| Owlbear Rodeo link | `cargo test --locked --test owlbear_link --test spell_areas` and `node tests/owlbear-tokens.cjs` (token and template sync against a stand-in SDK, no browser), then `node tests/owlbear-bridge.cjs` with `AURORA_PARTY` pointing at the built helper. The helper runtime is Windows-only on `dev`, so off Windows this needs the [Linux preview build](#rehearsals-in-the-linux-cloud). The extension publishes from `gh-pages` on each push to `dev` that touches `owlbear/`; bump `owlbear/manifest.json`'s `version` when it changes. |
+| Mechanics overlay, buffs or template looks | `cargo test --locked --test mechanics_overlay --test stat_buffs --test owlbear_link`. After editing `content/mechanics/curated.json`, rerun `node tools/build-mechanics-overlay.cjs <5etools-src checkout>` and commit both JSON files. Regenerate textures with `python tools/build-template-art.py` (numpy and Pillow). For the sheet, `node tests/stat-buffs.cjs`. |
+| 5etools bestiary import | `cargo test --locked --test fivetools_import`. For real files kept outside Git, `FIVETOOLS_FILE=<path to bestiary-*.json> cargo test --locked --test fivetools_import -- --ignored`. The files are at `raw.githubusercontent.com/5etools-mirror-3/5etools-src` under `data/bestiary/`. |
+| Damage defenses, save spells sent from the sheet, enemy timers | `cargo test --locked --test table_rules` and `node tests/damage-defenses.cjs`. |
+| Token art | `node tests/owlbear-tokens.cjs`. Rebuild class icons with `node tools/build-class-tokens.cjs` (Playwright). |
+| Reaction calls, lasting areas, difficulty, fight recap, summons | `cargo test --locked --test table_tools --test mechanics_overlay`. In the Linux cloud, the shared `table-tools/table-demo.cjs` runs the DM and two players through all four table tools with the preview harness (`AURORA_DEMO=<path to table-demo.cjs> AURORA_SHOTS=<folder>`), and `table-tools/summon-check.cjs <shots folder>` casts Summon Beast on the `overlay-spells` fixture with a debug `combat-sheet`. |
+| Party offers on the rail and auto-accept | `cargo test --locked --test owlbear_link --test table_rules` for the offer sources. In the Linux cloud, the shared `offers-review/offers-demo.cjs` (`AURORA_DEMO`) covers the rail cards, previews, sender notices, auto-accept and Undo. Run `--offers` and `--monster-damage` for the older flows; in the Linux harness `--offers` stops at the backup-restore step ("Party detached" is hidden), before and after R87. |
 | Encounter export and import | `cargo test --locked --test encounter_portability`, then `node tests/party-launcher.cjs --encounters`. |
 | Bundled pack or notices | Use the reproducibility and source audits for [SRD 5.1](srd51-pack.md#reproduce-and-audit) or [SRD 5.2.1](srd521-pack.md#reproduce-and-audit), then run the packaged suite with `--srd51` or `--srd521`. |
 
 For storage or receipt changes, repeat the applicable player-writer scenario with `--fallback-writer` to exercise the guest's IndexedDB writer. Useful cases include `--offers`, `--initiative`, `--monster-damage` and `--strike-windows`. The browser suites cover different profiles and loopback connectivity. Record physical two-PC Wi-Fi, firewall, Windows picker, and real clipboard checks separately. The clipboard assertion in the launcher harness captures the value passed by **Copy invite**.
 
 To exercise refresh against a running launcher, use an isolated settings directory containing synthetic `review.dnd5e` and `review.xml` copies of the combat-sheet fixtures. Leave the service open and set `AURORA_TEST_LAUNCHER_WORKSPACE` to the parent of its `Aurora Combat Tracker` settings subdirectory. The suite restores the copies after modifying them.
+
+## Windows builds from the cloud
+
+Grant has no Rust toolchain, so a Linux cloud session builds the Windows zip. All three exes import only system DLLs.
+
+1. `rustup target add x86_64-pc-windows-gnu` and `apt-get install gcc-mingw-w64-x86-64`, then `cargo build --release --locked --bins --target x86_64-pc-windows-gnu`. For a quick compile check, `cargo check --locked --target x86_64-pc-windows-gnu --bins`; a Linux build alone does not compile the `cfg(windows)` party runtime on `dev`.
+2. `apt-get install mono-mcs mono-devel`, then build the launcher with `mcs -nostdlib -noconfig -target:winexe -optimize+` and every `-r:` pointing into `/usr/lib/mono/4.8-api/` (`mscorlib`, `System`, `System.Core`, `System.Windows.Forms`, `System.Drawing`, `System.Web.Extensions`). Use the same `-resource:` list and source files as `launcher/build.cmd`. Mono's default `mscorlib` binds newer overloads that crash on .NET 4.8 with `MissingMethodException`.
+3. Zip `Aurora Combat Tracker.exe`, `combat-sheet.exe`, `aurora-party.exe` and the two `content/monster-packs/SRD-*-NOTICES.txt` files. Name the zip after the branch and short commit. Grant unzips it over `target\release`, which the desktop shortcut runs.
+
+The `mcs` output is deterministic, so a hash of the launcher can be checked against a rebuild from the same commit. The exes are unsigned, and Windows Defender has flagged the launcher as `Trojan:Win32/Wacatac.C!ml` (a false positive). Don't upload builds to public scanners without asking.
+
+## Rehearsals in the Linux cloud
+
+The packaged rehearsals in `tests/party-launcher.cjs` expect Windows. A cloud session can run the same scenarios with a local-only patch (kept outside Git as `linux-preview.patch` with `harness.cjs` and `run.cjs` in the project's shared `ui-overhaul/linux-harness/` folder) that adds a `cfg(aurora_preview)` build and a vault stub. Apply it, build with `RUSTFLAGS="--cfg aurora_preview" cargo build --bins`, and run `node run.cjs --dashboard` (or another scenario) from the repository root with `AURORA_ROOT` set. A plain `cargo build` overwrites the preview `aurora-party`, so rebuild with the flag before each run. `--offers` stops at the Aurora refresh step, which the harness doesn't emulate. Never commit the patch. The cloud cannot reach owlbear.rodeo or github.io, so real Owlbear checks happen on Grant's PC.
 
 ## Coding conventions
 

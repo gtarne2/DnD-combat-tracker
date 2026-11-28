@@ -105,6 +105,27 @@ const companionControls = (() => {
       return "creating " + template.name;
     });
   }
+  // A creature from a summon spell (R83), built by the cast dialog. A concentration summon
+  // goes when that concentration ends.
+  function conjure(state, values, focus) {
+    const roster = state.companions ||= blank();
+    const card = {...values, id: ++roster.sequence};
+    if (focus != null) card.focus = focus;
+    roster.cards.push(card);
+    previewEncounter.log(state, "action", `Summoned ${card.name}`);
+    document.dispatchEvent(new CustomEvent("companion-summoned", {detail: {card}}));
+    return card;
+  }
+  previewEncounter.reconcile((state) => {
+    const roster = state.companions;
+    if (!roster?.cards?.some((card) => card.focus != null)) return;
+    const active = state.focus?.active?.id ?? null;
+    for (const card of roster.cards.filter((card) => card.focus != null && card.focus !== active)) {
+      effectControls.endForRemovedTarget(state, "companion:" + card.id);
+      previewEncounter.log(state, "expiration", `${card.name} vanished when concentration ended`);
+    }
+    roster.cards = roster.cards.filter((card) => card.focus == null || card.focus === active);
+  });
   const createCannon = summon;
   const variantName = (name) => name.replace(/^Eldritch Cannon\s*[-—:]?\s*/i, "");
   const summons = [];
@@ -552,5 +573,5 @@ const companionControls = (() => {
       previewEncounter.transact(syncSeeds, { undo: false });
     }
   }
-  return { cannonTemplates, createCannon, summon, place, showCard, start, available, advance };
+  return { cannonTemplates, createCannon, summon, conjure, place, showCard, start, available, advance };
 })();
