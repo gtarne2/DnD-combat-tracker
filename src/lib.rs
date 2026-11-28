@@ -10,4 +10,5 @@ pub mod mechanics;
 pub mod monsters;
 pub mod owlbear;
 pub mod party;
+pub mod preview;
 pub mod session;

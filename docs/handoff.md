@@ -48,6 +48,16 @@ Recorded 2026-11-28. Ask Grant before starting any of these.
 - **Future, wait for Grant:** Grant will upload their D&D books and expansions. The plan is a curated database per spell and ability (how an ability such as an artificer's turret activates, how much description to show, template colours per spell) and a large search across all imported rules, attacks and characters. It extends the mechanics overlay, which ships only our own mechanics data, never book text.
 - **Style:** less clutter. Primary options first, the rest under "More options"; assists behind Settings; area damage not prefilled by default; Owlbear-native looks (rings, attachments) over custom badges.
 
+## Mac player handoff (R81)
+
+| Field | Record |
+| --- | --- |
+| Date and checkout | 2026-11-27 on `claude/project-thread-07p6rm`, branched from `dev` at `d87ce06`. |
+| Completed | R81: a macOS player app. The party runtime builds on all platforms (DPAPI only on Windows; `0600` bindings file elsewhere), `aurora-party player` is the Mac launcher (AppleScript dialogs, background `--service`, in-process guest binding and refresh bridge), `src/preview.rs` shares sheet rendering with `combat-sheet`, and `.github/workflows/macos-player.yml` builds a universal app zip with first-run steps (`docs/mac-player.md`). |
+| Modified components | `Cargo.toml`, `src/bin/aurora-party.rs`, `src/bin/party_runtime/{mod,vault,player}.rs`, `src/bin/combat-sheet.rs`, `src/preview.rs`, `src/lib.rs`, `macos/`, `tools/package-macos.sh`, `.github/workflows/macos-player.yml`, `docs/mac-player.md`. |
+| Validation | Linux cloud: `cargo test --locked` passed; `cargo check --locked --target x86_64-pc-windows-gnu --bins` passed; the macOS-only dialog code was type-checked by compiling it under `cfg(unix)`. A Linux rehearsal ran a DM helper (`serve`, mode dm), then `aurora-party player` through its terminal prompts with the invitation: the launcher exited, the background service wrote the sheet with party and refresh URLs, Chromium loaded it with no page errors and the DM's state listed the player online; `stage` and `apply` refreshed the file; a foreign origin got 403; the bindings file was `0600`; a second launch with Rejoin last party replaced the first service and reconnected. The macOS build, codesign check and helper smoke test run in GitHub Actions. Not run: a real Mac (AppleScript dialogs, Gatekeeper, Chrome/Safari on `file://`) and two-machine Wi-Fi play. |
+| Next action | On a Mac: install from the Actions zip, allow it under Privacy & Security, join a Windows DM's room over Wi-Fi, roll initiative, take damage from the DM, and use Session → Refresh from Aurora. Try Safari too. Linux harness note: `app_data` now honors `XDG_DATA_HOME` on Linux instead of `LOCALAPPDATA`, and the runtime builds without the `aurora_preview` patch. |
+
 ## Latest handoff
 
 | Field | Record |

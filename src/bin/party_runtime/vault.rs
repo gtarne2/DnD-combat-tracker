@@ -1,6 +1,7 @@
 use super::{Error, Saved};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::path::{Path, PathBuf};
+#[cfg(windows)]
 use windows_sys::Win32::{
     Foundation::LocalFree,
     Security::Cryptography::{
@@ -8,6 +9,14 @@ use windows_sys::Win32::{
     },
 };
 
+/// Off Windows there is no DPAPI. The bindings stay in a file only the current user can read
+/// (see `Vault::new`), the same protection SSH keys get on macOS.
+#[cfg(not(windows))]
+fn protect(bytes: &[u8], _encrypt: bool) -> Result<Vec<u8>, Error> {
+    Ok(bytes.to_vec())
+}
+
+#[cfg(windows)]
 fn protect(bytes: &[u8], encrypt: bool) -> Result<Vec<u8>, Error> {
     let input = CRYPT_INTEGER_BLOB {
         cbData: bytes.len().try_into()?,
@@ -66,6 +75,11 @@ impl Vault {
             profile TEXT NOT NULL, room TEXT NOT NULL, binding TEXT NOT NULL,
             status TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY(profile,room,binding))",
         )?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&vault.path, std::fs::Permissions::from_mode(0o600))?;
+        }
         Ok(vault)
     }
     fn open(&self) -> Result<Connection, Error> {

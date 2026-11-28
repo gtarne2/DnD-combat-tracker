@@ -50,6 +50,10 @@ the character in Aurora, open **Session → Refresh from Aurora** and review the
 them. Use the launcher to edit the content file list. **Session** also exports and restores tracker
 backups. To move an existing tracker session to an Aurora copy, open that copy and restore the backup there.
 
+## Play on a Mac
+
+Players on a Mac can open their sheet and join a Windows DM's party with `Aurora Combat Tracker.app`. GitHub Actions builds it ("macOS player build" workflow, under the run's Artifacts). It is unsigned, so the first launch needs one extra step. See [Aurora Combat Tracker for Mac](docs/mac-player.md).
+
 ## Generate a sheet from the command line
 
 From the repository root, generate a local HTML sheet and open it in a browser.

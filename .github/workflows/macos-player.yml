@@ -1,0 +1,54 @@
+# Build the macOS player app (join a DM's party from a Mac). Nobody on the project has a Mac
+# build setup, so GitHub's macOS runner builds it. Download the zip from the run's Artifacts.
+name: macOS player build
+
+on:
+  push:
+    branches: [dev, main]
+    paths-ignore: ["owlbear/**", "docs/**"]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Rust tests
+        run: cargo test --locked
+      - name: Build for Apple silicon and Intel
+        run: |
+          cargo build --release --locked --bin aurora-party --target aarch64-apple-darwin
+          cargo build --release --locked --bin aurora-party --target x86_64-apple-darwin
+          mkdir -p target/macos
+          lipo -create -output target/macos/aurora-party \
+            target/aarch64-apple-darwin/release/aurora-party \
+            target/x86_64-apple-darwin/release/aurora-party
+          lipo -info target/macos/aurora-party
+      - name: Package the app
+        run: |
+          mkdir -p target/macos/package
+          tools/package-macos.sh target/macos/aurora-party target/macos/package
+          codesign --verify --deep --verbose=2 "target/macos/package/Aurora Combat Tracker.app"
+      - name: Smoke test the packaged helper
+        run: |
+          app="target/macos/package/Aurora Combat Tracker.app/Contents/MacOS/aurora-party"
+          "$app" init "$RUNNER_TEMP/party.sqlite3"
+          printf '%s\n' '{"mode":"dm","profile":"dm","name":"DM","bind":"127.0.0.1"}' \
+            | HOME="$RUNNER_TEMP/home" "$app" serve | head -1 | grep '"role":"dm"'
+      - name: Zip
+        run: |
+          cd target/macos/package
+          ditto -c -k --sequesterRsrc --keepParent "Aurora Combat Tracker.app" ../app.zip
+          mkdir -p ../dist && mv ../app.zip ../dist/
+          cp "READ ME FIRST.txt" ../dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aurora-Combat-Tracker-macOS-${{ github.sha }}
+          path: target/macos/dist/
