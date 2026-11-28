@@ -198,7 +198,10 @@ fn a_save_spell_sent_from_the_sheet_joins_the_dm_queue() {
     );
     let offers = serde_json::to_value(service.poll(ALLY, room, 0).unwrap().offers).unwrap();
     assert_eq!(offers[0]["effect"], json!({"kind":"damage","amount":10}));
-    assert_eq!(offers[0]["source"], "Synaptic Static (spell, psychic, saved)");
+    assert_eq!(
+        offers[0]["source"],
+        "Synaptic Static (spell, psychic, saved)"
+    );
 }
 
 fn timers(service: &RoomService, room: Uuid, row: &Value) -> Value {

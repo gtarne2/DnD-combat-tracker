@@ -1077,8 +1077,8 @@ impl Fight {
 
     /// Map-facing projection for the DM's virtual tabletop link (Owlbear Rodeo): row IDs,
     /// kinds, revealed names, the turn pointer, and for enemies whether they are down plus the
-    /// monster template's key, name and size for token art. No HP, AC, conditions, scores,
-    /// notes or stat blocks. Enemies carry their player-facing alias, never the DM's name.
+    /// monster template's key, name and size for token art, and whether it is bloodied. No HP
+    /// numbers, AC, scores, notes or stat blocks. Enemies carry their player-facing alias, never the DM's name.
     pub fn table_view(&self) -> Value {
         let rows: Vec<Value> = self
             .position
@@ -1094,6 +1094,10 @@ impl Fight {
                         // show hidden items to players.
                         "name": &enemy.alias,
                         "down": enemy.hp == Some(0),
+                        // At or below half HP and still up. The extension shows it only when the
+                        // DM turns Bloodied on (R91); never a number.
+                        "bloodied": matches!((enemy.hp, enemy.max_hp),
+                            (Some(hp), Some(max)) if hp > 0 && u64::from(hp) * 2 <= u64::from(max)),
                         // Markers on the token, for conditions applied during the fight.
                         "conditions": enemy.marker_conditions(),
                     });

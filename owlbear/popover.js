@@ -2,7 +2,7 @@
 // opens the bridge window, which needs a click from the DM.
 import OBR from "./obr-sdk-3.1.0.js";
 import { DEFAULT_PORT, bridgeUrl, savePort, savedPort } from "./bridge-client.js";
-import { STANDARD_CONDITIONS, artKey, artSearch, chooseArt as rememberArt, conditionKey, encounterConditions, groupKey, loadArt, loadConditionArt, saveArt, saveConditionArt } from "./tokens.js";
+import { STANDARD_CONDITIONS, loadMarkerSettings, saveMarkerSettings, artKey, artSearch, chooseArt as rememberArt, conditionKey, encounterConditions, groupKey, loadArt, loadConditionArt, saveArt, saveConditionArt } from "./tokens.js";
 import { loadMatches, saveMatch } from "./players.js";
 import { KIND, rowLabel } from "./labels.js";
 
@@ -265,3 +265,15 @@ OBR.onReady(async () => {
   await party();
   channel.postMessage({ type: "get" });
 });
+
+// R91: HP on tokens. The background reads these on its next refresh.
+{
+  const settings = loadMarkerSettings();
+  const bloodied = document.getElementById("marker-bloodied");
+  const bars = document.getElementById("marker-hp-bars");
+  bloodied.checked = settings.bloodied;
+  bars.checked = settings.hpBars;
+  const save = () => saveMarkerSettings({ bloodied: bloodied.checked, hpBars: bars.checked });
+  bloodied.addEventListener("change", save);
+  bars.addEventListener("change", save);
+}

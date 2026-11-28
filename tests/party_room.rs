@@ -937,9 +937,7 @@ fn vitals_carry_death_saves_only_while_dying() {
         serde_json::from_value::<Vitals>(json!({"death_saves": {"successes": 1, "extra": 1}}))
             .is_err()
     );
-    assert!(
-        serde_json::from_value::<Vitals>(json!({"death_saves": {"successes": 300}})).is_err()
-    );
+    assert!(serde_json::from_value::<Vitals>(json!({"death_saves": {"successes": 300}})).is_err());
 }
 
 #[test]
