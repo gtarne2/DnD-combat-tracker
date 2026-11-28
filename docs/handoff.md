@@ -4,7 +4,7 @@
 
 - **Branch.** Work from `dev` (at `74ece6b` on 2026-11-28, after PR #20). GitHub's default branch, `codex/dev-character-sheet`, is stale; PR #7 (`dev` into it) is still open and nobody has asked to merge it. `main` is fully merged into `dev`. Open feature branches from `dev` and open PRs into `dev`.
 - **Who uses it.** Grant is the DM for a home table of three players. Everyone uses Chrome; Grant runs the DM side on Windows, uses Owlbear Rodeo for the map, and casts the DM laptop to a projector over Chromecast. Grant has no Rust toolchain on that PC and runs ready-made zips (see [Windows builds from the cloud](development.md#windows-builds-from-the-cloud)).
-- **Agents.** Codex and Claude Code both work here and share [AGENTS.md](../AGENTS.md). Requirement IDs run R1–R87 in [requirements.md](requirements.md) (R82–R87 merged with PR #20); R81 is reserved by the open Mac PR. Take the next free number (R88) and renumber on merge if two branches collide.
+- **Agents.** Codex and Claude Code both work here and share [AGENTS.md](../AGENTS.md). Requirement IDs run R1–R88 in [requirements.md](requirements.md) (R82–R87 merged with PR #20, R88 on PR #21); R81 is reserved by the open Mac PR. Take the next free number (R89) and renumber on merge if two branches collide.
 - **Checks on `dev` (2026-11-28, Linux cloud).** `cargo test --locked`: 85 passed, 1 ignored (the real-file 5etools test that needs `FIVETOOLS_FILE`). Nothing in this handoff was rerun on Windows.
 
 ## Product baseline
@@ -25,6 +25,7 @@ Everything below is merged into `dev`.
 | Token art | Player portraits (crop editor) as Owlbear tokens, class icons, DM art picks that become type/class defaults, companions placed beside owners, condition markers from Owlbear attachments. | R80 · PR #17 |
 | Table tools | Reaction calls from enemy cards that only prompt players who can react; summon spells (Tasha's, 2024 PHB, Fizban's) as companions; lasting spell areas with enter/start-of-turn prompts from Owlbear; encounter difficulty (2014/2024 DMG); end-of-fight recap from a room fight log. | R82–R86 · PR #20 |
 | Party offers on the rail | Incoming damage, healing and temp HP as rail cards with an HP preview (concentration DC, full-HP note); damage type and save in area offer sources; sender notices; shorter Session → Party list; auto-accept setting (off by default) with Undo. The caster's area template card was redesigned (name, shape and duration, dice and save, labelled targets, one damage/Roll/Send to DM row, coloured status) and the party box no longer repeats "The DM runs the turn order". | R87 · PR #20 |
+| Less clutter (PR #21) | Header status messages fade and say less; the Party chip opens Session with file tools folded; rail extras under More; DM name-only cards and standing hints trimmed. Checked with `tests/browser-review.cjs` (updated for the More fold) and the harness `--dashboard`, `--initiative`, `--monster-damage` and `--strike-windows` scenarios. | R88 · PR #21 |
 
 ## Open work
 

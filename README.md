@@ -78,7 +78,7 @@ Open **Roll Bonuses** below the ability tiles to search skills, saves, ability c
 
 **Character** puts skills, saves, passive scores, and exploration information together. In Combat, select **Skills** to show the list in the details pane. Use **Find on sheet** or press `/` to look up a feature, spell, check, or item from any page.
 
-During exploration or roleplay, use **Character**, **Companions**, **Inventory**, or **Journal**. Add dated Journal entries with links to sheet references or encounter activity. Your original journal and notes stay available below them. In Combat, **Activity** shows the current log and **Rosters and archive** holds saved rosters and previous encounters.
+During exploration or roleplay, use **Character**, **Companions**, **Inventory**, or **Journal**. Add dated Journal entries with links to sheet references or encounter activity. Your original journal and notes stay available below them. In Combat, **Activity** shows the current log and **More → Rosters and archive** holds saved rosters and previous encounters.
 
 Use **Pin to Quick Actions** in the inspector or **Pin action** in the strip to add a direct execution shortcut. The star keeps an option in **Favorites** for browsing. Use **Organize favorites** on that tab to reorder your pins. The strip also offers cannon creation and activation for imported variants. Use the × next to a shortcut to unpin it.
 

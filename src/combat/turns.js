@@ -174,7 +174,8 @@ const encounterTracker = (() => {
     undo.setAttribute("aria-label", undo.title);
     byId("undo-label").hidden = !undoLabel;
     byId("undo-label").textContent = undoLabel ? "Last change · " + undoLabel : "";
-    byId("encounter-storage").textContent = previewEncounter.isPersisted() ? "Saved locally" : "This tab only";
+    // Saving is the normal case; only say something when it isn't happening.
+    byId("encounter-storage").textContent = previewEncounter.isPersisted() ? "" : "Not saved: this tab only";
     owner.elements.initiative.value = state.companions?.owner ?? "";
     const hp = progress.hp || initialHp();
     byId("encounter-hp").textContent = displayHp(hp);

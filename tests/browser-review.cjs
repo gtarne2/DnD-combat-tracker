@@ -29,6 +29,10 @@ async function main() {
     page.on("pageerror", (error) => errors.push(error.message));
     return page;
   }
+  async function encounterExtras(page) {
+    const fold = page.locator("#encounter .encounter-extras");
+    if (!await fold.evaluate(node => node.open)) await fold.locator("summary").click();
+  }
   async function expectText(locator, value) {
     await locator.filter({hasText: value}).first().waitFor({state: "visible"});
   }
@@ -148,7 +152,7 @@ async function main() {
     assert.equal(await preset.getByLabel("Condition, modifier, or notes").inputValue(), "+2 to saves");
     await preset.getByRole("button", {name: "Save effect"}).click();
     await expectText(page.locator("#effect-list article"), "Owl ward");
-    await page.getByRole("button", {name: "Rosters and archive"}).click();
+    await encounterExtras(page); await page.getByRole("button", {name: "Rosters and archive"}).click();
     const library = page.locator("#encounter-library");
     await library.getByLabel("Roster name").fill("Owl and goblin");
     await library.getByRole("button", {name: "Save current roster"}).click();
@@ -157,7 +161,7 @@ async function main() {
     await owl.getByRole("button", {name: "Remove Round owl"}).click();
     await owl.waitFor({state: "detached"});
     await page.locator("#effect-list").getByText("Owl ward").waitFor({state: "detached"});
-    await page.getByRole("button", {name: "Rosters and archive"}).click();
+    await encounterExtras(page); await page.getByRole("button", {name: "Rosters and archive"}).click();
     await library.getByRole("button", {name: "Load roster"}).click();
     await library.getByRole("button", {name: "Close"}).click();
     await owl.waitFor();
@@ -287,18 +291,18 @@ async function main() {
     await castPage.waitForFunction(() => document.querySelector('[data-cast-spell][aria-label="Cast Lens Ray"]').disabled);
     await castPage.locator('#economy-chips [data-economy-chip="action"]').click();
     await ray.click();
-    await castPage.getByRole("button", {name: "Activity", exact: true}).click();
+    await encounterExtras(castPage); await castPage.getByRole("button", {name: "Activity", exact: true}).click();
     assert.equal(await castPage.locator("#encounter-log").getByText("Cast Lens Ray · cantrip").count(), 2);
     await castPage.locator("#encounter-activity").getByRole("button", {name: "Close"}).click();
     await castPage.locator("#undo-turn").click();
-    await castPage.getByRole("button", {name: "Activity", exact: true}).click();
+    await encounterExtras(castPage); await castPage.getByRole("button", {name: "Activity", exact: true}).click();
     assert.equal(await castPage.locator("#encounter-log").getByText("Cast Lens Ray · cantrip").count(), 1);
     await castPage.locator("#encounter-activity").getByRole("button", {name: "Close"}).click();
     await castPage.locator("#end-encounter").click();
     await castPage.getByLabel("Encounter title").fill("The Beacon Fight");
     await castPage.locator("#confirm-end-encounter").click();
     await castPage.locator("#start-encounter").click();
-    await castPage.getByRole("button", {name: "Rosters and archive"}).click();
+    await encounterExtras(castPage); await castPage.getByRole("button", {name: "Rosters and archive"}).click();
     await castPage.getByRole("button", {name: "The Beacon Fight"}).click();
     await expectText(castPage.locator("#encounter-log li"), "Cast Lens Ray · cantrip");
     console.log("Action economy, explicit override, zero-cost casting, undo, and archived activity passed.");

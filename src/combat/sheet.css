@@ -193,13 +193,17 @@ article { min-width: 0; overflow-wrap: anywhere; }
 .resource-list { max-height: min(55vh, 500px); }
 .encounter-extras { margin-block: 5px; gap: 3px; }
 .encounter-extras button { padding: 2px 5px; font-size: 12px; }
+.encounter-extras > summary { cursor: pointer; color: var(--muted); font-size: 12px; width: max-content; }
+.encounter-extras > div { margin-top: 3px; }
 .encounter-log { list-style: none; display: grid; gap: 5px; padding-left: 0; }
 .encounter-log li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 5px; border-bottom: 1px solid var(--line); }
 .encounter-log li > strong { flex-basis: 100%; }
 .encounter-log :is(time, small) { color: var(--muted); }
 #import-report ul { overflow-wrap: anywhere; }
 #import-report :is(p, details, section), #session-files :is(p, label) { margin-block: 7px; }
-#session-files > label { display: block; }
+#session-files > label, #session-tools > label { display: block; }
+.session-tools { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
+.session-tools > summary { cursor: pointer; color: var(--muted); }
 @media (min-width: 1080px) {
   .compact-combat .overview { padding: 5px 8px; gap: 4px 8px; }
   .compact-combat .identity-mark { display: none; }

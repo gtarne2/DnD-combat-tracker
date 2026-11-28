@@ -70,7 +70,11 @@ function initiativeWriter(request) {
     return;
   }
   panel.open = document.body.dataset.partyLobby === "true";
-  document.getElementById("party-chip")?.addEventListener("click", () => { panel.open = true; });
+  // The Party chip opens the same dialog on the party with the file tools folded away; the
+  // Session button opens it with them showing.
+  const tools = document.getElementById("session-tools");
+  document.getElementById("party-chip")?.addEventListener("click", () => { panel.open = true; if (tools) tools.open = false; });
+  document.querySelector('.command-tools [data-dialog="session-files"]:not(#party-chip)')?.addEventListener("click", () => { if (tools) tools.open = true; });
   const roster = document.createElement("ul");
   roster.className = "party-roster";
   roster.setAttribute("aria-label", "Party members");

@@ -147,8 +147,6 @@ const renderDmParty = (() => {
         card.append(hpRow, stats);
         stats.append(foot);
         if (tags.childElementCount) card.append(tags);
-      } else {
-        card.append(node("p", "Sharing only their name. Players choose what to share in Session → Party.", "dm-member-note"));
       }
       if (member.inspection) {
         const button = node("button");
@@ -162,7 +160,11 @@ const renderDmParty = (() => {
           dialog.showModal();
         };
         foot.append(button);
-      } else foot.append(node("span", "Name only", "dm-tag dm-private"));
+      } else {
+        const tag = node("span", "Name only", "dm-tag dm-private");
+        tag.title = "Sharing only their name. Players choose what to share in Session → Party.";
+        foot.append(tag);
+      }
       if (!vitals) card.append(foot);
       return card;
     }));

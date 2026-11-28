@@ -219,8 +219,6 @@ function setupDmInitiative(request, refresh) {
         const sheet = make("div", null, "dm-sheet-details");
         sheet.append(...dmCharacterSections(null, details, {folded:true, withVitals:false}));
         card.append(sheet);
-      } else {
-        card.append(make("p", member?.inspection ? "This player shares only HP and AC with the DM." : "Players run their own turns from their sheet.", "dm-muted"));
       }
       return;
     }

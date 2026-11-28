@@ -2,6 +2,7 @@
 <dialog id="session-files" aria-labelledby="session-files-title">
   <div class="dialog-heading"><h2 id="session-files-title">Tracker session</h2><form method="dialog"><button>Close</button></form></div>
   <div id="party-controls"></div>
+  <details id="session-tools" class="session-tools" open><summary>Backups and Aurora refresh</summary>
   <p>Back up encounter progress, layout, pins, journal, notes, and local edits. Open a moved or exported Aurora save and restore the backup to link your session to that copy.</p>
   <button type="button" id="export-session">Export tracker backup</button>
   <label>Choose tracker backup <input type="file" id="import-session" accept=".json,application/json"></label>
@@ -12,6 +13,7 @@
   <p id="session-file-status" role="status"></p>
   <div class="focus-form"><button type="button" id="view-import-report">Import report</button><button type="button" id="refresh-aurora">Refresh from Aurora</button></div>
   <p id="aurora-refresh-status" role="status"></p>
+  </details>
 </dialog>
 <dialog id="bind-charge-pool" aria-labelledby="bind-charge-heading">
   <form id="bind-charge-form">
