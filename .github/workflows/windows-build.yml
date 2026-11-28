@@ -1,0 +1,60 @@
+# Build the Windows zip on every push to dev, so Grant can download the latest build without
+# a Rust toolchain. The zip goes to the rolling "dev-build" pre-release (always the same link)
+# and to the run's Artifacts.
+name: Windows build
+
+on:
+  push:
+    branches: [dev]
+    paths-ignore: ["owlbear/**", "docs/**", "**.md"]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust tests
+        run: cargo test --locked
+      - name: Build the helpers
+        run: cargo build --release --locked --bins
+      - name: Build the launcher
+        shell: cmd
+        run: launcher\build.cmd
+      - name: Zip
+        shell: pwsh
+        run: |
+          $out = "target\release"
+          $stage = "target\tmp\zip"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          foreach ($f in "Aurora Combat Tracker.exe", "combat-sheet.exe", "aurora-party.exe", "SRD-5.1-NOTICES.txt", "SRD-5.2.1-NOTICES.txt") {
+            Copy-Item (Join-Path $out $f) $stage
+          }
+          New-Item -ItemType Directory -Force target\dist | Out-Null
+          Compress-Archive -Path "$stage\*" -DestinationPath "target\dist\Aurora-Combat-Tracker-Windows.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aurora-Combat-Tracker-Windows-${{ github.sha }}
+          path: target/dist/Aurora-Combat-Tracker-Windows.zip
+      # Pull requests only check that the build works; pushes to dev publish it.
+      - name: Publish the dev-build pre-release
+        if: github.event_name == 'push' || github.ref == 'refs/heads/dev'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short="${GITHUB_SHA::7}"
+          gh release delete dev-build --yes --cleanup-tag || true
+          gh release create dev-build target/dist/Aurora-Combat-Tracker-Windows.zip \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "Latest dev build ($short)" \
+            --notes "Windows build of dev at $short, made by GitHub Actions. Unzip and run Aurora Combat Tracker.exe. Replaced on every push to dev."

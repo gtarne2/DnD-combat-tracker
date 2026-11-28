@@ -45,6 +45,7 @@ module.exports = async function encounterPortability({launch,pageFor,api,pkg}) {
 
   // Export through the dashboard button. The file carries no member identity.
   const download = sourcePage.waitForEvent("download");
+  await sourcePage.locator("#dm-files-open").click();
   await sourcePage.getByRole("button",{name:"Export encounter",exact:true}).click();
   const file = path.join(pkg,"p10-encounter.json");
   await (await download).saveAs(file);

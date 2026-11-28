@@ -3,6 +3,12 @@ const previewEncounter = (() => {
   const key = profile && `aurora-combat-encounter-v1:${profile}`;
   const legacyKey = `aurora-combat-consumables-v1:${profile}`;
   const status = document.getElementById("encounter-status");
+  // Status messages in the header fade after a few seconds, so old news doesn't sit there.
+  let statusTimer;
+  new MutationObserver(() => {
+    clearTimeout(statusTimer);
+    if (status.textContent) statusTimer = setTimeout(() => { status.textContent = ""; }, 8000);
+  }).observe(status, {childList: true, characterData: true, subtree: true});
   const emptyFocus = () => ({ active: null, pending: [], last: null, sequence: 0, rules: "2014" });
   const emptyProgress = () => ({round: 1, current: null, hp: null, actors: [], sequence: 0, used: {}, resources: [], effects: []});
   const integer = (number) => Number.isSafeInteger(number) && number >= 0;
@@ -202,8 +208,8 @@ const previewEncounter = (() => {
     }
     state = nextState;
     history = retained || nextHistory;
-    if (clock) status.textContent = "DM clock updated. Local Undo starts here.";
-    else if (shared) status.textContent = "Party action saved. Local Undo starts here. Review recipients in Session → Party and correct costs in Resources or Turn actions.";
+    // A DM clock tick needs no message. A party action says so briefly; Undo can't reach past it.
+    if (shared && !clock) status.textContent = "Sent to the party.";
     delivery = ledger;
     if (!retained) persisted = false;
     return retained ? "durable" : "failed";

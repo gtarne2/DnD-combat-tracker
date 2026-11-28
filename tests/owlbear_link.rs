@@ -200,6 +200,29 @@ fn table_view_shows_only_what_players_may_see() {
         json!(["Poisoned", "prone", "Frightened"])
     );
 
+    // R91: a bloodied flag for enemies at or below half HP, never the numbers.
+    assert_eq!(shown["bloodied"], false);
+    for (hp, bloodied) in [(5, true), (6, false), (0, false)] {
+        enemy["hp"] = json!(hp);
+        enemy["max_hp"] = json!(11);
+        edit(
+            &mut service,
+            room,
+            HOST,
+            json!({"kind":"enemy","id":enemies[0]["id"],"score":14,"enemy":enemy}),
+        );
+        let table = service.table_view(HOST, room).unwrap();
+        let row = table["encounter"]["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == enemies[0]["id"])
+            .unwrap()
+            .clone();
+        assert_eq!(row["bloodied"], bloodied, "{hp} of 11");
+        assert!(!table.to_string().contains("\"hp\""));
+    }
+
     // A player's token look: class and a small inline portrait, kept across a reconnect.
     let portrait = "data:image/webp;base64,UklGRiQAAABXRUJQ";
     let look = TokenLook {
@@ -220,6 +243,26 @@ fn table_view_shows_only_what_players_may_see() {
     assert_eq!(player(&service)["look"]["portrait"], portrait);
     service.execute(PLAYER, &command(room, Resume)).unwrap();
     assert_eq!(player(&service)["look"]["portrait"], portrait);
+    // R91: a player who shares vitals gives the ally HP bar a rounded fraction, not numbers.
+    assert!(player(&service).get("hp_fraction").is_none());
+    service
+        .publish(
+            PLAYER,
+            room,
+            Publication::Vitals {
+                vitals: Vitals {
+                    current_hp: Some(7),
+                    max_hp: Some(20),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    assert_eq!(player(&service)["hp_fraction"], 0.35);
+    service
+        .publish(PLAYER, room, Publication::PartyNameOnly)
+        .unwrap();
+    assert!(player(&service).get("hp_fraction").is_none());
     for bad in [
         TokenLook {
             class: "x".repeat(41),

@@ -4,7 +4,7 @@
     <span class="dm-brand-mark"><svg class="icon" aria-hidden="true"><use href="#gi-dice-twenty-faces-twenty"/></svg></span>
     <div><p class="product-name">Aurora Combat Tracker</p><h1>DM dashboard</h1></div>
   </div>
-  <div class="dm-topbar-tools"><button type="button" id="dm-settings-open">Settings</button><div id="party-controls"></div></div>
+  <div class="dm-topbar-tools"><button type="button" id="dm-files-open" title="Game time, saved rosters and encounter files">Files</button><button type="button" id="dm-settings-open">Settings</button><div id="party-controls"></div></div>
 </header>
 <dialog id="dm-settings" aria-labelledby="dm-settings-title">
   <form method="dialog" class="dm-library-body">
@@ -37,6 +37,7 @@
     <div id="dm-empty" class="dm-empty" role="status">Waiting for players to join.</div>
     <p class="dm-hint" id="dm-join-hint">Use <strong>Copy invite</strong> above and send it to your players. They join from the launcher with <strong>Party… → Join</strong>.</p>
     <div id="dm-party-list" class="dm-party-list"></div>
+    <div id="dm-rest" class="dm-rest" hidden><span class="dm-rest-title">Party rest</span><button type="button" data-party-rest="short" title="Each player's sheet opens its short rest. They spend Hit Dice there.">Short rest</button><button type="button" data-party-rest="long" title="Each player's sheet opens its long rest.">Long rest</button><p id="dm-rest-status" class="dm-rest-status" role="status"></p></div>
     <section class="dm-owlbear" id="dm-owlbear" aria-labelledby="dm-owlbear-heading" hidden>
       <div class="dm-owlbear-head"><h3 id="dm-owlbear-heading">Owlbear Rodeo</h3><span id="dm-owlbear-state" class="dm-owlbear-state" role="status"></span></div>
       <p class="dm-owlbear-code"><span>Pairing code</span> <strong id="dm-owlbear-code"></strong></p>
@@ -97,13 +98,11 @@
         <div id="dm-call-list"></div>
       </section>
       <section id="dm-zones" class="dm-areas dm-zones" aria-labelledby="dm-zones-title" hidden>
-        <h3 id="dm-zones-title">Lasting spell areas</h3>
-        <p class="dm-waiting-hint">A creature takes the damage the first time on a turn that it enters the area or when it starts its turn there. Queue it, then resolve it with the other area spells.</p>
+        <h3 id="dm-zones-title" title="A creature takes the damage the first time on a turn that it enters the area or when it starts its turn there. Queue it, then resolve it with the other area spells.">Lasting spell areas</h3>
         <div id="dm-zone-list"></div>
       </section>
       <section id="dm-areas" class="dm-areas" aria-labelledby="dm-areas-title" hidden>
         <h3 id="dm-areas-title">Area spells to resolve</h3>
-        <p class="dm-waiting-hint">Assist rolls each save from the stat block or the player's shared sheet. Check the results, then Apply.</p>
         <div id="dm-area-list"></div>
       </section>
       <section id="dm-recap" class="dm-areas dm-recap" aria-labelledby="dm-recap-title" hidden>
@@ -111,8 +110,10 @@
         <div id="dm-recap-body"></div>
         <div class="dm-area-actions"><button type="button" id="dm-recap-copy">Copy recap</button><button type="button" id="dm-recap-clear" class="dm-danger-quiet">Clear recap</button></div>
       </section>
-      <details class="dm-more" id="dm-more-tools">
-      <summary>Game time, rosters and encounter files</summary>
+      <!-- Opened from Files in the header. It sits inside the panel so the panel's handlers reach it. -->
+      <dialog id="dm-files" class="dm-files-dialog" aria-labelledby="dm-files-title">
+      <header class="panel-heading"><h2 id="dm-files-title"><svg class="icon" aria-hidden="true"><use href="#gi-scroll-unfurled"/></svg>Game time, rosters and files</h2>
+        <form method="dialog"><button>Close</button></form></header>
       <div class="dm-tools">
         <form id="dm-advance" class="dm-tool"><span class="dm-tool-title"><svg class="icon" aria-hidden="true"><use href="#gi-hourglass"/></svg>Game time</span>
           <label>Advance game time <input name="amount" type="number" min="1" required></label>
@@ -127,7 +128,7 @@
           <label>Import encounter <input id="dm-import-encounter" type="file" accept=".json,application/json"></label>
         </div>
       </div>
-      </details>
+      </dialog>
     </div>
     <div class="dm-focus">
       <p class="dm-focus-empty" id="dm-focus-empty"><svg class="icon" aria-hidden="true"><use href="#gi-dragon-head"/></svg>Select a combatant to see its stat block and actions here.</p>

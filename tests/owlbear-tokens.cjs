@@ -142,6 +142,29 @@ async function main() {
     assert(ringsOn("o1").find((i) => i.metadata[t.MARKER] === t.DOWN).scale.x === 2, "down ring returns outward");
     await t.syncTokens({ ...turnTable, encounter: { ...turnTable.encounter, current: "p1", running: false } });
     assert(!ringsOn("p1").length, "no turn ring when the encounter is not running");
+    // R91: Bloodied ring and player HP bars, both off until the DM turns them on.
+    rows[0] = { ...rows[0], bloodied: true };
+    rows[2] = { ...rows[2], hp_fraction: 0.4 };
+    await t.syncTokens(table(rows));
+    assert(!ringsOn("w1").length && !ringsOn("p1").length, "no Bloodied ring or HP bar by default");
+    t.saveMarkerSettings({ bloodied: true, hpBars: true });
+    await t.syncTokens(table(rows));
+    const bloodied = ringsOn("w1").filter((i) => i.metadata[t.MARKER] === t.BLOODIED);
+    assert(bloodied.length === 1 && bloodied[0].strokeColor === "#ff9f1a", "a bloodied enemy gets an orange ring");
+    const bars = ringsOn("p1");
+    const fill = bars.find((i) => i.metadata[t.MARKER] === "hp-bar:fill");
+    assert(bars.length === 2 && fill && fill.shapeType === "RECTANGLE" && fill.fillColor === "#f0b429" && Math.abs(fill.width - 48) < 1e-9, "a player sharing vitals gets an amber bar at 40%");
+    assert(!bars.some((i) => /\d/.test(i.name)), "the bar shows no numbers");
+    await t.syncTokens(table(rows));
+    assert(ringsOn("p1").length === 2, "the bar sync is idempotent");
+    rows[2] = { ...rows[2], hp_fraction: 0.8 };
+    await t.syncTokens(table(rows));
+    assert(ringsOn("p1").find((i) => i.metadata[t.MARKER] === "hp-bar:fill").fillColor === "#4cc26a", "the bar follows the shared HP");
+    t.saveMarkerSettings({ bloodied: false, hpBars: false });
+    await t.syncTokens(table(rows));
+    assert(!ringsOn("w1").length && !ringsOn("p1").length, "turning them off removes them");
+    rows[0] = { ...rows[0], bloodied: false };
+    delete rows[2].hp_fraction;
 
     scene.set("mine", { id: "mine", type: "IMAGE", name: "My goblin", visible: true, metadata: { other: 1 }, position: { x: 0, y: 0 } });
     rows.push({ id: "g1", kind: "enemy", revealed: false, name: "Goblin", down: false, template: null });

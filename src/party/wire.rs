@@ -95,6 +95,16 @@ pub enum Effect {
     /// A spell or effect another player puts on this player, such as Longstrider or Bless,
     /// with the stat changes the recipient's sheet applies while it lasts (R79).
     Buff(StatBuff),
+    /// The DM calls a short or long rest for the party. Each sheet takes it with its own
+    /// choices (Hit Dice, prepared spells) and then accepts the offer (R90).
+    Rest(RestKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RestKind {
+    Short,
+    Long,
 }
 
 impl Effect {
@@ -258,6 +268,19 @@ pub struct Vitals {
     pub initiative: Option<i32>,
     pub conditions: Vec<String>,
     pub concentration: Option<String>,
+    /// Death saves while the character is at 0 HP. Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub death_saves: Option<DeathSaves>,
+}
+
+/// R89: a dying character's death saving throws, as the sheet counts them.
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DeathSaves {
+    pub successes: u8,
+    pub failures: u8,
+    pub stable: bool,
+    pub dead: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

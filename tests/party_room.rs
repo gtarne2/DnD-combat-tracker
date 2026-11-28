@@ -919,3 +919,54 @@ fn native_entry_point_initializes_and_preserves_versioned_database() {
         Err(PartyError::Schema(2))
     ));
 }
+
+#[test]
+fn vitals_carry_death_saves_only_while_dying() {
+    // Older sheets publish no death_saves; the field stays out of the JSON when absent.
+    let old: Vitals = serde_json::from_value(json!({"current_hp": 7, "max_hp": 20})).unwrap();
+    assert!(old.death_saves.is_none());
+    assert!(!serde_json::to_string(&old).unwrap().contains("death_saves"));
+    let dying: Vitals = serde_json::from_value(json!({
+        "current_hp": 0, "max_hp": 20,
+        "death_saves": {"successes": 1, "failures": 2, "stable": false, "dead": false}
+    }))
+    .unwrap();
+    let saves = dying.death_saves.as_ref().unwrap();
+    assert_eq!((saves.successes, saves.failures), (1, 2));
+    assert!(
+        serde_json::from_value::<Vitals>(json!({"death_saves": {"successes": 1, "extra": 1}}))
+            .is_err()
+    );
+    assert!(serde_json::from_value::<Vitals>(json!({"death_saves": {"successes": 300}})).is_err());
+}
+
+#[test]
+fn only_the_host_calls_a_rest() {
+    let db = Database::new();
+    let mut service = db.open();
+    let (room, first, second) = roster(&mut service, HostMode::Dm);
+    let rest = |recipient| Send {
+        action_id: Uuid::new_v4(),
+        recipient,
+        source: "Long rest".into(),
+        effect: Effect::Rest(RestKind::Long),
+    };
+    rejected(
+        service.execute(FIRST, &command(room, rest(second))),
+        Rejection::InvalidInput,
+    );
+    let Receipt::Offer { offer_id, status } = run(&mut service, room, HOST, rest(first)) else {
+        panic!("expected an offer");
+    };
+    assert_eq!(status, Status::Pending);
+    let wire = serde_json::to_value(Effect::Rest(RestKind::Short)).unwrap();
+    assert_eq!(wire, json!({"kind": "rest", "amount": "short"}));
+    run(&mut service, room, FIRST, Claim { offer_id });
+    assert_eq!(
+        run(&mut service, room, FIRST, Accept { offer_id }),
+        Receipt::Offer {
+            offer_id,
+            status: Status::Accepted
+        }
+    );
+}

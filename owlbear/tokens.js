@@ -15,10 +15,25 @@ const HIDDEN_NAME = "Enemy";
  * (outermost) and down. Colours come from that extension's palette. */
 export const TURN = "ring-turn";
 export const DOWN = "ring-down";
+export const BLOODIED = "ring-bloodied";
 export const RINGS = [
   { kind: TURN, colour: "#ffd433", name: "Current turn" },
+  { kind: BLOODIED, colour: "#ff9f1a", name: "Bloodied" },
   { kind: DOWN, colour: "#ff4d4d", name: "Down" },
 ];
+const HP_BAR = "hp-bar";
+
+/** R91: optional token markers, off by default because the table keeps HP secret. Kept in
+ * this browser: a Bloodied ring on enemies at or below half HP, and HP bars on player tokens
+ * for players who share vitals. Neither shows a number. */
+const MARKER_SETTINGS_KEY = "aurora-obr-token-markers";
+export function loadMarkerSettings() {
+  try { return { bloodied: false, hpBars: false, ...JSON.parse(localStorage.getItem(MARKER_SETTINGS_KEY) || "{}") }; }
+  catch { return { bloodied: false, hpBars: false }; }
+}
+export function saveMarkerSettings(settings) {
+  try { localStorage.setItem(MARKER_SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
 const CELLS = { tiny: 0.5, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
 
 /** Art is remembered per monster template, player or companion. */
@@ -375,8 +390,10 @@ export async function syncTokens(table) {
 
   // Read the tokens again: the updates above may have changed their visibility.
   const kept = await OBR.scene.items.getItems(linked.filter((item) => rows.has(linkOf(item, room).row)).map((item) => item.id));
-  await syncRings(kept, rows, room, table.encounter);
+  const settings = loadMarkerSettings();
+  await syncRings(kept, rows, room, table.encounter, settings);
   await syncConditions(kept, rows, room);
+  await syncHpBars(kept, rows, room, settings);
 }
 
 // Condition markers use art the DM picks once per condition from Owlbear's asset library
@@ -544,19 +561,22 @@ function buildRing(token, ring, index, dpi) {
 }
 
 /** Rings follow the tracker: the current turn while the encounter runs, and down rows. */
-async function syncRings(tokens, rows, room, encounter) {
+async function syncRings(tokens, rows, room, encounter, settings = loadMarkerSettings()) {
   const ids = tokens.map((item) => item.id);
   const markers = await markersFor(ids);
   // Older versions drew a text label or a skull badge. Those go.
   const known = new Set(RINGS.map((ring) => ring.kind));
-  const stale = markers.filter((marker) => !known.has(marker.metadata[MARKER]) && !String(marker.metadata[MARKER]).startsWith(CONDITION));
+  const stale = markers.filter((marker) => !known.has(marker.metadata[MARKER]) && !String(marker.metadata[MARKER]).startsWith(CONDITION)
+    && !String(marker.metadata[MARKER]).startsWith(HP_BAR));
   const dpi = await OBR.scene.grid.getDpi();
   const add = [];
   const remove = stale.map((marker) => marker.id);
   const restyle = [];
   for (const token of tokens) {
     const row = rows.get(linkOf(token, room).row);
-    const wanted = RINGS.filter((ring) => (ring.kind === TURN ? encounter.running && encounter.current === row.id : Boolean(row.down)));
+    const wanted = RINGS.filter((ring) => (ring.kind === TURN ? encounter.running && encounter.current === row.id
+      : ring.kind === BLOODIED ? settings.bloodied && row.kind === "enemy" && Boolean(row.bloodied) && !row.down
+      : Boolean(row.down)));
     const mine = markers.filter((marker) => marker.attachedTo === token.id && known.has(marker.metadata[MARKER]));
     for (const marker of mine) if (!wanted.some((ring) => ring.kind === marker.metadata[MARKER])) remove.push(marker.id);
     wanted.forEach((ring, index) => {
@@ -584,5 +604,59 @@ async function syncRings(tokens, rows, room, encounter) {
       }
     });
   }
+  if (add.length) await OBR.scene.items.addItems(add);
+}
+
+// R91: an HP bar under a player's token: a dark track and a coloured fill, no numbers.
+function hpColour(fraction) {
+  return fraction > 0.5 ? "#4cc26a" : fraction > 0.25 ? "#f0b429" : "#ff4d4d";
+}
+function buildHpBar(token, fraction, part, dpi) {
+  const dpiScale = dpi / (token.grid?.dpi || dpi);
+  const width = (token.image?.width || dpi) * dpiScale;
+  const height = (token.image?.height || dpi) * dpiScale;
+  const offsetX = token.grid?.offset && token.image?.width ? (token.grid.offset.x / token.image.width) * width : width / 2;
+  const offsetY = token.grid?.offset && token.image?.height ? (token.grid.offset.y / token.image.height) * height : height / 2;
+  const size = Math.min(width, height) * Math.abs(token.scale?.x || 1);
+  const centre = { x: token.position.x - offsetX + width / 2, y: token.position.y - offsetY + height / 2 };
+  const barWidth = size * 0.8;
+  const barHeight = Math.max(6, size * 0.08);
+  const fill = part === "fill";
+  return buildShape()
+    .width(fill ? Math.max(1, barWidth * fraction) : barWidth)
+    .height(barHeight)
+    .position({ x: centre.x - barWidth / 2, y: centre.y + size / 2 + barHeight * 0.4 })
+    .fillColor(fill ? hpColour(fraction) : "#1b1f27")
+    .fillOpacity(fill ? 1 : 0.85)
+    .strokeColor("#000000")
+    .strokeOpacity(fill ? 0 : 0.6)
+    .strokeWidth(fill ? 0 : 2)
+    .shapeType("RECTANGLE")
+    .attachedTo(token.id)
+    .locked(true)
+    .name(fill ? "HP" : "HP track")
+    .metadata({ [MARKER]: HP_BAR + ":" + part, [MARKER + "/fraction"]: fraction })
+    .layer("ATTACHMENT")
+    .disableHit(true)
+    .visible(token.visible)
+    .build();
+}
+
+async function syncHpBars(tokens, rows, room, settings) {
+  const markers = (await markersFor(tokens.map((t) => t.id))).filter((m) => String(m.metadata[MARKER]).startsWith(HP_BAR));
+  const dpi = await OBR.scene.grid.getDpi();
+  const add = [];
+  const remove = [];
+  for (const token of tokens) {
+    const row = rows.get(linkOf(token, room).row);
+    const fraction = settings.hpBars && row.kind === "player" && typeof row.hp_fraction === "number"
+      ? Math.max(0, Math.min(1, row.hp_fraction)) : null;
+    const mine = markers.filter((m) => m.attachedTo === token.id);
+    const current = mine.length === 2 && mine.every((m) => m.metadata[MARKER + "/fraction"] === fraction && m.visible === token.visible);
+    if (current) continue;
+    remove.push(...mine.map((m) => m.id));
+    if (fraction !== null) add.push(buildHpBar(token, fraction, "track", dpi), buildHpBar(token, fraction, "fill", dpi));
+  }
+  if (remove.length) await OBR.scene.items.deleteItems(remove);
   if (add.length) await OBR.scene.items.addItems(add);
 }

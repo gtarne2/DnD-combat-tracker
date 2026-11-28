@@ -205,6 +205,8 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 .dm-stat-label { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 .dm-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .dm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
+.dm-dying { border-color: #8a3b3b; color: #ffc4c4; background: #2c1719; font-weight: 650; }
+.dm-turn-dying { display: block; color: #ff9d9d; font-size: 12px; font-weight: 650; }
 .dm-condition { border-color: #7a5a2d; color: #f3cf91; background: #2a2115; }
 .dm-concentration { border-color: #5b4a8c; color: var(--violet); background: #211c33; }
 .dm-private { color: var(--faint); }
@@ -559,3 +561,17 @@ button.dm-pill:hover:not(:disabled) { filter: brightness(1.25); }
 .dm-difficulty-more input[type="number"] { width: 4em; }
 .dm-recap-head { margin: 6px 0 2px; font-weight: 600; }
 .dm-recap-line { margin: 2px 0; font-size: 13px; }
+.dm-member-link { cursor: pointer; }
+.dm-member-link:hover { text-decoration: underline; }
+
+/* Files dialog: game time, rosters and encounter files, opened from the header. */
+.dm-files-dialog { width: min(520px, calc(100vw - 32px)); }
+.dm-files-dialog .panel-heading { margin-bottom: 4px; }
+.dm-files-dialog .dm-tools { margin-top: 6px; }
+
+/* R90: party rest buttons under the party overview */
+.dm-rest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.dm-rest[hidden] { display: none; }
+.dm-rest-title { font-weight: 650; margin-right: auto; }
+.dm-rest-status { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13px; }
+.dm-rest-status:empty { display: none; }

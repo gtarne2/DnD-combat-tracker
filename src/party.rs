@@ -312,6 +312,23 @@ impl RoomService {
                 if let Some(look) = look {
                     row["look"] = serde_json::json!(look);
                 }
+                // R91: a shared HP fraction (rounded to a twentieth) for the optional ally HP bar.
+                let vitals = row["member_id"]
+                    .as_str()
+                    .and_then(|id| id.parse::<Uuid>().ok())
+                    .and_then(|member| self.live.get(&(room_id, member)))
+                    .and_then(|presence| match presence.inspection.as_ref()? {
+                        Publication::Vitals { vitals } => Some(vitals),
+                        Publication::CharacterDetails { vitals, .. } => Some(vitals),
+                        Publication::PartyNameOnly => None,
+                    });
+                if let Some((current, max)) =
+                    vitals.and_then(|v| Some((v.current_hp?, v.max_hp.filter(|m| *m > 0)?)))
+                {
+                    let fraction =
+                        (f64::from(current.min(max)) / f64::from(max) * 20.0).round() / 20.0;
+                    row["hp_fraction"] = serde_json::json!(fraction);
+                }
             }
         }
         Ok(serde_json::json!({"room_id": room_id, "encounter": encounter}))

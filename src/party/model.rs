@@ -710,6 +710,11 @@ impl Room {
     ) -> Result<Change, Rejection> {
         if !valid_label(source)
             || matches!(effect, Effect::Buff(buff) if !buff.valid())
+            || (matches!(effect, Effect::Rest(_))
+                && !self
+                    .members
+                    .get(&sender)
+                    .is_some_and(|m| m.principal == Principal::LocalHost))
             || recipient == sender
             || (self.mode == HostMode::Dm
                 && self

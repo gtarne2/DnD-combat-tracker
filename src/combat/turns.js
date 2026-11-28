@@ -159,6 +159,9 @@ const encounterTracker = (() => {
       const note = byId("party-encounter-note");
       if (!note.dataset.error) note.textContent = !joined ? "Roll initiative to join. The DM can also add you."
         : !running ? "You're in. The DM starts the encounter."
+        : mine(active) && active.key === "owner" && (progress.hp || initialHp())?.current === 0
+          && !progress.deathSaves?.stable && !progress.deathSaves?.dead
+          ? "It's your turn. Make a death save on your HP card, then press End Turn."
         : mine(active) ? "It's your turn. Press End Turn when you're done."
         : "";
       note.hidden = !note.textContent;
@@ -174,7 +177,8 @@ const encounterTracker = (() => {
     undo.setAttribute("aria-label", undo.title);
     byId("undo-label").hidden = !undoLabel;
     byId("undo-label").textContent = undoLabel ? "Last change · " + undoLabel : "";
-    byId("encounter-storage").textContent = previewEncounter.isPersisted() ? "Saved locally" : "This tab only";
+    // Saving is the normal case; only say something when it isn't happening.
+    byId("encounter-storage").textContent = previewEncounter.isPersisted() ? "" : "Not saved: this tab only";
     owner.elements.initiative.value = state.companions?.owner ?? "";
     const hp = progress.hp || initialHp();
     byId("encounter-hp").textContent = displayHp(hp);

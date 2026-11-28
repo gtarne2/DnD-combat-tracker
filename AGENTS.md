@@ -2,7 +2,7 @@
 
 These instructions are shared by Codex and Claude Code. Start in the repository root. Check `git status --short --branch` and preserve existing work, including untracked files.
 
-The current line is `dev`. GitHub's default branch (`codex/dev-character-sheet`) is stale, so branch from `dev` and open pull requests into `dev`. The user (Grant) has no Rust toolchain on the Windows PC, so changes to try at the table need a Windows zip built in the cloud ([how](docs/development.md#windows-builds-from-the-cloud)). The backlog and dislikes are in the [handoff](docs/handoff.md#grants-backlog-and-preferences).
+The current line is `dev`. GitHub's default branch (`codex/dev-character-sheet`) is stale, so branch from `dev` and open pull requests into `dev`. The user (Grant) has no Rust toolchain on the Windows PC. Once a change is on `dev`, GitHub Actions publishes the Windows zip ([how](docs/development.md#windows-builds-from-github)); a branch to try before merging needs a zip built in the cloud ([how](docs/development.md#windows-builds-from-the-cloud)). The backlog and dislikes are in the [handoff](docs/handoff.md#grants-backlog-and-preferences).
 
 ## Load context for the task
 

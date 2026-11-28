@@ -43,3 +43,5 @@ button.small { padding: 3px 8px; font-size: 12px; }
 .pick li { padding: 0; }
 .pick button { width: 100%; text-align: left; border: 0; border-radius: 0; padding: 8px 10px; }
 .pick button:hover { background: var(--line); }
+label.check { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0; font-size: 13px; }
+label.check input { margin-top: 2px; }

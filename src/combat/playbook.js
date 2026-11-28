@@ -745,6 +745,8 @@ const playbook = (() => {
       return true;
     });
     rest.close();
+    // A rest the DM called (R90) is answered once the player has taken it.
+    document.dispatchEvent(new CustomEvent("sheet-rest-taken", {detail: {kind}}));
   });
 
   document.addEventListener("preview-encounter-change", render);
