@@ -159,6 +159,9 @@ const encounterTracker = (() => {
       const note = byId("party-encounter-note");
       if (!note.dataset.error) note.textContent = !joined ? "Roll initiative to join. The DM can also add you."
         : !running ? "You're in. The DM starts the encounter."
+        : mine(active) && active.key === "owner" && (progress.hp || initialHp())?.current === 0
+          && !progress.deathSaves?.stable && !progress.deathSaves?.dead
+          ? "It's your turn. Make a death save on your HP card, then press End Turn."
         : mine(active) ? "It's your turn. Press End Turn when you're done."
         : "";
       note.hidden = !note.textContent;

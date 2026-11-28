@@ -39,6 +39,8 @@ function setupPartySharing(panel, request) {
       conditions: effects.filter(effect => effect.category === "condition").map(effect => effect.name),
       concentration: state.focus.active?.name ?? null,
     };
+    const dying = deathSaves.current(state);
+    if (dying) vitals.death_saves = dying;
     if (mode === "vitals") return {sharing: mode, vitals};
 
     function numbers(selector, name, value) {

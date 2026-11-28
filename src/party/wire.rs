@@ -258,6 +258,19 @@ pub struct Vitals {
     pub initiative: Option<i32>,
     pub conditions: Vec<String>,
     pub concentration: Option<String>,
+    /// Death saves while the character is at 0 HP. Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub death_saves: Option<DeathSaves>,
+}
+
+/// R89: a dying character's death saving throws, as the sheet counts them.
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DeathSaves {
+    pub successes: u8,
+    pub failures: u8,
+    pub stable: bool,
+    pub dead: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

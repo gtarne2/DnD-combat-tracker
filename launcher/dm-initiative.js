@@ -54,7 +54,7 @@ function setupDmInitiative(request, refresh) {
     const board = room?.combat;
     const rows = board?.rows || [];
     const key = JSON.stringify([rows, board?.running, board?.current, order.value,
-      room?.members?.map(m => [m.member_id, m.name, m.online, m.inspection?.vitals?.current_hp, m.inspection?.vitals?.max_hp, m.inspection?.vitals?.initiative]), busy]);
+      room?.members?.map(m => [m.member_id, m.name, m.online, m.inspection?.vitals?.current_hp, m.inspection?.vitals?.max_hp, m.inspection?.vitals?.initiative, m.inspection?.vitals?.death_saves]), busy]);
     if (key === turnsKey) return;
     turnsKey = key;
     renderWaiting(rows);
@@ -85,6 +85,8 @@ function setupDmInitiative(request, refresh) {
       if (!enemy && row.damage_recipient) {
         const vitals = room.members?.find(m => m.member_id === row.damage_recipient)?.inspection?.vitals;
         if (vitals) hp = {current:vitals.current_hp, max:vitals.max_hp};
+        const dying = dmDeathSaves(vitals);
+        if (dying) body.append(make("span", dying, "dm-turn-dying"));
       }
       item.append(score, body);
       if (hp) {
@@ -210,6 +212,8 @@ function setupDmInitiative(request, refresh) {
         }
         card.append(stats);
         const tags = make("div", null, "dm-tags");
+        const dying = dmDeathSaves(vitals);
+        if (dying) tags.append(make("span", dying, "dm-tag dm-dying"));
         for (const condition of vitals.conditions || []) tags.append(make("span", condition, "dm-tag dm-condition"));
         if (vitals.concentration) tags.append(make("span", "Concentrating · " + vitals.concentration, "dm-tag dm-concentration"));
         if (tags.childElementCount) card.append(tags);

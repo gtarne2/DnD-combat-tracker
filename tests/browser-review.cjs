@@ -625,12 +625,68 @@ async function main() {
     await expectText(compact.locator("#combat-turn-order"), "16 HP");
     await compact.locator("#undo-turn").click();
     await expectText(compact.locator("#combat-turn-order"), "20 HP");
+    // R89: death saves at 0 HP. With the roll assist off, type the d20 or click the result.
+    const saves = compact.locator("#key-stats [data-death-saves]");
+    const marks = async (successes, failures) => {
+      await saves.locator(`[data-death-marks=success][aria-label="${successes} of 3 successes"]`).waitFor();
+      await saves.locator(`[data-death-marks=failure][aria-label="${failures} of 3 failures"]`).waitFor();
+    };
+    assert.equal(await saves.isHidden(), true);
+    await compact.locator("#key-stats [data-hp-amount]").fill("12");
+    await compact.locator("#key-stats [data-hp-op=damage]").click();
+    await expectText(compact.locator("#key-stats [data-stat=hp]"), "0 / 24");
+    await saves.waitFor();
+    assert.equal(await saves.getByRole("button", {name: "Roll death save"}).isHidden(), true);
+    await saves.getByLabel("Death save d20 result").fill("14");
+    await saves.getByRole("button", {name: "Record"}).click();
+    await marks(1, 0);
+    await saves.getByLabel("Death save d20 result").fill("1");
+    await saves.getByLabel("Death save d20 result").press("Enter");
+    await marks(1, 2);
+    await saves.getByRole("button", {name: "Failure", exact: true}).click();
+    await marks(1, 3);
+    await expectText(saves.locator("[data-death-save-state]"), "Dead.");
+    assert.equal(await saves.locator(".death-save-actions").isHidden(), true);
+    await compact.locator("#undo-turn").click();
+    await marks(1, 2);
+    // Damage at 0 HP is a failure; a stable character starts dying again.
+    await saves.getByRole("button", {name: "Success", exact: true}).click();
+    await saves.getByRole("button", {name: "Success", exact: true}).click();
+    await expectText(saves.locator("[data-death-save-state]"), "Stable at 0 HP");
+    await compact.locator("#key-stats [data-hp-amount]").fill("3");
+    await compact.locator("#key-stats [data-hp-op=damage]").click();
+    await marks(3, 3);
+    await compact.locator("#undo-turn").click();
+    await expectText(saves.locator("[data-death-save-state]"), "Stable at 0 HP");
+    await compact.locator("#undo-turn").click();
+    await compact.locator("#undo-turn").click();
+    await marks(1, 2);
+    await compact.locator("[data-sheet-setting=rollDeathSaves]").evaluate((box) => {
+      box.checked = true;
+      box.dispatchEvent(new Event("change"));
+    });
+    await saves.getByRole("button", {name: "Roll death save"}).waitFor();
+    assert.equal(await saves.locator("[data-death-save-form]").isHidden(), true);
+    await compact.locator("[data-sheet-setting=rollDeathSaves]").evaluate((box) => {
+      box.checked = false;
+      box.dispatchEvent(new Event("change"));
+    });
+    await saves.getByLabel("Death save d20 result").fill("20");
+    await saves.getByRole("button", {name: "Record"}).click();
+    await expectText(compact.locator("#key-stats [data-stat=hp]"), "1 / 24");
+    await saves.waitFor({state: "hidden"});
+    // Leftover damage that reaches the HP maximum kills outright.
+    await compact.locator("#key-stats [data-hp-amount]").fill("30");
+    await compact.locator("#key-stats [data-hp-op=damage]").click();
+    await marks(0, 3);
+    await compact.locator("#undo-turn").click();
+    await expectText(compact.locator("#key-stats [data-stat=hp]"), "1 / 24");
     const divider = compact.locator("#inspector-divider");
     await divider.press("ArrowLeft");
     const width = await compact.locator("#all-options").evaluate((list) => list.clientWidth);
     await compact.reload();
     assert.equal(await compact.locator("#all-options").evaluate((list) => list.clientWidth), width);
-    console.log(`Legacy encounter and journal, HP controls, and inspector persistence passed. Compact action list at 1536 × 745: ${height}px.`);
+    console.log(`Legacy encounter and journal, HP controls, death saves, and inspector persistence passed. Compact action list at 1536 × 745: ${height}px.`);
 
     for (const [displayWidth, displayHeight] of [[1920, 1080], [2560, 1440]]) {
       for (const scale of [1, 1.25]) {

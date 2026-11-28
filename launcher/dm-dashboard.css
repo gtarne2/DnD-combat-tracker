@@ -205,6 +205,8 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 .dm-stat-label { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 .dm-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .dm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
+.dm-dying { border-color: #8a3b3b; color: #ffc4c4; background: #2c1719; font-weight: 650; }
+.dm-turn-dying { display: block; color: #ff9d9d; font-size: 12px; font-weight: 650; }
 .dm-condition { border-color: #7a5a2d; color: #f3cf91; background: #2a2115; }
 .dm-concentration { border-color: #5b4a8c; color: var(--violet); background: #211c33; }
 .dm-private { color: var(--faint); }

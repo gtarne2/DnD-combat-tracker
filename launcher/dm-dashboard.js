@@ -157,6 +157,8 @@ const renderDmParty = (() => {
           stats.append(init);
         }
         const tags = node("div", null, "dm-tags");
+        const dying = dmDeathSaves(vitals);
+        if (dying) tags.append(node("span", dying, "dm-tag dm-dying"));
         for (const condition of vitals.conditions) tags.append(node("span", condition, "dm-tag dm-condition"));
         if (vitals.concentration) {
           const focus = node("span", null, "dm-tag dm-concentration");
@@ -202,6 +204,16 @@ const renderDmParty = (() => {
 // Shared character details, as sections. Used by the inspector and by the turn order card when
 // the DM selects a player. Long lists (attacks, spells, features, inventory) fold away when
 // `folded` is set, so the turn card stays short.
+// R89: a dying player's death saves, as a short phrase for DM cards and lists.
+function dmDeathSaves(vitals) {
+  const saves = vitals?.death_saves;
+  if (!saves) return null;
+  if (saves.dead) return "Dead";
+  if (saves.stable) return "Stable at 0 HP";
+  return "Dying · " + saves.successes + " success" + (saves.successes === 1 ? "" : "es") + ", "
+    + saves.failures + " failure" + (saves.failures === 1 ? "" : "s");
+}
+
 function dmCharacterSections(vitals, details, {folded = false, withVitals = true} = {}) {
   const node = (tag, value, className) => {
     const element = document.createElement(tag);
@@ -227,6 +239,7 @@ function dmCharacterSections(vitals, details, {folded = false, withVitals = true
     HP: vitals ? shown(vitals.current_hp) + " / " + shown(vitals.max_hp) : "—", "Temp HP": vitals.temporary_hp, AC: vitals.effective_ac,
     Initiative: vitals.initiative, Conditions: (vitals.conditions || []).join(", ") || "None",
     Concentration: vitals.concentration ?? "None",
+    ...(dmDeathSaves(vitals) ? {"Death saves": dmDeathSaves(vitals)} : {}),
   });
   if (!details) return sections;
   facts("Ability scores", details.ability_scores);

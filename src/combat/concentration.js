@@ -653,17 +653,22 @@ const concentrationControls = (() => {
 
   function applyDamage(state, amount, ruleset = state.focus.rules) {
     const focus = state.focus;
+    const before = encounterTracker.hp(state);
     const hp = encounterTracker.damageOwner(state, amount);
     const previousRules = focus.rules;
     focus.rules = ruleset;
-    if (hp.changed || focus.active) previewEncounter.log(state, "damage", `Took ${amount} damage${hp.current == null ? "" : ` · ${hp.current} HP left`}`);
-    const feedback = hp.current == null ? "HP unavailable."
+    const downed = before?.current === 0 && amount - (hp.absorbed || 0) > 0;
+    if (hp.changed || focus.active || downed) previewEncounter.log(state, "damage", `Took ${amount} damage${hp.current == null ? "" : ` · ${hp.current} HP left`}`);
+    // R89: damage at or to 0 HP feeds the death saves (a failure, or instant death).
+    const dying = deathSaves.damaged(state, before, amount - (hp.absorbed || 0));
+    const feedback = (hp.current == null ? "HP unavailable."
       : hp.absorbed ? `${hp.absorbed} absorbed by temporary HP · ${hp.temporary} temp and ${hp.current} HP left.`
-      : hp.changed ? `${amount} damage recorded · ${hp.current} HP left.` : "HP is already 0.";
+      : hp.changed ? `${amount} damage recorded · ${hp.current} HP left.` : downed ? `${amount} damage at 0 HP.` : "HP is already 0.") + dying;
     if (hp.dropped && focus.active) {
       clear(focus);
       return {changed: true, feedback: feedback + " Concentration ended."};
     }
+    if (downed) return {changed: true, feedback};
     if (focus.active) {
       const dc = Math.max(10, Math.floor(amount / 2));
       focus.sequence += 1;

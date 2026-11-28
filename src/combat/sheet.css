@@ -1068,3 +1068,24 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .party-card[data-earlier] { opacity: .7; }
 .party-offers-more { justify-self: start; }
 .party-offer-accept { font-weight: 700; color: #22170a; background: linear-gradient(180deg, #f4d08d, #d9a650); border-color: #f6d79d; }
+
+/* R89: death saves on the HP card while at 0 HP */
+.death-saves { margin-top: 6px; padding: 6px 7px; border: 1px solid #6b3a3a; border-radius: 6px; background: #241a1f; }
+.death-saves[data-state=stable] { border-color: #2f6a48; background: #17261f; }
+.death-saves[data-state=dead] { border-color: #555; background: #1c1c1f; }
+.death-save-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 13px; }
+.death-save-head strong { color: #f0c8c8; }
+.death-save-head .death-save-stable { padding: 1px 6px; font-size: 11.5px; }
+.death-save-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; margin-top: 3px; font-size: 12px; }
+.death-save-tally { display: inline-flex; align-items: center; gap: 4px; }
+.death-save-label { color: var(--muted); }
+.death-dot { display: inline-block; width: 10px; height: 10px; margin-right: 1px; border-radius: 50%; border: 1.5px solid #7a8a8a; }
+.death-dot[data-kind=success].is-marked { background: var(--green); border-color: var(--green); }
+.death-dot[data-kind=failure].is-marked { background: var(--red); border-color: var(--red); }
+.death-save-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 5px; }
+.death-save-actions[hidden], .death-save-form[hidden], .death-save-roll[hidden] { display: none; }
+.death-save-form { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.death-save-roll { grid-column: 1 / -1; }
+.death-save-form input { min-width: 0; padding: 2px 6px; text-align: center; font-weight: 700; }
+.death-save-state { margin: 4px 0 0; font-size: 12.5px; color: #cfd8d8; }
+.death-save-state:empty { display: none; }
