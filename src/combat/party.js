@@ -132,6 +132,7 @@ function initiativeWriter(request) {
 
   function setBusy(value) {
     busy = value;
+    railKey = null;
     for (const button of [...send.querySelectorAll("button"), ...offers.querySelectorAll("button")]) {
       button.disabled = value;
     }
@@ -224,6 +225,120 @@ function initiativeWriter(request) {
     }
   }
 
+  // Offers on the encounter rail: incoming damage, healing and temporary HP with what accepting
+  // would do to this sheet, short notices when an offer this sheet sent is answered, and the
+  // automatic accepts with Undo. Session -> Party keeps the full list and attack grants.
+  const HP_KINDS = ["healing", "temporary_hp", "damage"];
+  const rail = hasSheet ? document.getElementById("party-offer-rail") : null;
+  const answered = new Map();
+  const notices = [];
+  const autoFailed = new Set();
+  let showEarlier = false;
+  let railKey;
+  function notice(text, undoState = null) {
+    notices.push({id: crypto.randomUUID(), text, undoState});
+    if (notices.length > 4) notices.shift();
+    railKey = null;
+  }
+  function offerLine(offer, members, state) {
+    const incoming = offer.recipient === state.self_id;
+    const other = members.find(member => member.member_id === (incoming ? offer.sender : offer.recipient));
+    const who = !other ? "" : other.member_id === state.dm_id ? "the DM" : partyActions.memberLabel(other);
+    const what = {healing: "healing", temporary_hp: "temporary HP", damage: "damage"}[offer.effect.kind];
+    return offer.source + " · " + offer.effect.amount + " " + what + (who ? (incoming ? " from " : " to ") + who : "");
+  }
+  // What accepting would do, worked out on a copy of this sheet's HP and concentration.
+  function preview(offer) {
+    const state = previewEncounter.current();
+    const hp = encounterTracker.hp(state);
+    if (!hp) return "Set your HP on the sheet first";
+    const amount = offer.effect.amount;
+    const temporary = hp.temporary || 0;
+    if (offer.effect.kind === "damage") {
+      const absorbed = Math.min(temporary, amount);
+      const current = Math.max(0, hp.current - (amount - absorbed));
+      const parts = ["HP " + hp.current + " → " + current + (absorbed ? " (" + absorbed + " from temp HP)" : "")];
+      if (current === 0 && hp.current > 0) parts.push("drops you to 0");
+      if (state.focus?.active) parts.push(current === 0 ? "ends your concentration" : "Concentration save DC " + Math.max(10, Math.floor(amount / 2)));
+      return parts.join(" · ");
+    }
+    if (offer.effect.kind === "healing") {
+      const current = Math.min(hp.max ?? 0xffffffff, hp.current + amount);
+      return current === hp.current ? "You're at full HP, so it heals nothing" : "HP " + hp.current + " → " + current;
+    }
+    return amount <= temporary ? "You already have " + temporary + " temp HP, so it adds nothing" : "Temp HP " + temporary + " → " + amount;
+  }
+  function renderRail(state, addressed, members) {
+    if (!rail || !state) return;
+    for (const offer of addressed) {
+      if (offer.sender !== state.self_id || !HP_KINDS.includes(offer.effect.kind)) continue;
+      const before = answered.get(offer.offer_id);
+      if (before === "pending" && ["accepted", "declined"].includes(offer.status)) {
+        const other = members.find(member => member.member_id === offer.recipient);
+        notice((other ? partyActions.memberLabel(other) : "They") + " " + offer.status + " " + offer.source + " (" + offer.effect.amount + " "
+          + {healing: "healing", temporary_hp: "temporary HP", damage: "damage"}[offer.effect.kind] + ")");
+      }
+      answered.set(offer.offer_id, offer.status);
+    }
+    const incoming = state.ended ? [] : addressed.filter(offer => offer.recipient === state.self_id
+      && HP_KINDS.includes(offer.effect.kind) && ["pending", "claimed"].includes(offer.status)
+      && !(sheetSettings.get("autoAcceptOffers") && offer.status === "pending" && !autoFailed.has(offer.offer_id)));
+    const current = previewEncounter.current();
+    const key = JSON.stringify([incoming, notices.map(n => [n.id, n.undoState === current]), busy, current.progress?.hp, current.focus?.active?.id]);
+    if (key === railKey) return;
+    railKey = key;
+    const cards = incoming.map(offer => {
+      const card = document.createElement("article");
+      card.className = "party-card party-offer-card";
+      card.dataset.kind = offer.effect.kind;
+      card.dataset.offerId = offer.offer_id;
+      const heading = document.createElement("strong");
+      heading.textContent = offerLine(offer, members, state);
+      const outcome = document.createElement("p");
+      outcome.textContent = preview(offer);
+      card.append(heading, outcome);
+      const action = (label, choice, primary) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.disabled = busy;
+        if (primary) button.className = "party-offer-accept";
+        button.onclick = () => perform(() => decide(state.room_id, offer, choice).catch(error => { notice(error.message); throw error; }));
+        card.append(button);
+      };
+      if (offer.status === "claimed") {
+        action("Apply", "apply", true);
+        action("Already handled", "handled");
+      } else action("Accept", "apply", true);
+      action("Decline", "decline");
+      return card;
+    });
+    const lines = notices.map(item => {
+      const line = document.createElement("p");
+      line.className = "party-offer-notice";
+      line.append(item.text);
+      if (item.undoState && item.undoState === current) {
+        const undo = document.createElement("button");
+        undo.type = "button";
+        undo.className = "quiet-button";
+        undo.textContent = "Undo";
+        undo.onclick = () => { item.undoState = null; item.text += " · Undone on this sheet"; railKey = null; previewEncounter.undo(); };
+        line.append(" ", undo);
+      }
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "quiet-button";
+      dismiss.textContent = "×";
+      dismiss.setAttribute("aria-label", "Dismiss");
+      dismiss.onclick = () => { notices.splice(notices.indexOf(item), 1); railKey = null; renderRail(state, addressed, members); };
+      line.append(" ", dismiss);
+      return line;
+    });
+    rail.hidden = !cards.length && !lines.length;
+    rail.replaceChildren(...cards, ...lines);
+  }
+  document.addEventListener("preview-encounter-change", () => { if (view) renderRail(view, view.offers || [], view.members || []); });
+
   function renderOffers(state) {
     const members = state.members || [];
     const recipients = members.filter(member => member.member_id !== state.self_id && member.member_id !== state.dm_id);
@@ -240,10 +355,13 @@ function initiativeWriter(request) {
     const addressed = (state.offers || []).filter(offer => offer.effect.kind === "damage"
       || hasSheet && ["healing", "temporary_hp", "grant", "buff"].includes(offer.effect.kind));
     if (!hasSheet) offers.parentElement.hidden = !addressed.length;
-    const nextOffers = JSON.stringify([state.room_id, state.ended, members, addressed]);
+    const open = offer => ["pending", "claimed"].includes(offer.status) || offer.reversal_requested;
+    const earlier = addressed.filter(offer => !open(offer)).reverse();
+    const listed = [...addressed.filter(open), ...(showEarlier ? earlier : earlier.slice(0, 3))];
+    const nextOffers = JSON.stringify([state.room_id, state.ended, members, addressed, showEarlier]);
     if (nextOffers !== offersKey) {
       offersKey = nextOffers;
-      offers.replaceChildren(...addressed.map(offer => {
+      offers.replaceChildren(...listed.map(offer => {
         const row = document.createElement("article");
         row.dataset.offerId = offer.offer_id;
         const incoming = offer.recipient === state.self_id;
@@ -298,19 +416,41 @@ function initiativeWriter(request) {
         } else if (!incoming && offer.status === "accepted" && !grant && !buff && !state.ended) {
           action("Request reversal", () => writeOffer(state.room_id, {kind: "request_reversal", offer_id: offer.offer_id}));
         }
+        if (!open(offer)) row.dataset.earlier = "true";
         return row;
       }));
+      if (earlier.length > 3) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "quiet-button party-offers-more";
+        toggle.textContent = showEarlier ? "Show only recent offers" : "Show all " + earlier.length + " earlier offers";
+        toggle.onclick = () => { showEarlier = !showEarlier; renderOffers(state); };
+        offers.append(toggle);
+      }
     }
+    if (hasSheet) renderRail(state, addressed, members);
     if (hasSheet && !busy) {
       const saved = addressed.find(offer => offer.recipient === state.self_id && offer.status === "claimed"
         && previewEncounter.received(offer.offer_id));
       // A buff from another player applies itself: there is nothing to choose (R79).
       const buff = !saved && !state.ended && addressed.find(offer => offer.recipient === state.self_id
         && offer.effect.kind === "buff" && offer.status === "pending");
+      const automatic = !saved && !buff && !state.ended && sheetSettings.get("autoAcceptOffers")
+        && encounterTracker.hp(previewEncounter.current())
+        && addressed.find(offer => offer.recipient === state.self_id && offer.status === "pending"
+          && HP_KINDS.includes(offer.effect.kind) && !autoFailed.has(offer.offer_id));
       if (buff) {
         setBusy(true);
         decide(state.room_id, buff, "apply").catch(error => { feedback.textContent = error.message; })
           .finally(() => { setBusy(false); });
+      } else if (automatic) {
+        setBusy(true);
+        const text = offerLine(automatic, members, state);
+        const outcome = preview(automatic);
+        decide(state.room_id, automatic, "apply")
+          .then(() => notice("Applied automatically · " + text + (outcome ? " · " + outcome : ""), previewEncounter.current()))
+          .catch(error => { autoFailed.add(automatic.offer_id); feedback.textContent = error.message; })
+          .finally(() => { setBusy(false); renderRail(view, view.offers || [], view.members || []); });
       } else if (saved) {
         setBusy(true);
         decide(state.room_id, saved, "retry").catch(error => { feedback.textContent = error.message; })

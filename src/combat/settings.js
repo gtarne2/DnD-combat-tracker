@@ -3,7 +3,7 @@
 // listen for "sheet-settings-change".
 const sheetSettings = (() => {
   const KEY = "aurora-sheet-settings-v1";
-  const DEFAULTS = {trackActions: true, trackActionsSolo: false, autoRollArea: false, concentrationReminder: true};
+  const DEFAULTS = {trackActions: true, trackActionsSolo: false, autoRollArea: false, concentrationReminder: true, autoAcceptOffers: false};
   let values = {...DEFAULTS};
   try { Object.assign(values, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
   const status = document.getElementById("sheet-settings-status");

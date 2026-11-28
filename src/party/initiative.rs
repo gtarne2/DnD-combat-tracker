@@ -1259,13 +1259,14 @@ impl Fight {
     }
 
     /// Record the DM's decision on a queued area and lower each enemy's HP. Returns the players
-    /// to send damage offers to, as (member, amount), and the spell name for the offer source.
+    /// to send damage offers to, as (member, amount, offer source). The source names the spell,
+    /// its damage type and the player's save, such as "Fireball (area, fire, saved)".
     pub(super) fn apply_area(
         &mut self,
         cmd: &FightEdit,
         id: Uuid,
         results: &[AreaResult],
-    ) -> Result<(String, Vec<(Uuid, u32)>), Rejection> {
+    ) -> Result<Vec<(Uuid, u32, String)>, Rejection> {
         self.check_revision(cmd)?;
         let area = self
             .areas
@@ -1289,10 +1290,22 @@ impl Fight {
         }
         // The offer's source on the player's sheet: an area from the map, or a spell aimed
         // from the sheet.
-        let spell = if area.request.template.is_nil() {
-            format!("{} (spell)", area.spell)
+        let how = if area.request.template.is_nil() {
+            "spell"
         } else {
-            format!("{} (area)", area.spell)
+            "area"
+        };
+        let damage_type = area.damage_type.clone();
+        let spell_name = area.spell.clone();
+        let source = |save: Option<&str>| {
+            let mut parts = vec![how.to_string()];
+            parts.extend(damage_type.clone());
+            match save {
+                Some("succeeded") => parts.push("saved".into()),
+                Some("failed") => parts.push("failed save".into()),
+                _ => {}
+            }
+            format!("{} ({})", spell_name, parts.join(", "))
         };
         let mut offers = Vec::new();
         let caster = player_row(&self.position.rows, area.member)
@@ -1316,7 +1329,7 @@ impl Fight {
                     }
                 }
                 Participant::Player { member, .. } if result.amount > 0 => {
-                    offers.push((*member, result.amount));
+                    offers.push((*member, result.amount, source(result.save.as_deref())));
                     lost = result.amount;
                 }
                 // Companions and zero damage are settled at the table.
@@ -1371,7 +1384,7 @@ impl Fight {
             });
         }
         self.revised();
-        Ok((spell, offers))
+        Ok(offers)
     }
 
     /// Log damage the DM sent a player for a recorded monster strike.

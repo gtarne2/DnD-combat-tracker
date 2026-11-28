@@ -1043,3 +1043,13 @@ body.party-encounter-active #combat-turn-order { max-height: 220px; }
 .party-recap h3 { margin: 0 0 4px; font-size: .95em; }
 .party-recap p { margin: 2px 0; font-size: .9em; }
 .party-recap p:first-child { font-weight: 600; }
+/* Party offers on the encounter rail: incoming HP changes with a preview, and short notices. */
+.party-offer-rail { display: grid; gap: 6px; margin: 6px 0; }
+.party-offer-rail[hidden] { display: none; }
+.party-offer-card { background: #1d2433; box-shadow: 0 0 0 1px #efc57655; }
+.party-offer-card > p { font-size: .9em; opacity: .9; }
+.party-offer-notice { margin: 0; font-size: .85em; color: var(--muted, #aab2c0); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.party-offer-notice button { padding: 1px 8px; min-height: 0; }
+.party-card[data-earlier] { opacity: .7; }
+.party-offers-more { justify-self: start; }
+.party-offer-accept { font-weight: 700; color: #22170a; background: linear-gradient(180deg, #f4d08d, #d9a650); border-color: #f6d79d; }
