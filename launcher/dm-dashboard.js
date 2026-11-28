@@ -103,12 +103,31 @@ const renderDmParty = (() => {
     empty.hidden = Boolean(members.length);
     hint.hidden = Boolean(members.length || !state || state.ended);
     empty.textContent = !state ? "Waiting for the party helper." : state.ended ? "Room closed." : "Waiting for players to join.";
+    const rowFor = member => lastState?.combat?.rows?.find(row => row.damage_recipient === member.member_id);
+    function showInTurnPanel(member) {
+      const row = rowFor(member);
+      const order = document.getElementById("dm-order");
+      if (!row || !order || ![...order.options].some(option => option.value === row.id)) return false;
+      order.value = row.id;
+      order.dispatchEvent(new Event("change"));
+      document.getElementById("dm-enemy-detail")?.scrollIntoView({block: "nearest", behavior: "smooth"});
+      return true;
+    }
     rows.replaceChildren(...members.map(member => {
       const card = node("article", null, "dm-member");
       card.dataset.member = member.member_id;
       card.dataset.presence = member.online ? "online" : "offline";
       const head = node("header", null, "dm-member-head");
       const name = node("h3", member.name, "dm-member-name");
+      // Clicking the name shows the player in the middle panel when they're in the turn order.
+      name.classList.add("dm-member-link");
+      name.title = "Show " + member.name + " in the turn panel";
+      name.onclick = () => {
+        if (showInTurnPanel(member) || !member.inspection) return;
+        inspector = member.member_id;
+        renderInspector(member);
+        dialog.showModal();
+      };
       if (members.some(other => other.member_id !== member.member_id && other.name === member.name)) {
         name.append(node("small", member.member_id.slice(0, 8)));
       }
@@ -154,7 +173,10 @@ const renderDmParty = (() => {
         button.dataset.inspectMember = member.member_id;
         button.setAttribute("aria-label", "Inspect " + name.textContent);
         button.append(icon("magnifying-glass"), node("span", "Inspect"));
+        // A player in the turn order opens in the middle panel, like any other row; one who
+        // isn't seated yet opens in the pop-up.
         button.onclick = () => {
+          if (showInTurnPanel(member)) return;
           inspector = member.member_id;
           renderInspector(member);
           dialog.showModal();

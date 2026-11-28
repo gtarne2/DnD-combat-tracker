@@ -559,3 +559,5 @@ button.dm-pill:hover:not(:disabled) { filter: brightness(1.25); }
 .dm-difficulty-more input[type="number"] { width: 4em; }
 .dm-recap-head { margin: 6px 0 2px; font-weight: 600; }
 .dm-recap-line { margin: 2px 0; font-size: 13px; }
+.dm-member-link { cursor: pointer; }
+.dm-member-link:hover { text-decoration: underline; }
