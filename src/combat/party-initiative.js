@@ -406,7 +406,8 @@ const partyInitiative = (() => {
     return result;
   }
   // Owlbear spell templates. The room keeps them; the DM's Owlbear extension draws them.
-  const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"around me"};
+  const SHAPES = {sphere:"sphere", cylinder:"cylinder", cone:"cone", cube:"cube", line:"line", emanation:"aura around you"};
+  const LASTS = {turn:"This turn", concentration:"While you concentrate", removed:"Until you remove it"};
   async function templateEdit(edit) {
     if (!sendEdit || !board()?.joined) throw new Error("Join the party encounter to place templates.");
     for (let attempt = 1; ; attempt++) {
@@ -518,14 +519,23 @@ const partyInitiative = (() => {
         try { await templateEdit({kind:"clear_template", id:template.id}); }
         catch (error) { remove.disabled = false; remove.title = error.message; }
       };
-      title.append(name, " · " + template.size + " ft " + SHAPES[template.shape] + " ", remove);
+      // The name on its own line with the remove button beside it, and the shape and duration
+      // underneath, so a long name never splits the size across lines.
+      title.className = "party-template-head";
+      const heading = document.createElement("span");
+      const meta = document.createElement("small");
+      meta.textContent = template.size + "-ft " + (SHAPES[template.shape] || template.shape) + (LASTS[template.lasts] ? " · " + LASTS[template.lasts] : "");
+      heading.append(name, meta);
+      title.append(heading, remove);
       card.append(title);
+      if (template.damage) card.append(ruleLine(template));
       const pick = pickFor(template);
       const suggested = new Set(template.inside || []);
       const note = document.createElement("p");
       note.className = "party-template-note";
-      note.textContent = template.inside === undefined ? "Waiting for the DM's map to say who is inside."
-        : suggested.size ? "Inside on the map:" : "Nobody is inside on the map.";
+      note.className = "party-template-label";
+      note.textContent = template.inside === undefined ? "Targets · waiting for the map"
+        : suggested.size ? "Targets · inside on the map" : "Targets · nobody inside on the map";
       card.append(note);
       const list = document.createElement("div");
       list.className = "party-template-targets";
@@ -546,7 +556,7 @@ const partyInitiative = (() => {
       if (others.length) {
         const more = document.createElement("details");
         const summary = document.createElement("summary");
-        summary.textContent = "Add someone else";
+        summary.textContent = "Add a target";
         more.append(summary, ...others.map(box));
         list.append(more);
       }
@@ -577,6 +587,15 @@ const partyInitiative = (() => {
       return card;
     }));
   }
+  // "3d8 radiant · WIS save DC 15, half" under the template's name.
+  function ruleLine(template) {
+    const rule = document.createElement("p");
+    rule.className = "party-template-rule";
+    const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
+      + (template.save.on_success === "half" ? ", half" : ", none") + " on a success" : "";
+    rule.textContent = template.damage + " " + (template.damage_type || "") + save;
+    return rule;
+  }
   // The damage line, the send button and the outcome of the latest application.
   function areaControls(template, pick, chosen, rows) {
     const nodes = [];
@@ -594,8 +613,6 @@ const partyInitiative = (() => {
     }
     const line = document.createElement("p");
     line.className = "party-template-damage";
-    const save = template.save ? " · " + ABILITY[template.save.ability] + " save DC " + template.save.dc
-      + (template.save.on_success === "half" ? ", half on a success" : ", none on a success") : "";
     const amount = Object.assign(document.createElement("input"), {type:"number", min:0, max:100000, value:pick.rolled ?? "", placeholder:"Total"});
     amount.setAttribute("aria-label", template.spell + " damage");
     amount.oninput = () => {
@@ -605,19 +622,15 @@ const partyInitiative = (() => {
     const reroll = Object.assign(document.createElement("button"), {type:"button", className:"quiet-button",
       textContent: pick.rolled == null ? "Roll" : "Reroll", title:"Roll " + template.damage});
     reroll.onclick = () => { pick.rolled = rollDice(template.damage); renderTemplates(); };
-    // The rule on its own line, then the total and the roll button.
-    const rule = document.createElement("p");
-    rule.className = "party-template-note";
-    rule.textContent = template.damage + " " + (template.damage_type || "") + save;
-    line.append("Damage ", amount, " ", reroll);
-    nodes.push(rule, line);
+    line.append(amount, reroll);
     const names = new Map(rows.map(row => [row.id, rowName(row)]));
     if (latest) {
       const outcome = document.createElement("p");
-      outcome.className = "party-template-note";
+      outcome.className = "party-template-status";
+      outcome.dataset.state = latest.results ? "applied" : "waiting";
       outcome.textContent = latest.results
-        ? "Applied by the DM: " + (latest.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
-        : "Sent " + latest.amount + " damage to the DM. Waiting for saves.";
+        ? "DM applied: " + (latest.results.map(r => (names.get(r.row) || "a hidden creature") + " " + r.amount).join(", ") || "no damage")
+        : "Sent " + latest.amount + ". Waiting for the DM.";
       nodes.push(outcome);
     }
     // Instant spells are sent once. Zone spells can be sent again on later turns.
@@ -625,7 +638,8 @@ const partyInitiative = (() => {
     const pending = latest && !latest.results;
     const blocked = () => !chosen.length || pending || (latest && !repeat) || !Number.isInteger(pick.rolled);
     send = Object.assign(document.createElement("button"), {type:"button",
-      textContent: latest && repeat ? "Send again to the DM" : "Confirm and send to the DM", disabled: blocked()});
+      className:"party-template-send", textContent: latest && repeat ? "Send again" : "Send to DM", disabled: blocked()});
+    send.title = "Send the damage and targets to the DM, who rolls saves and applies it";
     send.onclick = async () => {
       send.disabled = true;
       try {
@@ -634,9 +648,8 @@ const partyInitiative = (() => {
         pick.sentRoll = pick.rolled;
       } catch (error) { send.disabled = false; send.title = error.message; }
     };
-    const actions = document.createElement("p");
-    actions.append(send);
-    nodes.push(actions);
+    line.append(send);
+    nodes.push(line);
     return nodes;
   }
   const templates = {
