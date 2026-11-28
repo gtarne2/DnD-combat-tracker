@@ -2,7 +2,7 @@
 
 A personal Windows app that uses an Aurora character and its content to show combat options and track the encounter.
 
-R31–R54 cover multiplayer. For implementation entry points and regression checks, see the [multiplayer UI handoff](multiplayer-ui.md).
+R31–R54 cover multiplayer. R55–R80 cover table feedback, the Owlbear Rodeo link, the mechanics overlay and the playtest rounds. For implementation entry points and regression checks, see the [multiplayer UI handoff](multiplayer-ui.md).
 
 | ID | Requirement |
 | --- | --- |

@@ -2,6 +2,8 @@
 
 These instructions are shared by Codex and Claude Code. Start in the repository root. Check `git status --short --branch` and preserve existing work, including untracked files.
 
+The current line is `dev`. GitHub's default branch (`codex/dev-character-sheet`) is stale, so branch from `dev` and open pull requests into `dev`. The user (Grant) has no Rust toolchain on the Windows PC, so changes to try at the table need a Windows zip built in the cloud ([how](docs/development.md#windows-builds-from-the-cloud)). The backlog and dislikes are in the [handoff](docs/handoff.md#grants-backlog-and-preferences).
+
 ## Load context for the task
 
 Read the relevant behavior in [requirements.md](docs/requirements.md) and the owning section of the [architecture map](docs/architecture.md#shipped-component-map). Follow the map to the entry point and its tests. Use `rg` to find the relevant headings, requirement IDs, and symbols before opening full files.
@@ -12,6 +14,7 @@ Read the relevant behavior in [requirements.md](docs/requirements.md) and the ow
 | Implementing a multiplayer phase | [Common decisions](docs/local-multiplayer-plan.md#architecture-decisions-for-all-phases), the assigned phase, and the prerequisite handoff it depends on |
 | Reworking the multiplayer UI | [UI entry points, state boundaries and regression checklist](docs/multiplayer-ui.md) |
 | Building or validating a change | [Development commands and check matrix](docs/development.md) |
+| Owlbear extension, mechanics overlay or template art | [Owlbear link](docs/architecture.md#owlbear-rodeo-link) and [mechanics overlay](docs/architecture.md#mechanics-overlay) |
 | Changing bundled SRD data | [2014 source audit](docs/srd51-pack.md) or [2024 source audit](docs/srd521-pack.md) |
 
 Use the historical handoffs and research for specific questions. Keep large documents as links so each session can choose what to read.
